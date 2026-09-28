@@ -1,0 +1,81 @@
+# ==== OS / Editor ====
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# ==== Secrets / local config ====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.claude/settings.local.json
+
+# ==== Python ====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# ==== Training outputs / experiment tracking ====
+checkpoints/
+outputs/
+runs/
+logs/
+wandb/
+mlruns/
+lightning_logs/
+.hydra/
+
+# ==== Model weights / exported artifacts ====
+# 公開用 artifact は Hugging Face で管理し、Git には含めない
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.onnx
+*.gguf
+*.tflite
+artifacts/
+
+# ==== Datasets ====
+# manifest と小規模な自作 dataset のみ commit する
+datasets/raw/
+datasets/cache/
+datasets/downloads/
+*.arrow
+.cache/
+
+# ==== Tokenizer training outputs ====
+tokenizer/out/
+
+# ==== ESP-IDF / Firmware ====
+# build/ は Python セクションで除外済み
+managed_components/
+sdkconfig.old
+*.elf
+*.map
+
+# ==== Host runtime (C/C++) ====
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+*.o
+*.obj
+*.a
+*.exe

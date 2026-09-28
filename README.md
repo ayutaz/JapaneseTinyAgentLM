@@ -30,4 +30,4 @@ ESP32-S3 / M5Stack CoreS3 上で動作する、日本語向けの超小型 Langu
 
 ## 想定ライセンスと公開状態
 
-ライセンス、学習データ、モデルカード、第三者コードの採用可否はまだ決定していません。GitHub/Hugging Face への公開は、データ provenance、ライセンス、再現性、実機評価、安全性の gate を通過した artifact だけを対象にします。`ayutaz/Ralomi` は別プロジェクトかつ非公開・実験段階として扱い、本リポジトリの公開と連動させません。
+本リポジトリのソースコードと文書は [Apache License 2.0](LICENSE) で提供します（Copyright 2026 ayutaz）。学習データ、モデル重み、モデルカード、第三者コードの採用可否とそれぞれのライセンスはまだ決定していません。GitHub/Hugging Face への公開は、データ provenance、ライセンス、再現性、実機評価、安全性の gate を通過した artifact だけを対象にします。`ayutaz/Ralomi` は別プロジェクトかつ非公開・実験段階として扱い、本リポジトリの公開と連動させません。
