@@ -373,7 +373,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |
 | M3 合成データセット | **完了**（2026-09-29）。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
 | M4 Tokenizer と 3M / 5M / 20M の学習 | **完了**（2026-09-29）。下の「M4 の結果」 |
-| Track B（B1、B3、B2.5、B2 の準備） | 実行中（2026-09-29 開始）。結果は [`hardware.md`](hardware.md) |
+| Track B | B1、B3（計測）、B2.5 は **完了**、B2 は build まで完了（2026-09-29）。残りは servo の確認（ユーザーの立ち会いが必要）。結果は [`hardware.md`](hardware.md) §7–§10 |
 | M5 以降 | 未着手。次は「M4 の後の計画」 |
 | vast.ai の費用（累計） | 約 $1.27（M2.5〜M3 が約 $1.03、M4 が約 $0.24） |
 
@@ -482,10 +482,10 @@ M3 の評価セットを学習データとは別のモデルと別の prompt で
 | # | マイルストーン | 内容 |
 |---|---|---|
 | B0 | 実機の初回調査 | **完了**（2026-09-29）。対象機の特定、SoC / Flash / PSRAM、Flash 全体のバックアップ（[`hardware.md`](hardware.md)） |
-| B1 | ESP-IDF の build 環境 | ESP-IDF **v5.5.5** の公式 Docker image（`espressif/idf:v5.5.5`）で build する。ローカルへの導入は不要。書き込みは Windows から `esptool` で行う |
-| B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する |
-| B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う |
-| B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate） |
+| B1 | ESP-IDF の build 環境 | ESP-IDF **v5.5.5** の公式 Docker image（`espressif/idf:v5.5.5`）で build する。ローカルへの導入は不要。書き込みは Windows から `esptool` で行う。**完了**（2026-09-29） |
+| B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する。**build まで完了**。起動直後から首が動くので、書き込みと確認はユーザーの立ち会いのもとで行う（手順は [`hardware.md`](hardware.md) §10、5〜10分） |
+| B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う。**完了**（2026-09-29）: stories3M INT8 は forward だけで 6.5〜7.1 tok/s（上流の約半分。CoreS3 は Quad PSRAM のため） |
+| B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate）。**計測の部分は完了**（2026-09-29、`firmware/jtalm_eval/`）: 起動直後の内部 SRAM 空き 335,663 B、PSRAM 空き 8.39MB、14MB の `model` partition を1回で mmap、読み出しは PSRAM 32.8 MB/s、Flash の mmap 31.2 MB/s。servo と画面を載せた状態の計測は B4 で行う |
 | B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、5M INT4 の tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす |
 
 B2 以降は、実機の firmware を書き込む前に必ずバックアップを取ります（[`development.md`](development.md) §5）。
@@ -498,7 +498,7 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 - **精度が足りない場合:** 20M の上限参照と比べて原因を切り分ける。
   - 20M が大きく上回る場合は、capacity が足りないと判断し、10M Action を試す。
   - 20M も低い場合は、data か tokenizer の問題と判断し、そちらを見直す。
-- **速度:** B2.5 で測った stories3M INT8 の実機速度を基準にし、5M / 10M を実機に載せたときの latency を見積もって、規模の判断に使う。
+- **速度:** B2.5 で測った stories3M INT8 の実機速度（forward だけで約 7 tok/s）を基準にし、5M / 10M を実機に載せたときの latency を見積もって、規模の判断に使う。重みを毎 token 読む前提では、速度の上限は約 32 MB/s ÷ 重みの byte 数（B3）なので、INT4 化、入力のまとめ処理（batch prefill）、KV cache の小型化が効く。
 
 ## 13. 工数の見積もり（Claude Code が実行する前提）
 
@@ -537,6 +537,7 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 | M2.5 | 未記録 | RTX 3090 で 0.208 h（ほかに失敗 1回、0.105 h）。計 約 $0.055 | SSH の失敗（vLLM の image の権限）の修正が加わった |
 | M3 | 未記録 | A100 80GB で 3回、計 約 1.04 h。$0.50 + $0.31 + $0.17 = 約 $0.98 | 見積もりの前提外だった反復（v0.1 の失敗、否定の追加生成）を含む |
 | M4 | 約 1.3 h（05:33〜06:53 UTC。実装と CPU の smoke test が約 10 分、GPU の job の待ちが約 65 分、分析と記録が約 5 分） | Tesla V100 32GB で 1.085 h、約 $0.24（5モデルの学習と評価） | 見積もり（4〜6 h、GPU で数時間）より大幅に短かった |
+| Track B（B1、B3、B2.5、B2 の build） | 約 1 h（06:27〜07:26 UTC、担当 agent が M4 と並行して実行） | — | 見積もり（B1〜B3 と B2.5 で 5.5〜11 h）より大幅に短かった |
 | 合計 | — | 約 $1.27 | GPU の時間は、見積もり（数時間）より短かった |
 
 M1〜M3 の Claude Code の作業時間は計測していないため、「未記録」としています。M4 からは、主な手順の開始と終了の時刻を記録しています。

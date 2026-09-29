@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 JapaneseTinyAgentLM contributors
+#
+# Overlay on top of esp32-llm's sdkconfig.defaults for M5Stack CoreS3 (K151).
+# Upstream targets the Waveshare ESP32-S3-LCD-1.9 (octal PSRAM).
+CONFIG_IDF_TARGET="esp32s3"
+# CoreS3 has 8MB quad PSRAM
+# CONFIG_SPIRAM_MODE_OCT is not set
+CONFIG_SPIRAM_MODE_QUAD=y
+# 16MB quad flash
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y

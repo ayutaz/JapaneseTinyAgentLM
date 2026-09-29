@@ -1,0 +1,13 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 JapaneseTinyAgentLM contributors
+#
+# Stand-in for Node.js inside the ESP-IDF container. The two build-time Node
+# steps (avatar DSL -> bytecode, settings page injection) were run on the
+# Windows host with Node v24; this copies their outputs to where CMake expects.
+here="$(dirname "$0")"
+case "$(basename "$1")" in
+  cli.mjs)    cp "$here/default_face.avbc" "$3" ;;
+  inject.mjs) cp "$here/settings_wifi.html" "$3" ;;
+  *) echo "node shim: unsupported $*" >&2; exit 1 ;;
+esac

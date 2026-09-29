@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 JapaneseTinyAgentLM contributors
+#
+# Select the float32 engine (llm.c, stories260K). Needs espressif/esp-dsp.
+CONFIG_LLM_INFERENCE_FLOAT32=y

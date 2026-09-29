@@ -77,7 +77,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | M2.5 vast.ai の実行基盤（GPU での torch と vLLM の動作確認、自動削除、費用の記録） | 完了 |
 | M3 合成データセット（学習 9,544 件、評価 1,189 件、ルールベースの baseline 76.4%） | 完了。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
 | M4 Tokenizer（SentencePiece 2k）と 3M / 5M / 20M の学習 | 完了。評価セットの完全一致は 3M が 84.4%、20M が 83.9%（ルールベースは 76.4%）。single、correction、英語はまだ届かない |
-| Track B（ESP-IDF の環境、評価用 firmware、既存 runtime の実機速度、servo の確認の準備） | 実行中 |
+| Track B（ESP-IDF の環境、評価用 firmware、既存 runtime の実機速度、servo の確認の準備） | 完了（servo の確認だけ、ユーザーの立ち会いが必要）。3M 級 INT8 の実機速度は約 7 tok/s |
 
 次の作業は、次の順序で進めます。各マイルストーンの目的と完了条件は [`docs/roadmap.md`](docs/roadmap.md) §12 にあります。
 

@@ -87,3 +87,7 @@ backups/
 
 # ==== Generated Action datasets (published on Hugging Face, not in Git) ====
 datasets/action/
+
+# ==== Firmware: third-party clones and generated sdkconfig (sdkconfig.defaults is the source) ====
+firmware/third_party/
+firmware/*/sdkconfig
