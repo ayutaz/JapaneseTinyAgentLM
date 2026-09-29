@@ -17,6 +17,14 @@ from jtalm.infra.env import read_secret, redact
 
 SSH_KEY = Path.home() / ".ssh" / "id_ed25519_vast"
 
+# Some images (e.g. vllm/vllm-openai) ship a group/world-writable /root, so sshd's StrictModes
+# refuses /root/.ssh/authorized_keys ("bad ownership or modes"). Fix the modes at container start.
+ONSTART_FIX_SSH = (
+    "chown root:root /root; chmod 755 /root; "
+    "mkdir -p /root/.ssh; chown -R root:root /root/.ssh; chmod 700 /root/.ssh; "
+    "chmod 600 /root/.ssh/authorized_keys 2>/dev/null; true"
+)
+
 
 class VastError(RuntimeError):
     pass
@@ -37,7 +45,7 @@ class VastClient:
             raise VastError("vastai CLI not found; run via `uv run`")
         self.exe = exe
 
-    def _run(self, *args: str, timeout: int = 180) -> Any:
+    def _run(self, *args: str, timeout: int = 180, parse: bool = True) -> Any:
         # The key goes through the environment (not argv) so it never shows in process lists.
         proc = subprocess.run(
             [self.exe, *args, "--raw"],
@@ -49,6 +57,8 @@ class VastClient:
         out = redact(proc.stdout + proc.stderr, self.api_key)
         if proc.returncode != 0:
             raise VastError(f"vastai {' '.join(args[:2])} failed: {out[:500]}")
+        if not parse:
+            return out
         try:
             return json.loads(proc.stdout)
         except json.JSONDecodeError as e:
@@ -57,12 +67,15 @@ class VastClient:
     def search_offers(self, query: str, order: str = "dph+") -> list[dict[str, Any]]:
         return self._run("search", "offers", query, "-o", order)
 
-    def create_instance(self, offer_id: int, image: str, disk_gb: int, label: str) -> int:
+    def create_instance(
+        self, offer_id: int, image: str, disk_gb: int, label: str, onstart: str = ""
+    ) -> int:
         result = self._run(
             "create", "instance", str(offer_id),
             "--image", image,
             "--disk", str(disk_gb),
             "--label", label,
+            "--onstart-cmd", onstart or ONSTART_FIX_SSH,
             "--ssh", "--direct", "--cancel-unavail",
         )  # fmt: skip
         instance_id = result.get("new_contract")
@@ -77,7 +90,10 @@ class VastClient:
         return [int(i["id"]) for i in self._run("show", "instances")]
 
     def destroy_instance(self, instance_id: int) -> None:
-        self._run("destroy", "instance", str(instance_id), "-y")
+        """Destroy an instance; an instance that is already gone counts as destroyed."""
+        out = self._run("destroy", "instance", str(instance_id), "-y", parse=False)
+        if '"error": true' in out and "not found" not in out.lower():
+            raise VastError(f"destroy {instance_id} failed: {out[:300]}")
 
     def wait_running(self, instance_id: int, timeout_s: int = 1200) -> tuple[SshTarget, dict]:
         deadline = time.monotonic() + timeout_s
@@ -127,7 +143,7 @@ class Ssh:
             proc = subprocess.run(argv, stdout=f, stderr=subprocess.STDOUT, timeout=timeout_s)
         return proc.returncode
 
-    def wait_ssh(self, attempts: int = 20) -> None:
+    def wait_ssh(self, attempts: int = 12) -> None:
         for _ in range(attempts):
             if self.run("echo ok", timeout_s=60) == 0:
                 return

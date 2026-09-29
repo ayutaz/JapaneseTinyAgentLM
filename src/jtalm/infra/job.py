@@ -103,19 +103,42 @@ def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
             record["status"] = "succeeded"
         except BaseException as e:
             record["status"] = f"failed: {e}"
+            _save_debug(client, instance_id, out_dir)
             raise
         finally:
-            client.destroy_instance(instance_id)
+            record["destroyed"] = _destroy(client, instance_id)
             hours = (time.monotonic() - created) / 3600
             record["hours"] = round(hours, 3)
             record["cost_usd_estimate"] = round(hours * offer["dph_total"], 3)
-            record["destroyed"] = instance_id not in client.list_instance_ids()
             (out_dir / "run.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
             print(
                 f"destroyed={record['destroyed']} hours={record['hours']} "
                 f"cost~${record['cost_usd_estimate']} -> {out_dir}"
             )
     return record
+
+
+def _destroy(client: VastClient, instance_id: int) -> bool:
+    """Destroy with retries and confirm it is gone. Never raises, so run.json is always written."""
+    for attempt in range(5):
+        try:
+            client.destroy_instance(instance_id)
+            if instance_id not in client.list_instance_ids():
+                return True
+        except Exception as e:  # keep trying; report below
+            print(f"destroy attempt {attempt + 1} failed: {e}")
+        time.sleep(10)
+    print(f"WARNING: instance {instance_id} may still be running; destroy it manually")
+    return False
+
+
+def _save_debug(client: VastClient, instance_id: int, out_dir: Path) -> None:
+    """Best effort: keep the container log for diagnosing failures."""
+    try:
+        logs = client._run("logs", str(instance_id), "--tail", "200", parse=False)
+        (out_dir / "container.log").write_text(logs, encoding="utf-8")
+    except Exception as e:
+        print(f"could not fetch container logs: {e}")
 
 
 def main(argv: list[str] | None = None) -> int:
