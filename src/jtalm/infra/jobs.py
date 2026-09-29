@@ -53,7 +53,7 @@ EVAL_MODEL = "llm-jp/llm-jp-3.1-13b-instruct4"  # Apache-2.0, bf16 ~27GB
 def generate(phase: str, config: str = "configs/action_v0.json", out: str = "") -> str:
     return (
         f"{UV} run --no-dev python -m jtalm.data.generate --phase {phase} "
-        f"--config {config} --workers 64" + (f" --out {out}" if out else "")
+        f"--config {config} --workers 256" + (f" --out {out}" if out else "")
     )
 
 
@@ -107,18 +107,30 @@ TRAIN_RUNS = [
 
 
 def train_action_steps(
-    runs: list[tuple[str, str, str]], tag: str, data: str = ACTION_DATA
+    runs: list[tuple[str, str, str]], tag: str, data: str = ACTION_DATA, parallel: bool = False
 ) -> list[str]:
-    """Train each run, then evaluate all of them on the v0 evaluation set (never changes)."""
+    """Train each run, then evaluate all of them on the v0 evaluation set (never changes).
+
+    With ``parallel`` all runs start at once on the same GPU. A 3M-20M model at batch 64 uses
+    under 1GB of VRAM and leaves the GPU mostly idle, so this cuts wall-clock time several-fold
+    without changing any hyperparameter (results stay comparable with sequential runs).
+    """
     ckpts = " ".join(f"artifacts/{tag}/{name}/best.pt" for name, _, _ in runs)
+    cmds = [
+        f"{TRAIN} --data {data} --size {size} {extra} --out artifacts/{tag}/{name} "
+        f"> artifacts/{tag}-{name}.log 2>&1"
+        for name, size, extra in runs
+    ]
+    if parallel:
+        launch = " ".join(f"({c}) & pids+=($!);" for c in cmds)
+        cmds = [
+            f"pids=(); {launch} fail=0; for p in ${{pids[@]}}; do wait $p || fail=1; done; "
+            "exit $fail"
+        ]
     return [
         "nvidia-smi > artifacts/nvidia_smi.txt",
         f"{UV} sync --locked --no-dev --group train",
-        *(
-            f"{TRAIN} --data {data} --size {size} {extra} --out artifacts/{tag}/{name} "
-            f"> artifacts/{tag}-{name}.log 2>&1"
-            for name, size, extra in runs
-        ),
+        *cmds,
         f"{UV} run --no-dev --group train python -m jtalm.model.evaluate --ckpt {ckpts} "
         f"--tokenizer {TOKENIZER} --cases {ACTION_DATA}/eval.jsonl --out artifacts/{tag}/eval",
     ]
@@ -250,7 +262,7 @@ TRAIN_ACTION_V03 = JobSpec(
     image=VLLM_IMAGE,
     disk_gb=80,
     max_hours=3.0,
-    steps=train_action_steps(V03_RUNS, "v03", ACTION_DATA_V03),
+    steps=train_action_steps(V03_RUNS, "v03", ACTION_DATA_V03, parallel=True),
     uploads=[
         f"{ACTION_DATA_V03}/train.jsonl",
         f"{ACTION_DATA_V03}/val.jsonl",
