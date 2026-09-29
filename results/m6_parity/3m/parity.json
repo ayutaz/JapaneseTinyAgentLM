@@ -1,0 +1,135 @@
+{
+  "ckpt": "runs\\vast\\train_action_v0-20260929T054319Z\\artifacts\\m4\\3m\\best.pt",
+  "cases": "C:\\Users\\yuta\\Desktop\\Private\\JapaneseTinyAgentLM\\datasets\\action\\v0\\eval.jsonl",
+  "tokenization": {
+    "train.jsonl": {
+      "n": 9067,
+      "match": 9067,
+      "mismatches": []
+    },
+    "val.jsonl": {
+      "n": 477,
+      "match": 477,
+      "mismatches": []
+    },
+    "eval.jsonl": {
+      "n": 1189,
+      "match": 1189,
+      "mismatches": []
+    },
+    "fuzz": {
+      "n": 20000,
+      "match": 20000,
+      "mismatches": []
+    },
+    "decode_fuzz": {
+      "n": 20000,
+      "match": 20000,
+      "mismatches": []
+    }
+  },
+  "generation": {
+    "fp32": {
+      "file": "3m_fp32.jtlm",
+      "bytes": 12883200,
+      "first_logits": {
+        "n": 1189,
+        "max_abs_diff": 2.002716064453125e-05,
+        "max_abs_logit": 18.8909969329834
+      },
+      "plain": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.8435660218671153,
+        "exact_c": 0.8435660218671153,
+        "min_prob_max_abs_diff": 7.86786682127616e-06,
+        "c_summary": "1189 prompts, 22536 forward tokens (6086 generated) in 22.992 s: 980.2 tok/s",
+        "python_seconds": 16.03,
+        "mismatches": []
+      },
+      "grammar": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.8444070647603028,
+        "exact_c": 0.8444070647603028,
+        "min_prob_max_abs_diff": 7.86786682127616e-06,
+        "c_summary": "1189 prompts, 22534 forward tokens (6084 generated) in 22.227 s: 1013.8 tok/s",
+        "python_seconds": 15.55,
+        "mismatches": []
+      }
+    },
+    "int8": {
+      "file": "3m_q8_g64.jtlm",
+      "bytes": 3544320,
+      "first_logits": {
+        "n": 1189,
+        "max_abs_diff": 1.1444091796875e-05,
+        "max_abs_logit": 18.88233184814453
+      },
+      "plain": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.8452481076534903,
+        "exact_c": 0.8452481076534903,
+        "min_prob_max_abs_diff": 7.2121168518402e-06,
+        "c_summary": "1189 prompts, 22534 forward tokens (6084 generated) in 59.967 s: 375.8 tok/s",
+        "python_seconds": 14.21,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.8452481076534903,
+        "fake_quant_output_match": 1189
+      },
+      "grammar": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.8460891505466779,
+        "exact_c": 0.8460891505466779,
+        "min_prob_max_abs_diff": 7.2121168518402e-06,
+        "c_summary": "1189 prompts, 22532 forward tokens (6082 generated) in 62.535 s: 360.3 tok/s",
+        "python_seconds": 16.84,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.8460891505466779,
+        "fake_quant_output_match": 1189
+      }
+    },
+    "int4": {
+      "file": "3m_q4_g64.jtlm",
+      "bytes": 1971456,
+      "first_logits": {
+        "n": 1189,
+        "max_abs_diff": 1.430511474609375e-05,
+        "max_abs_logit": 19.007305145263672
+      },
+      "plain": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.847771236333053,
+        "exact_c": 0.847771236333053,
+        "min_prob_max_abs_diff": 4.410911804253459e-06,
+        "c_summary": "1189 prompts, 22484 forward tokens (6034 generated) in 58.831 s: 382.2 tok/s",
+        "python_seconds": 16.1,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.847771236333053,
+        "fake_quant_output_match": 1189
+      },
+      "grammar": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.847771236333053,
+        "exact_c": 0.847771236333053,
+        "min_prob_max_abs_diff": 4.410911804253459e-06,
+        "c_summary": "1189 prompts, 22484 forward tokens (6034 generated) in 58.676 s: 383.2 tok/s",
+        "python_seconds": 15.12,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.847771236333053,
+        "fake_quant_output_match": 1189
+      }
+    }
+  },
+  "fp32_roundtrip_exact": true
+}

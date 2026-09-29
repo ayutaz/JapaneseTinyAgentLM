@@ -150,6 +150,8 @@ TinyLM-Bench の検証メモは 8k〜16k から始めることを提案してい
 
 Chat LM や Unified では、一般的な日本語の corpus で tokenizer を作り直すので、この tokenizer は Action LM v0 専用です。
 
+C の runtime（M6、`runtime/host/`）は、この tokenizer を SentencePiece と同じ結果になるように移植しています。`nmt_nfkc` の正規化表（precompiled charsmap、0.24MB）はそのまま `.jtlm` ファイルに入れ、C で直接引きます。書き出しは `jtalm.model.export`、一致の確認は `jtalm.model.parity` です。
+
 Tokenizer 評価では vocabulary 数だけでなく、次も測ります。
 
 - 文字あたり token 数、モーラあたり token 数

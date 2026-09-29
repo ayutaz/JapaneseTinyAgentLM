@@ -22,6 +22,7 @@ class Prediction:
     text: str
     min_prob: float
     tokens: int
+    ids: tuple[int, ...] = ()  # generated ids up to and including </s>
 
 
 @torch.no_grad()
@@ -71,7 +72,10 @@ def greedy(
                 gen = x[row, length:].tolist()
                 n = gen.index(codec.eos) + 1 if codec.eos in gen else len(gen)
                 results[i] = Prediction(
-                    text=codec.decode_target(gen), min_prob=float(min_prob[row]), tokens=n
+                    text=codec.decode_target(gen),
+                    min_prob=float(min_prob[row]),
+                    tokens=n,
+                    ids=tuple(gen[:n]),
                 )
     model.train(was_training)
     return [r for r in results if r is not None]

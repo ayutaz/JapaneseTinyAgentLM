@@ -376,7 +376,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | Track B | B1、B3（計測）、B2.5 は **完了**、B2 は build まで完了（2026-09-29）。残りは servo の確認（ユーザーの立ち会いが必要）。結果は [`hardware.md`](hardware.md) §7–§10 |
 | M5 grammar と量子化 | **完了**（2026-09-29）。grammar で致命的な誤りを 1/3 に、INT4 でも精度は落ちない。confidence gate は保留 |
 | データ v0.3 / v0.4 | v0.3 は完了（3M で 91〜92%）。v0.4 は生成中 |
-| M6 Host C runtime | 実装中（3M で出力が PyTorch と完全に一致） |
+| M6 Host C runtime | **完了**（2026-09-29）。3M / 5M の FP32 / INT8 / INT4 で、出力が PyTorch と完全に一致（[`runtime/host/README.md`](../runtime/host/README.md)） |
 | vast.ai の費用（累計） | 約 $3.40（`runs/vast/*/run.json` の合計。M2.5〜M3 が約 $1.03、M4 が約 $0.24、M4 の後の量の確認・v0.3・v0.4 の生成と学習が、失敗した起動を含めて約 $2.13。実行中の v0.4b は含まない。2026-09-29 09:10 UTC 時点） |
 
 ### M1〜M3 の目的と完了条件
@@ -476,7 +476,18 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 
 **4. 量子化**（M5 後半、`results/m5_quant_on_m4`）: 重みだけを INT8 / INT4（64個ずつの group、対称、fp16 の scale）にしても、精度は落ちない（3M: 84.4% → INT8 84.5%、INT4 84.8%。5M も ±0.4 point）。3M の INT4 は 1.68MB で、LM の予算（1.5〜5MB）に収まる。
 
-**5. Host C runtime**（M6）: 実装中。3M の FP32 / INT8 / INT4 のそれぞれで、grammar なし・ありのどちらでも、評価セットの 1,189件すべてで出力が PyTorch と一致した。tokenizer も、学習データ、validation、評価セットの全件と、無作為な 2万件で一致した。
+**5. Host C runtime**（M6、**完了**。`runtime/host/`、`results/m6_parity`）: portable な C11 で、外部への依存はない。
+
+| model | FP32（grammar なし / あり） | INT8 | INT4 |
+|---|---|---|---|
+| 3M | 84.36 / 84.44 | 84.52 / 84.61 | 84.78 / 84.78 |
+| 5M | 79.56 / 79.98 | 79.56 / 79.98 | 79.48 / 79.90 |
+
+- すべての構成で、評価セット 1,189件の token 列と出力が PyTorch と一致した（argmax の反転は 0 件）。C の完全一致率は Python と同じ。
+- Tokenizer（SentencePiece の unigram と `nmt_nfkc` の正規化を移植）は、学習データ 9,067、validation 477、評価セット 1,189 の全件と、無作為な 2万件で一致した。
+- ESP32 と同じ float の累積（`-DJTLM_ACC=float`）でも、3M の6つの構成すべてで一致した。
+- 配布形式は `.jtlm`（1ファイルに設定、tokenizer、RoPE の表、重みを入れる）。3M INT4 は 2.0MB、5M INT4 は 3.0MB（どちらも tokenizer の 0.27MB を含む）。作業領域は 3M で 477KB、5M で 416KB（大半は f32 の KV cache）で、token ごとの malloc はない。
+- PC（Docker、1 thread）での速度は、3M FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。ESP32 向けの kernel は B4 で作る。
 
 ### 次の計画（2026-09-29）
 
@@ -485,7 +496,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | 1 | データ v0.4: 書き手を 7 つにして約 5 万件に増やす（ABEJA-Qwen2.5-32B-Japanese、Mistral-Nemo-Japanese、granite-3.3-8b、ELYZA-Shortcut-32B、calm3、sarashina2.2、Qwen3） | 生成中（1回目は host の disk 不足で3つの書き手が失敗。成功した4つは回収して、`gen_action_v04b` で残りを生成中） |
 | 2 | v0.4 で 3M / 5M / 20M を再学習し、v0 / v0.3 / v0.4 の曲線から、**データ量とモデルサイズの候補**を決める | v0.4 の生成の後 |
 | 3 | 採用するモデルを INT8 / INT4 で確認する | 手順は完成済み |
-| 4 | M6 の完了（5M の parity、文書） → B4（実機への移植と速度の計測） → **モデルサイズの最終決定** | M6 は実装中 |
+| 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | M6 は完了。B4 は次 |
 | 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | 手順は [`hardware.md`](hardware.md) §10 |
 
 - 英語は学習データに入れていないので、完了条件の判定では参考値として扱う（完全一致の全体の値には含まれる）。
@@ -506,7 +517,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書き、同じモデルが温度 0 で検証する。v0.1 の llm-jp-3.1 による検証は機能しなかったため変更した。評価セットは llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証する）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する。**完了**（2026-09-29。§12「M4 の結果」） |
 | M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | §12 冒頭のリストの手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
-| M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |
+| M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる。**完了**（2026-09-29、`runtime/host/`） |
 
 M3 の評価セットを学習データとは別のモデルと別の prompt で作るのは、同じ生成元のデータで評価すると、生成のくせを暗記しているだけで高得点になるためです。評価セットは評価だけに使い、学習には使いません。
 
