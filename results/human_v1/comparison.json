@@ -1,0 +1,143 @@
+{
+  "conditions": {
+    "decoding": "greedy; modes: grammar, gate",
+    "gate_rule": "largest threshold within 0.005 of val exact (no gate)",
+    "prompt_format": "<s> <act> prompt <out>",
+    "eval_cases": "eval.jsonl",
+    "eval_sha256": "911f060a53efd98c18f4e9f38d4e58fbf7552d3a72c6edd16937b4769efaef50",
+    "tokenizer_sha256": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4",
+    "device": "cpu"
+  },
+  "models": {
+    "3m-q4_g64 (3.15M)": {
+      "ckpt": "runs\\vast\\train_action_v04-20260929T095441Z\\artifacts\\v04\\3m\\best_q4_g64.pt",
+      "epoch": 14,
+      "gate": {
+        "threshold": 0.97004,
+        "val_exact_no_gate": 0.9839807769323188,
+        "val_exact_gated": 0.9791750100120145
+      }
+    }
+  },
+  "eval": {
+    "rule baseline": {
+      "exact_rate": 0.9620362381363244,
+      "single": 0.4032258064516129,
+      "multi_action": null,
+      "negation": 1.0,
+      "no_action": 0.9935661764705882,
+      "correction": null,
+      "en": null,
+      "no_action_precision": 0.9671694764862466,
+      "no_action_recall": 0.9936189608021878,
+      "critical_error_rate": 0.0060396893874029335,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M) +grammar": {
+      "exact_rate": 0.9559965487489215,
+      "single": 0.9354838709677419,
+      "multi_action": null,
+      "negation": 1.0,
+      "no_action": 0.9568014705882353,
+      "correction": null,
+      "en": null,
+      "no_action_precision": 0.9990485252140818,
+      "no_action_recall": 0.9571558796718322,
+      "critical_error_rate": 0.04055220017256255,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M) +gate": {
+      "exact_rate": 0.9836065573770492,
+      "single": 0.8870967741935484,
+      "multi_action": null,
+      "negation": 1.0,
+      "no_action": 0.9889705882352942,
+      "correction": null,
+      "en": null,
+      "no_action_precision": 0.9945004582951421,
+      "no_action_recall": 0.9890610756608933,
+      "critical_error_rate": 0.010353753235547885,
+      "pair_accuracy": null
+    }
+  },
+  "bench16": {
+    "rule baseline": {
+      "exact_rate": 1.0,
+      "single": 1.0,
+      "multi_action": 1.0,
+      "negation": 1.0,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 1.0,
+      "no_action_precision": 1.0,
+      "no_action_recall": 1.0,
+      "critical_error_rate": 0.0,
+      "pair_accuracy": null
+    },
+    "Needle 2 official": {
+      "exact_rate": 0.1875,
+      "single": 0.3333333333333333,
+      "multi_action": 0.0,
+      "negation": 0.0,
+      "no_action": 0.25,
+      "correction": null,
+      "en": 0.25,
+      "no_action_precision": 0.3333333333333333,
+      "no_action_recall": 0.16666666666666666,
+      "critical_error_rate": 0.5,
+      "pair_accuracy": null
+    },
+    "FunctionGemma 270M": {
+      "exact_rate": 0.375,
+      "single": 0.6666666666666666,
+      "multi_action": 0.0,
+      "negation": 0.0,
+      "no_action": 0.5,
+      "correction": null,
+      "en": 0.25,
+      "no_action_precision": 1.0,
+      "no_action_recall": 0.3333333333333333,
+      "critical_error_rate": 0.5,
+      "pair_accuracy": null
+    },
+    "MimiModel C": {
+      "exact_rate": 0.0625,
+      "single": 0.0,
+      "multi_action": 0.0,
+      "negation": 0.0,
+      "no_action": 0.25,
+      "correction": null,
+      "en": 0.125,
+      "no_action_precision": 1.0,
+      "no_action_recall": 0.16666666666666666,
+      "critical_error_rate": 0.6875,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M) +grammar": {
+      "exact_rate": 0.875,
+      "single": 1.0,
+      "multi_action": 0.75,
+      "negation": 0.5,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 0.75,
+      "no_action_precision": 1.0,
+      "no_action_recall": 0.8333333333333334,
+      "critical_error_rate": 0.0625,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M) +gate": {
+      "exact_rate": 0.75,
+      "single": 0.8333333333333334,
+      "multi_action": 0.5,
+      "negation": 0.5,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 0.5,
+      "no_action_precision": 0.7142857142857143,
+      "no_action_recall": 0.8333333333333334,
+      "critical_error_rate": 0.0625,
+      "pair_accuracy": null
+    }
+  }
+}

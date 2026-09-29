@@ -15,6 +15,7 @@ Existing models are compared on the 16 TinyLM-Bench cases, whose outputs are in 
 import argparse
 import hashlib
 import json
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -130,6 +131,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--modes", nargs="+", choices=MODES, default=["plain"])
     parser.add_argument("--val", type=Path, default=PROJECT_ROOT / "datasets/action/v0/val.jsonl")
     args = parser.parse_args(argv)
+    if hasattr(sys.stdout, "reconfigure"):  # Japanese tables on a cp932 Windows console
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
     device = pick_device(args.device)
     codec = Codec(args.tokenizer)

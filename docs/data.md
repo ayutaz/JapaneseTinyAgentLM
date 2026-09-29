@@ -185,3 +185,22 @@ v0.3 に、7つの書き手（新しい4つと、続けて使う3つ）で書い
 | データセットカード | 生成に使ったモデルとライセンス、生成方法、検査の規則、件数、既知の限界、Claude Code の役割（pipeline のコードの作成だけ） |
 | 既存データ | MASSIVE などの第三者データは再配布せず、manifest で出典を参照する |
 | 手順 | アップロードの直前に、データセットカードと件数を提示して最終確認を取る。認証には `.env` の `HF_TOKEN` を使う。`japanese-data-analyze` への write 権限が必要。`jtalm.data.publish` は、public にする前に `jtalm.infra.hf.disable_community` で Community を off にし、off になったことを確認する |
+
+## 7. 人が書いた文の評価セット（human v1、2026-09-30）
+
+LLM が書いた評価セット（§5）とは別に、人が書いた文で精度を確かめるための評価セットです。作り方は `jtalm.data.human_eval`、記録は `datasets/manifests/action_human_v1.json`、結果は `results/human_v1` です。
+
+**背景:** 首・表情・うなずきをロボットに頼む、人が書いた日本語の文をまとまって含む公開データセットは見つかりませんでした（2026-09-29 の調査。日本語のロボット対話コーパスは、物を運ぶ依頼、WoZ の雑談、有償・申請制のものに限られる）。
+
+| 種類 | 出典 | ライセンス | 件数 |
+|---|---|---|---:|
+| 正例（依頼） | [Tatoeba](https://tatoeba.org/en/downloads) の日本語文、[JESC](https://nlp.stanford.edu/projects/jesc/)（映画・ドラマの字幕） | CC BY 2.0 FR、CC BY-SA 4.0 | 62 |
+| 否定の依頼（`[]`） | 同上（「こっち見ないで」など） | 同上 | 9 |
+| 負例（`[]`） | [YJ_AmbigDialogue](https://github.com/yahoojapan/YJ_AmbigDialogue)（Yahoo! 音声アシストの実際の発話）、[J-CRe3](https://github.com/riken-grp/J-CRe3)（家庭内でロボットに話しかける人の発話）、[DSLC3](https://dialog-system-live-competition.github.io/dslc3/data.html)（chatbot との対話ログ）、MASSIVE ja-JP の test | CC BY 4.0、CC BY-SA 4.0、MIT、CC BY 4.0 | 1,088 |
+
+- **正例の抜き出し:** 文全体が「呼びかけ + 量 + 動作 +（もう1つの動作）+ 依頼の語尾」だけでできているものを拾い、当てはまった規則から正解を決める。「彼は笑って答えた」のような文は拾わない。
+- **検証:** すべての候補を Qwen3 が温度 0 で JSON に変換し、規則の正解と一致したものだけを残した（不一致は 19件で、「面白い面白い」を笑顔と答えたような感情の文が 18件）。
+- **重複:** 学習データ、validation、LLM が書いた評価セットとの重複を除いた。J-CRe3 の書き起こし記号（`(F えっと)` など）は取り除いた。
+- **限界:** 正例は人に向けた依頼で、件数も少なく、「正面を向く」と「笑う」に偏る。そのため主な目的は、現実の発話で誤って動かないかを測ることにある。
+- **配布:** データは手元（`datasets/`、Git の管理外）にだけ置き、再配布しない。
+
