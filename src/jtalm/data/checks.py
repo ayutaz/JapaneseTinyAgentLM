@@ -10,17 +10,20 @@ import unicodedata
 
 JA_CHARS = re.compile(r"[぀-ヿ一-鿿]")
 NEGATION_JA = re.compile(
-    r"(ないで|なくていい|なくて(?:も)?いい|しなくて|やめて|だめ|ダメ|禁止|するな|な(?:い)?でね|な$)"
+    r"(ないで|ないように|なくて|なくても|ずに|(?<![まえ])ず[、,。]|んといて|へんといて|ひんといて|んで(?:ね|よ)|"
+    r"[^ら]んな[!！。よ]?$|[くぐすつぬぶむるう]な(?:よ|[!！。、\s]|$)|ませんように|んじゃね|やめ|だめ|ダメ|禁止|いらない|いらん|不要|結構|控え|しなくて)"
 )
 CONTRAST_JA = re.compile(
-    r"(ではなく|じゃなくて|じゃなく|でなく|ないで|なくて|やめて|違う|ちがう|より)"
+    r"(ではなく|じゃなくて|じゃなく|でなく|やなくて|ちゃう|やっぱり|やっぱ|って言ったけど|と言ったけど|"
+    r"代わりに|かわりに|取り消|違う|ちがう|変えて|より)"
 )
-NEGATION_EN = re.compile(r"\b(don't|do not|dont|never|stop|no need)\b", re.IGNORECASE)
+NEGATION_EN = re.compile(r"\b(don't|do not|dont|never|stop|no need|not)\b", re.IGNORECASE)
+QUOTES = str.maketrans({"’": "'", "‘": "'", "“": '"', "”": '"'})
 PUNCT_OR_SPACE = re.compile(r"[\s　、。，．,.!！?？・「」『』（）()\"'〜~ー…]+")
 
 
 def normalize(text: str) -> str:
-    return unicodedata.normalize("NFKC", text).strip()
+    return unicodedata.normalize("NFKC", text).translate(QUOTES).strip()
 
 
 def dedup_key(text: str) -> str:
@@ -42,5 +45,6 @@ def negation_consistent(text: str, category: str, language: str) -> bool:
     if category == "negation":
         return neg is not None
     if category == "correction" and language == "ja":
-        return CONTRAST_JA.search(normalize(text)) is not None
+        text = normalize(text)
+        return CONTRAST_JA.search(text) is not None or NEGATION_JA.search(text) is not None
     return True

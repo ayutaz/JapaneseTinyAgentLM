@@ -50,3 +50,21 @@ def test_negation_consistency() -> None:
 def test_dedup_key_ignores_punctuation_width_and_spaces() -> None:
     assert dedup_key("右を向いて！") == dedup_key("右を 向いて")
     assert dedup_key("ＡＢＣ") == dedup_key("abc")
+
+
+def test_negation_variants_and_positive_imperatives() -> None:
+    for text in [
+        "笑わんといてよ",
+        "うなずかずにいてね",
+        "上は見んな",
+        "下向かへんといてや",
+        "笑うなよ ちゃんと聞いて",
+    ]:
+        assert negation_consistent(text, "negation", "ja"), text
+    for text in ["右向きなよ", "まず、右を向いて", "とりあえず、笑って", "正面向きなよ"]:
+        assert negation_consistent(text, "single", "ja"), text
+
+
+def test_curly_apostrophe_is_normalized_for_english() -> None:
+    assert well_formed("Don’t look left.", "en")
+    assert negation_consistent("Don’t look left.", "negation", "en")

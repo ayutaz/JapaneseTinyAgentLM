@@ -206,9 +206,12 @@ def run(args: argparse.Namespace) -> dict:
         stats = {"eval_verify_failures": failures}
         _write(out / "eval_raw.jsonl", rows)
     else:
-        gen = Generator(args.base_url, eval_cfg["served_name"], cfg)
+        # v0.1 used llm-jp here, but llm-jp-3.1-13b could not parse reliably (it returned actions
+        # for chit-chat); v0.2 verifies train sentences with the train generator at temperature 0.
+        verifier_cfg = cfg[cfg.get("train_verifier", "eval_generator")]
+        gen = Generator(args.base_url, verifier_cfg["served_name"], cfg)
         rows, failures = phase_verify(
-            gen, eval_cfg["hf_id"], _read(out / "train_gen.jsonl"), args.workers
+            gen, verifier_cfg["hf_id"], _read(out / "train_gen.jsonl"), args.workers
         )
         stats = {"train_verify_failures": failures}
         _write(out / "train_raw.jsonl", rows)

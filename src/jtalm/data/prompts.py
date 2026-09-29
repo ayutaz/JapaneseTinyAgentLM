@@ -5,7 +5,7 @@ import json
 from jtalm.action.schema import load_schema
 from jtalm.data.specs import Spec
 
-PROMPT_VERSION = "action-v0.1"
+PROMPT_VERSION = "action-v0.2"
 
 ROBOT = "首を左右・上下に動かせて、画面に表情を出せる、小さな卓上ロボット"
 
@@ -34,14 +34,45 @@ def sentence_schema(n: int) -> dict:
     }
 
 
+def requirements(spec: Spec) -> list[str]:
+    """Spec-specific constraints so every sentence carries all parts of the label (v0.2)."""
+    reqs: list[str] = []
+    for call in spec.label:
+        args = call["arguments"]
+        if call["name"] == "look" and args["amount"] == "slight":
+            reqs.append("「少し」「ちょっと」のように、動きが小さいことが分かる言葉を必ず入れる")
+        if call["name"] == "look" and args["amount"] == "large":
+            reqs.append(
+                "「大きく」「思いっきり」のように、動きが大きいことが分かる言葉を必ず入れる"
+            )
+        if call["name"] == "look" and args["amount"] == "normal" and args["direction"] != "center":
+            reqs.append("「少し」「大きく」のような量の言葉は入れない")
+        if call["name"] == "nod" and args["count"] >= 2:
+            reqs.append(f"うなずく回数（{args['count']}回）が分かるようにする")
+    if spec.category == "multi_action":
+        reqs.append("2つの動作の両方を入れ、どちらを先にするかが分かる言い方にする")
+    if spec.category == "negation":
+        reqs.append("「〜しないで」「〜しなくていい」「〜はやめて」のような否定の依頼にする")
+    if spec.category == "correction":
+        reqs.append(
+            "取り消す動作と、本当にしてほしい動作の両方を文に入れる"
+            "（「〜じゃなくて〜」「やっぱり〜はやめて〜」「〜はしないで、〜して」のような形）"
+        )
+    if spec.category == "no_action":
+        reqs.append("首を動かす、表情を変える、うなずく、を頼む文にはしない")
+    return reqs
+
+
 def generation_messages(spec: Spec, n: int, split: str) -> list[dict]:
     styles = STYLES_TRAIN if split == "train" else STYLES_EVAL
+    extra = "".join(f"- {r}\n" for r in requirements(spec))
     user = (
         f"{ROBOT}に、人が話しかける日本語の短い文を{n}個作ってください。\n\n"
         f"意味: {spec.meaning}\n\n"
         "条件:\n"
         f"- 文ごとに言い方を変える（例: {styles}）\n"
         "- 1文は40文字以内\n"
+        f"{extra}"
         "- 意味に含まれない動作や指示を足さない\n"
         "- 同じ言い回しを繰り返さない\n"
         '- 出力は {"sentences": [...]} の JSON だけ'
@@ -86,6 +117,7 @@ def english_messages(spec: Spec, n: int) -> list[dict]:
         "robot that can turn its head left/right/up/down and show facial expressions on a "
         f"screen.\n\nMeaning (in Japanese): {spec.meaning}\n\n"
         "Vary the wording. Each sentence must be under 15 words. Do not add other actions.\n"
+        "Write every sentence in English only (no Japanese characters).\n"
         'Output only JSON: {"sentences": [...]}'
     )
     return [{"role": "user", "content": user}]

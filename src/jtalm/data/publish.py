@@ -61,6 +61,7 @@ def prepare(data_dir: Path, hf_dir: Path, manifest: dict) -> dict[str, int]:
 def dataset_card(counts: dict[str, int], by_cat: dict[str, Counter], manifest: dict) -> str:
     cfg = manifest["config"]
     train_gen, eval_gen = cfg["train_generator"], cfg["eval_generator"]
+    train_verifier = cfg[cfg.get("train_verifier", "eval_generator")]
     cats = sorted({c for v in by_cat.values() for c in v})
     table = "\n".join(
         f"| {c} | " + " | ".join(str(by_cat[s][c]) for s in SPLITS.values()) + " |" for c in cats
@@ -129,7 +130,7 @@ Action LM (ESP32-S3). Project: JapaneseTinyAgentLM.
 2. オープンモデルに、その意味の日本語の文を様々な言い方で書かせる。
    - train / validation: `{train_gen["hf_id"]}`（{train_gen["license"]}）
    - test: `{eval_gen["hf_id"]}`（{eval_gen["license"]}）と別の prompt。生成元を分け、生成のくせの暗記を評価で見抜けるようにしている
-3. もう一方のモデルが各文を動作の JSON に変換し、1. の正解と一致した文だけを残す（train は {eval_gen["hf_id"]}、test は {train_gen["hf_id"]} が検証）。
+3. モデルが各文を温度 0 で動作の JSON に変換し、1. の正解と一致した文だけを残す（train は `{train_verifier["hf_id"]}`、test は文を書いていない `{train_gen["hf_id"]}` が検証）。
 4. 長さ・文字化け・否定との矛盾を検査し、重複と train/test の重なりを除く。
 
 prompt version: `{PROMPT_VERSION}`

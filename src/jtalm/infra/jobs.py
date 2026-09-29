@@ -70,9 +70,7 @@ GEN_ACTION_V0 = JobSpec(
         start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
         generate("train-gen"),
         generate("eval-verify"),
-        STOP_VLLM,
-        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
-        generate("train-verify"),
+        generate("train-verify"),  # v0.2: train sentences are verified by Qwen3 (temperature 0)
     ],
 )
 

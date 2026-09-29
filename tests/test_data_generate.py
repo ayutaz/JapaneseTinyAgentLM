@@ -16,6 +16,7 @@ CFG = {
     "max_tokens": 64,
     "train_generator": {"served_name": "qwen", "hf_id": "gen/train"},
     "eval_generator": {"served_name": "llmjp", "hf_id": "gen/eval"},
+    "train_verifier": "train_generator",
     "train_quota": {"single": 4, "negation": 2},
     "eval_quota": {"single": 2, "no_action": 2},
     "eval_pairs": 4,
@@ -66,7 +67,7 @@ def test_phases_produce_raw_files_with_labels(run_phase) -> None:
 
     train = [json.loads(x) for x in (out / "train_raw.jsonl").read_text("utf-8").splitlines()]
     evals = [json.loads(x) for x in (out / "eval_raw.jsonl").read_text("utf-8").splitlines()]
-    assert all(r["generator"] == "gen/train" and r["verifier"] == "gen/eval" for r in train)
+    assert all(r["generator"] == "gen/train" and r["verifier"] == "gen/train" for r in train)
     assert all(r["generator"] == "gen/eval" and r["verifier"] == "gen/train" for r in evals)
     assert all(r["verified"] == [] for r in train + evals)
     pairs = [r for r in evals if r.get("pair_id")]
