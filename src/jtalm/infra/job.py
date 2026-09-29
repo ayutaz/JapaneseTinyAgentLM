@@ -85,10 +85,16 @@ def _start(
     Slow image pulls on some hosts kept instances in "loading" for over 20 minutes (2026-09-29),
     so a failed start destroys that instance and tries the next cheapest offer.
     """
-    for offer in offers[:STARTUP_ATTEMPTS]:
-        instance_id = client.create_instance(
-            offer["id"], spec.image, spec.disk_gb, f"jtalm-{spec.name}"
-        )
+    for offer in offers[: STARTUP_ATTEMPTS + 3]:
+        if len(attempts) >= STARTUP_ATTEMPTS:
+            break
+        try:
+            instance_id = client.create_instance(
+                offer["id"], spec.image, spec.disk_gb, f"jtalm-{spec.name}"
+            )
+        except VastError as e:  # the offer was taken between search and create; nothing rented
+            print(f"offer {offer['id']} unavailable ({str(e)[:120]}); trying the next one")
+            continue
         created = time.monotonic()
         print(
             f"created instance {instance_id} on {offer['gpu_name']} at ${offer['dph_total']:.3f}/h"
