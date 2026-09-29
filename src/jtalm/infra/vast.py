@@ -143,6 +143,57 @@ class Ssh:
             proc = subprocess.run(argv, stdout=f, stderr=subprocess.STDOUT, timeout=timeout_s)
         return proc.returncode
 
+    def output(self, command: str, timeout_s: int = 60) -> tuple[int, str]:
+        """Run a short command and return (exit code, stdout); 255 means SSH itself failed."""
+        argv = ["ssh", *self.opts, "-p", str(self.target.port), self.dest, "bash", "-lc"]
+        try:
+            proc = subprocess.run(
+                [*argv, _quote(command)], capture_output=True, text=True, timeout=timeout_s
+            )
+        except subprocess.TimeoutExpired:
+            return 255, ""
+        return proc.returncode, proc.stdout
+
+    def run_detached(
+        self, command: str, name: str, log: Path, timeout_s: int, poll_s: int = 20
+    ) -> int:
+        """Run ``command`` on the host independently of the SSH session and wait for it.
+
+        The vast.ai SSH proxy sometimes closes long sessions, which used to kill the step with
+        it (exit 255). Here the command runs under ``setsid nohup`` and writes its exit code to
+        a file; short SSH calls poll for that file and are retried when the proxy drops them.
+        Launching is idempotent (a marker file), so a dropped launch can simply be retried.
+        """
+        d = "/root/.jtalm_steps"
+        script = f"{d}/{name}.sh"
+        launch = (
+            f"mkdir -p {d}; if [ ! -e {d}/{name}.started ]; then touch {d}/{name}.started; "
+            f"cat > {script} <<'JTALM_STEP_EOF'\n{command}\nJTALM_STEP_EOF\n"
+            f"setsid nohup bash -c 'bash -l {script} > {d}/{name}.log 2>&1; "
+            f"echo $? > {d}/{name}.rc' > /dev/null 2>&1 < /dev/null & fi; echo launched"
+        )
+        with log.open("a", encoding="utf-8") as f:
+            f.write(f"\n$ {command}\n")
+        deadline = time.monotonic() + timeout_s
+        failures = 0
+        launched = False
+        while time.monotonic() < deadline:
+            if not launched:
+                code, out = self.output(launch)
+                launched = code == 0 and "launched" in out
+            else:
+                code, out = self.output(f"cat {d}/{name}.rc 2>/dev/null || true")
+                if code == 0 and out.strip():
+                    _, text = self.output(f"cat {d}/{name}.log", timeout_s=300)
+                    with log.open("a", encoding="utf-8") as f:
+                        f.write(text)
+                    return int(out.strip())
+            failures = failures + 1 if code == 255 else 0
+            if failures >= 30:  # about 10 minutes without any SSH connection
+                return 255
+            time.sleep(poll_s if launched else 5)
+        return 124  # timed out; the remote process may still be running until destroy
+
     def wait_ssh(self, attempts: int = 12) -> None:
         for _ in range(attempts):
             if self.run("echo ok", timeout_s=60) == 0:

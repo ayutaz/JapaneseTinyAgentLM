@@ -171,7 +171,7 @@ def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
                 if remaining <= 0:
                     raise VastError("max_hours exceeded")
                 t0 = time.monotonic()
-                code = ssh.run(step, log=log, timeout_s=remaining)
+                code = ssh.run_detached(step, f"step{n:02d}", log, timeout_s=remaining)
                 record["steps"].append(
                     {"cmd": step, "exit": code, "sec": round(time.monotonic() - t0)}
                 )
