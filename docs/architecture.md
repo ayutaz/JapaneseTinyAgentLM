@@ -38,6 +38,7 @@
 - 図中の Servo は Feetech SCS0009 ×2 で、UART1（`G6` / `G7`、1Mbps）の SCS protocol で動かす。
 - Servo の電源（`VM_EN`）は IO expander（PY32L020）が制御する。
 - 検証済みの JSON を servo の命令に変換するのは firmware 側の dispatcher であり、LM は servo の raw 値を直接出力しない。
+- **実装の状況（2026-09-29）:** 実機の firmware（`firmware/jtalm_action/`）は、LM、grammar、confidence gate までを持ちます。図の validator と dispatcher、表情の表示、servo の制御はまだ実装していません（[`roadmap.md`](roadmap.md) §12「次の計画」）。raw への変換式は B2 で確かめてあります（§7）。
 
 ## 2. 共通 Base と派生モデル
 
@@ -59,7 +60,7 @@
 - 入力: 1〜2文の日本語の command または状態文。英語の命令は、評価用に少量だけ扱う。
 - 出力: action call の JSON 配列（0〜2個）。空配列 `[]` が no-action。形式は §7。
 - Tool: v0 は3種類（ベンチ互換）。v1 で 8〜16 種類に広げる。引数は enum と小さな整数だけにする。
-- 目標規模: 3M / 5M / 10M を中心に比較する。量子化後の容量は §9 の LM 予算（1.5〜5MB）に収める。
+- 目標規模: 3M / 5M / 10M を中心に比較する。量子化後の容量は §9 の LM 予算（1.5〜5MB）に収める。→ **3M（INT4）に決定**（2026-09-29、§3）。
 - 目標 context: 64〜128 tokens。schema を prompt に含める方式では 256 も比較
 - 自由生成は不要。構文妥当性、slot 値、no-action、安全性を優先
 - Grammar 制約と confidence gate（§8）を基本機能とする
@@ -86,8 +87,8 @@ INT4 の理論的な重み本体は、1 parameter あたり約0.5 byteです。�
 
 | 規模 | INT4 重み理論値 | 主用途候補 | 現時点の見立て |
 |---:|---:|---|---|
-| 3M | 約1.5MB | Action 最小構成 | 限定語彙・限定 schema なら検証価値あり |
-| 5M | 約2.5MB | Action 主候補、Chat 下限実験 | Action の第一候補。Chat はかなり厳しい可能性 |
+| 3M | 約1.5MB | Action 最小構成 | **Action LM に採用**（2026-09-29。下の「サイズの決定」） |
+| 5M | 約2.5MB | Chat 下限実験 | Action では 3M を上回らなかった。Chat はかなり厳しい可能性 |
 | 10M | 約5MB | Action 高精度、Chat 主候補 | LM 予算（§9）の上限 |
 | 20M | 約10MB | Action の上限参照、Chat の品質比較 | **PC のみ。実機には載せない**（INT4 では LM 予算を超える） |
 
@@ -98,6 +99,19 @@ M4 で学習した構成（語彙 2,048、`jtalm.model.transformer.SIZES`）:
 | 3M | 192 | 7 | 6（2） | 512 | 3.15M |
 | 5M | 256 | 6 | 8（2） | 768 | 5.05M |
 | 20M | 384 | 12 | 6（2） | 1,024 | 19.67M |
+
+### サイズの決定（2026-09-29）
+
+Action LM は **3M（INT4）** に決めました。学習データ v0.4（書き手7つ、47,450件）での比較です（[`roadmap.md`](roadmap.md) §12）。
+
+| model | 評価セットの完全一致（2 seed の平均） | 重み（INT4、group 64） | `.jtlm`（tokenizer 0.27MB を含む） | 実機の1回の依頼（中央値） |
+|---|---:|---:|---:|---:|
+| **3M INT4** | **94.3%** | 1.68MB | 約 2.0MB | 1.08〜1.15 秒 |
+| 5M INT4 | 93.3% | 2.69MB | 約 3.0MB | 1.79 秒 |
+| 20M（FP、PC のみ） | 95.0%（1 seed） | 10.5MB | — | 実機に載らない |
+
+- 3M は 5M より精度が高く、実機でも速い。20M との差は +0.7 point で、容量の面で実機に載らない。
+- INT4 にしても精度は落ちない（3M: FP32 94.2% → INT4 94.3%）。
 
 設計上は 3M / 5M / 10M / 20M を同じ training code で比較可能にします。最初から全サイズを完走させず、最初の1周は 3M / 5M の Action と、PC だけの 20M 上限参照に限ります。10M Chat は、Action LM の完成後に取り組みます。
 
@@ -116,9 +130,9 @@ TinyLM-Bench の 91 は、Action 専用のモデルを 10M〜50M で学習する
 
 - SentencePiece Unigram または BPE
 - Byte fallback を有効化し OOV をなくす
-- NFC 正規化
+- NFC 正規化（→ Action LM v0 では `nmt_nfkc` を採用。下の「固定した tokenizer」）
 - 入力はテキストのみ。漢字仮名交じり文を主な対象とし、ひらがなだけの入力は頑健性の確認用に一部だけ扱う
-- `<chat>`, `<action>`, `<eos>`, `<no_action>` 等の special token を予約
+- `<chat>`, `<action>`, `<eos>`, `<no_action>` 等の special token を予約（→ Action LM v0 では `<act>` と `<out>` を使い、no-action は専用の token ではなく `[]` を1 token にした）
 
 ### 比較する vocabulary
 
@@ -167,13 +181,13 @@ Tokenizer 評価では vocabulary 数だけでなく、次も測ります。
 - hidden: 128〜384
 - layers: 4〜12
 - attention: MQA または GQA
-- positional encoding: RoPE を第一候補
-- normalization: RMSNorm を第一候補
+- positional encoding: RoPE（M4 で採用）
+- normalization: RMSNorm（M4 で採用）
 - activation: SwiGLU 系と単純 FFN のサイズ・速度を比較
 - weight tying: 必須候補
 - context: 64 / 128 / 256
-- KV cache: INT8 を基準とし、必要なら K/V の bit 幅を個別検討
-- sampling: Chat は greedy / top-k / temperature、Action は grammar 下で greedy を第一候補
+- KV cache: INT8 を基準とし、必要なら K/V の bit 幅を個別検討（→ M6 / B4 の実装は **f32 で PSRAM に置く**。INT8 の KV cache は未実装。3M で 458,752 B）
+- sampling: Chat は greedy / top-k / temperature、Action は grammar 下で greedy（M5 で採用）
 
 KV cache の概算は、一般には次で見積もります。
 
@@ -181,7 +195,9 @@ KV cache の概算は、一般には次で見積もります。
 bytes ≈ layers × context × 2(K,V) × kv_heads × head_dim × bytes_per_element
 ```
 
-GQA/MQA、短い context、INT8 KV は PSRAM 削減に大きく効きます。実際の allocator overhead、alignment、temporary buffer を含め、実機 peak を別途測定します。
+GQA/MQA、短い context、INT8 KV は PSRAM 削減に大きく効きます。実際の allocator overhead、alignment、temporary buffer を含め、実機 peak を別途測定します（→ B4 で測定済み。§10）。
+
+採用した構成（M4）は、RMSNorm（pre-norm）、RoPE、GQA、SwiGLU、weight tying、bias なしの decoder-only Transformer です（`jtalm.model.transformer`）。Action の decode は grammar 下の greedy です。
 
 ## 6. Quantization と artifact
 
@@ -202,6 +218,8 @@ GQA/MQA、短い context、INT8 KV は PSRAM 削減に大きく効きます。�
 - peak SRAM / PSRAM
 - artifact size と alignment overhead
 - 対応 kernel の保守性
+
+**実施した方式と結果（M5〜M6）:** 重みだけを INT8 / INT4（行ごとに 64個ずつの group、対称、round-to-nearest）にし、scale は fp16 で持ちます（`jtalm.model.quantize`）。RMSNorm の重みは f32 のままです。3M / 5M のどちらでも、評価セットの精度は FP32 と ±0.4 point 以内で、INT4 でも落ちません。配布形式は、設定、tokenizer、RoPE の表、重みを1つにまとめた `.jtlm` ファイルです（`jtalm.model.export`）。整数の値は `quantize.py` と同じで、C の runtime は PyTorch と同じ出力になります（M6）。
 
 量子化で挙動そのものが変わることがあります。TinyTalk 2 は、FP32 では「天気は分からない」と答えたのに、Q4 では晴れだと捏造しました（[`research_notes.md`](research_notes.md) §3.7）。そのため、量子化後は logit の誤差だけでなく、評価セット全体をカテゴリ別に評価し直します。
 
@@ -313,12 +331,15 @@ Action LM はカテゴリだけを出力し、firmware の dispatcher が K151 �
 | `normal` | ∓20° / ±20° | ±10° |
 | `large` | ∓30° / ±30° | ±15° |
 
-- 上の角度は初期値（設計目標）で、実機で見え方を確認してから確定する。
+- 上の角度は初期値（設計目標）で、実機で見え方を確認してから確定する（Action から servo を動かす dispatcher の実装時に確認する）。
 - 最大値は yaw ±30°、pitch ±15° とし、公式の可動域より狭く保つ。安全上の上限は、実行側の validator で再確認する。
 - `nod` は pitch を小さく往復させ、回数は `count` に従う。
 - 連続回転（PWM mode）や raw position は、Action LM から指定させない。
 
-符号の規約は、実機を動かして確認してから確定します（[`roadmap.md`](roadmap.md) §12 の B2）。
+符号の規約と中立位置は、2026-09-29 に B2 で確定しました（ユーザーの立ち会いのもとで実機を動かして確認。[`hardware.md`](hardware.md) §10）。1 step は 0.3125° なので、dispatcher は次の式で raw に変換します。
+
+- yaw（右が正）: `raw = 460 − deg × 16 / 5`
+- pitch（上が正）: `raw = 620 + deg × 16 / 5`
 
 ### 例
 
@@ -363,10 +384,12 @@ TinyLM-Bench でも、Needle 2 は schema 妥当率が 16/16 でしたが、厳�
 
 意味の誤りを実行前に止めるため、生成の確信度で出力を絞ります。
 
-- 各 action について、生成した token の確率から確信度を求める。指標は、最小確率と平均 log 確率を比べて選ぶ。
-- 閾値を下回る action は捨て、全体を no-action（`[]`）にする。
+- 指標は、生成した各 token の確率の**最小値**（`min_prob`）。確率は grammar で制約する**前**の softmax で求めるので、grammar が強制した token は確信度を下げる（`jtalm.model.decode`）。
+- `min_prob` が閾値を下回ったら、action 単位ではなく**出力全体**を no-action（`[]`）にする。
 - 確信度の低い出力は、ロボットの誤作動につながるので、実行しないほうを安全側とする。
-- 閾値は held-out の評価セットで決める。no-action の recall を優先し、誤った動作の率とのバランスを見る。
+- 閾値は **validation** で決め、評価セットでは選ばない（`jtalm.model.evaluate --modes gate`。validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値）。
+- **採用した設定（2026-09-29）:** 書き手7つの validation（v0.4、2,497件）で選んだ **0.970**。3M INT4 + grammar で、評価セットの完全一致は 94.3% → 94.4% のまま、致命的な誤りは 2.0% → 0.6% に減った。実機（`firmware/jtalm_action/`）では標準で有効で、閾値は build 時の `CONFIG_JTALM_GATE_PERMILLE`（千分率、既定 970）と、実行中の serial command `!gate <閾値>`（0 で無効）で変えられる。
+- M4（validation の書き手が1つ）では、閾値がほぼ 1 に選ばれて gate は逆効果だった。validation の書き手の多様さが、閾値の選び方に効く。
 - 曖昧な入力に対して「確認を求める」出力は、Chat と組み合わせる必要があるため v1 以降で検討する。
 
 ## 9. Flash 予算
@@ -377,12 +400,13 @@ CoreS3 の物理上限は 16MB Flash です。
 
 本計画の範囲は LLM を作ることです（[`roadmap.md`](roadmap.md) §1）。LM は次の予算だけを前提に開発します。TTS / ASR との同居は前提にしません。
 
-| 対象 | Flash の予算（設計目標） |
-|---|---:|
-| 3M / 5M Action（INT4） | 1.5〜3MB |
-| 10M Chat / Action / Unified（INT4） | 3〜5MB |
+| 対象 | Flash の予算（設計目標） | 実測（2026-09-29） |
+|---|---:|---:|
+| 3M / 5M Action（INT4） | 1.5〜3MB | 採用した 3M INT4 の `.jtlm` は約 2.0MB（1,971,456 B、tokenizer 0.27MB を含む）。5M INT4 は約 3.0MB |
+| 10M Chat / Action / Unified（INT4） | 3〜5MB | — |
 
-確定値は、Phase 0 で自前の最小 firmware（LM runtime と servo 制御）を測ってから決めます。
+- 自前の最小 firmware（B3 の `jtalm_eval`、B4 の `jtalm_action`）では、`model` partition（subtype 0x40）を `0x200000` に 14MB 取り、`.jtlm` を置きます。1回の `esp_partition_mmap` で全体を map できます（[`hardware.md`](hardware.md) §8、§11）。App は 0x10000 から 1,984KiB（`jtalm_action` の app は約 250〜270KB）。
+- Servo 制御や画面を載せた状態の Flash と memory は、まだ測っていません。
 
 ### 参考: 統合時の全体予算
 
@@ -419,9 +443,21 @@ Full offline 構成は範囲上限を足すと 16MB を超えます。統合す�
 | 常駐 runtime、metadata、小さな buffer | ≤1.5MB | PSRAM |
 | GEMV の scratch などの高速 buffer | 数十 KB 以下 | 内部 SRAM |
 
-- 重みは Flash から mmap して読む。
-- 内部 SRAM の目安は、受領時の firmware での値で、起動直後の空きが約 155KB、最大連続ブロックが約 98KB でした（[`hardware.md`](hardware.md) §4）。
-- 確定値は、Phase 0 で自前の最小 firmware を測ってから決めます。
+**実装した配置と実測（B4、3M INT4、[`hardware.md`](hardware.md) §11）:**
+
+| 領域 | 大きさ | 置き場所 |
+|---|---:|---|
+| 重み（`.jtlm`） | 約 2.0MB | Flash から mmap（heap を使わない） |
+| KV cache（f32、context 128） | 458,752 B | PSRAM |
+| activation（16 token 分）、attention の score、logits | 125,952 B | 内部 SRAM |
+| tokenizer の作業領域 | 32KB | 内部 SRAM |
+
+- 書き換える状態は1つの arena（`jtlm_state_bytes()`、3M で 584,704 B）にまとめ、token ごとの malloc はありません。
+- 入力はまとめて処理し（batch prefill、最大 16 token ずつ）、行列の計算は2つの core で行を分けます（LM の task は core 1、行列の worker は core 0）。どちらも計算の値を変えません。
+- 読み込み後の内部 SRAM の空きは 3M で約 140KB（最大連続ブロック 90KB）、5M で約 90KB。PSRAM の空きは約 7.9MB です。
+- 上の設計目標の「activation を PSRAM に置く」案は、速さのために変えました（activation は内部 SRAM）。
+- 内部 SRAM の参考値: 受領時の firmware では起動直後の空きが約 155KB でした（[`hardware.md`](hardware.md) §4）。自前の最小 firmware（B3）では 335,663 B です（§8）。
+- 画面、servo、M5Unified を載せた状態の memory は、まだ測っていません。
 
 ### 参考: 統合時の時分割 workspace（本計画の対象外）
 
@@ -485,6 +521,8 @@ union AiWorkspace {
 - latency / memory telemetry
 - watchdog、timeout、cancel
 
+**実装の状況（2026-09-29）:** `runtime/host/`（M6）と `firmware/jtalm_action/`（B4）で、loader、tokenizer、Transformer の各層、RoPE、量子化した行列の計算、KV cache、grammar 付きの Action sampler、confidence gate、latency と memory の telemetry（`JTALM {json}` の行）、host との一致の確認（golden vector は `results/m6_parity/*/golden.jsonl`）を実装しました。Chat の sampler、実機側の JSON validator、watchdog / timeout / cancel は未実装です。
+
 Host と ESP32 の双方で同じ golden vector を読み、Tokenizer、1-layer、full forward、KV incremental decode、grammar mask を段階的に照合します。
 
 Windows の host runtime では、日本語の入力を UTF-8 のファイルか stdin から読みます。argv では渡しません。TinyLM-Bench では、needle-2-esp32 の C host に argv で日本語を渡すと制限がありました。
@@ -531,34 +569,38 @@ JapaneseTinyAgentLM/
 │   ├── eval/               # 評価指標、評価セットの読み込み、baseline（M2〜M3）
 │   ├── data/               # 合成データの生成・検査・分割・manifest（M3）
 │   ├── infra/              # vast.ai の job runner、vastai と SSH の wrapper、job の定義（M2.5）
-│   └── model/              # 系列の形式、tokenizer、Transformer、学習、greedy decode、評価（M4）
+│   └── model/              # 系列の形式、tokenizer、Transformer、学習、greedy decode、評価（M4）、grammar と量子化（M5）、.jtlm の書き出しと C との一致の確認（M6）
 ├── datasets/
 │   ├── manifests/          # データの出典・ライセンス・hash（commit する）
-│   ├── action/             # 生成したデータ本体（Git 管理外。Hugging Face で公開）
+│   ├── action/             # 生成したデータ本体 v0 / v0.3 / v0.4（Git 管理外。Hugging Face で公開したのは v0 だけ）
 │   └── downloads/          # MASSIVE などの取得物（Git 管理外）
 ├── tokenizer/out/          # 学習した tokenizer の出力（Git 管理外。M4）
 ├── runs/vast/              # vast.ai の実行記録と回収物、checkpoint（Git 管理外）
 ├── results/                # 評価の比較表と学習の記録（commit する。例: m4_action_v0/）
 ├── configs/                # 生成と学習の設定
-├── runtime/host/           # Host C reference runtime（M6。未作成）
-├── firmware/               # ESP32 の firmware（Track B）。third_party/ は Git 管理外
+├── runtime/host/           # Host C reference runtime（M6）。ESP32 の firmware もこの source を build する
+├── firmware/
+│   ├── jtalm_eval/         # memory と帯域を測る最小 firmware（B3）
+│   ├── jtalm_action/       # Action LM を動かす firmware（B4）
+│   ├── baselines/          # esp32-llm、stackchan-idf 用の overlay / patch / shim（B2、B2.5）
+│   ├── tools/              # serial の取得、LM の一致と速度の計測
+│   └── third_party/        # 第三者の clone（Git 管理外）
 ├── tests/                  # fixtures/tinylm_bench/ に TinyLM-Bench の16件と既存モデルの出力
 └── backups/                # 実機 Flash のバックアップ（Git 管理外）
 ```
 
-作成済みなのは、`LICENSE`、`.gitignore`、`.python-version`、`pyproject.toml`、`uv.lock`、`configs/`、`docs/`、`src/jtalm/`（`action/`、`eval/`、`data/`、`infra/`）、`datasets/manifests/`、`tests/`（TinyLM-Bench の fixture を含む）です（M3 完了時点）。`tokenizer/`、`model/`、`training/`、`runtime/` は M4 以降で作ります。
+上の構成はすべて作成済みです（2026-09-29、M6 と B4 の完了時点）。学習は `src/jtalm/model/train.py` で行い、独立した `training/` は作っていません。
 
 GitHub はコードと再現手順を1 repository にまとめ、Hugging Face は artifact を用途・サイズ・量子化ごとに分離します。
 
 ```text
 ayutaz/JapaneseTinyAgentLM                                    # GitHub（private で作成済み）
 
-ayousanz/JapaneseTinyAgentLM-3M-Action                        # HF のモデル（名前は候補）
-ayousanz/JapaneseTinyAgentLM-5M-Action
+ayousanz/JapaneseTinyAgentLM-3M-Action                        # HF のモデル（名前は候補。採用した 3M INT4。公開は保留中）
 ayousanz/JapaneseTinyAgentLM-10M-Base
 ayousanz/JapaneseTinyAgentLM-10M-Chat
 ayousanz/JapaneseTinyAgentLM-10M-Unified
 japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth       # HF の dataset（public、manual gate。M3 で公開済み）
 ```
 
-Hugging Face の公開先は、**モデルはユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz)**、データセットは organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。モデルを公開する前には、必ずユーザーの確認を取ります。どの repository も Community contributions は off にします。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。**モデルの** repository の名前は未確定で（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）、既存の名称、商標、repository との衝突を公開前に確認します。
+Hugging Face の公開先は、**モデルはユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz)**、データセットは organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。モデルを公開する前には、必ずユーザーの確認を取ります。**モデルの公開は、ユーザーの判断で保留中です**（2026-09-29）。5M は採用しなかったので、5M の Action の repository は作りません。どの repository も Community contributions は off にします。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。**モデルの** repository の名前は未確定で（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）、既存の名称、商標、repository との衝突を公開前に確認します。

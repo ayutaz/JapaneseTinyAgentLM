@@ -93,7 +93,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 - Windows host では、float32 engine を上流のソースを変えずに動かせた（外部 shim を使用）。
 - Xtensa PIE の INT8 kernel は実機でしか動かない。
-- 約 12 tok/s という速度は上流の値で、CoreS3 での実測はまだない。
+- 約 12 tok/s という速度は上流の値（Octal PSRAM）。CoreS3（Quad PSRAM）では、B2.5 で stories3M INT8 が 6.0〜6.6 tok/s（loop 全体）、6.5〜7.1 tok/s（forward だけ）だった（[`hardware.md`](hardware.md) §9）。
 - stories3M INT8 は、規模も量子化も本プロジェクトの 3M / 5M Action に近い。そのため、CoreS3 での速度と PSRAM 帯域の基準値を取る対象として最適である（[`roadmap.md`](roadmap.md) §12 の B2.5）。
 - Fork 候補にする前に、commit、license、training code を確認する。
 
@@ -108,8 +108,8 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 本プロジェクトへの示唆:
 
-- Servo の座標の確認（[`roadmap.md`](roadmap.md) §12 の B2）に、そのまま使える。
-- LM 評価用の最小 firmware では、`scs_servo` component の流用を候補にする。License（BSL-1.0）と第三者 notice は、採用時に確認する。
+- Servo の座標の確認（[`roadmap.md`](roadmap.md) §12 の B2）に使い、2026-09-29 にユーザーの立ち会いのもとで確認を終えた（[`hardware.md`](hardware.md) §10）。
+- Action から servo を動かす dispatcher では、`scs_servo` component の流用を候補にする（未着手）。License（BSL-1.0）と第三者 notice は、採用時に確認する。
 
 ### 3.6 m5stack/StackChan（K151 の公式 firmware）
 
@@ -194,8 +194,8 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 | Needle 2 ESP32 | English tool calling | 45M | 約13.1〜13.7MB、CQ2系 | 1.87 tok/s | 日本語、より小型、Stack-chan action 特化 | 一次ソース確認済み |
 | slvDev/esp32-ai | TinyStories text generation | 28.9M stored | 14.9MB、4-bit PLE | 9.88 tok/s | instruction/action 向けでない | 一次ソース確認済み |
 | esp32-mind | TinyStories text generation | 11.5M | int4（group 128）、5.97MB | 14.22 tok/s | 日本語・action ではない | 速度は一次ソース、規模は TinyLM-Bench で確認 |
-| doryiii/esp32-llm | Tiny Llama experiment | 3.1M（stories3M） | INT8（group 64）、3.35MB | 約12 tok/s（上流の値） | 3M / 5M 規模の実機速度の基準に使える | 規模は TinyLM-Bench で確認、速度は未確認 |
-| JapaneseTinyAgentLM | 日本語 Chat + Action | 3M〜10M（実機の候補。20M は PC だけの上限参照） | INT8/INT4候補、1.5〜5MB | 未計測 | 日本語、共有 Base、K151 向けの Action（multi-action、否定、no-action を重視） | 設計目標 |
+| doryiii/esp32-llm | Tiny Llama experiment | 3.1M（stories3M） | INT8（group 64）、3.35MB | 約12 tok/s（上流の値）。CoreS3 では 6.5〜7.1 tok/s（forward だけ） | 3M / 5M 規模の実機速度の基準に使える | 規模は TinyLM-Bench で確認、CoreS3 の速度は実測（B2.5） |
+| JapaneseTinyAgentLM（Action LM） | 日本語 Action | 3M（3.15M、採用） | INT4（group 64）、`.jtlm` 2.0MB（tokenizer を含む） | decode 9.6 tok/s、1回の応答は中央値 1.08〜1.15 秒 | 日本語、K151 向けの Action（multi-action、否定、no-action を重視）。評価セットで完全一致 94.3% | 実測（B4） |
 
 数値比較では prompt length、prefill、decode、CPU clock、PSRAM mode、出力長、temperature を固定した共通 benchmark が必要です。
 
@@ -203,7 +203,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 ### 仮説A: 日本語 Action 専用なら、英語汎用 tool model より小さくできる
 
-世界知識と長文生成を捨て、Stack-chan が実行可能な action、値域、表現に絞れば 3M〜10M で有用な精度を得られる可能性があります。これは未検証です。
+世界知識と長文生成を捨て、Stack-chan が実行可能な action、値域、表現に絞れば 3M〜10M で有用な精度を得られる可能性があります。**Action については検証済みです**（2026-09-29）。3M（INT4）で、評価セット 1,189件の完全一致 94.3%、TinyLM-Bench の16件で 87.5%（Needle 2 は 18.8%、FunctionGemma 270M は 37.5%）でした。効いたのはモデルの大きさではなく、学習データの書き手の多様さでした（[`roadmap.md`](roadmap.md) §12）。
 
 ### 仮説B: Ralomi の正規化ひらがなを直接使うと小型化に有利
 
@@ -240,10 +240,10 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 未検証事項:
 
 - 同様の日本語 MCU action model、製品、論文、特許の網羅調査。
-- 3M〜10M で日本語の否定、相対表現、複合命令が十分理解できるか。
+- 3M〜10M で日本語の否定、相対表現、複合命令が十分理解できるか（→ Action の範囲では検証済み。3M で否定 94〜95%、multi-action 97%。ただし評価セットも LLM が書いた文で、人が書いた文での評価はまだない）。
 - 入力ミス、変換ミス、表記ゆれを含む入力での action accuracy。
 - Chat 品質が利用価値を持つ水準に達するか。
-- CoreS3 単体で Flash / PSRAM / latency / battery が成立するか。
+- CoreS3 単体で Flash / PSRAM / latency / battery が成立するか（→ LM 単体の Flash、PSRAM、latency は実測で成立。画面・servo と同居させたときのメモリーと、battery は未確認）。
 - ユーザーが cloud model より local model を選ぶ条件。
 - データ・モデル・第三者 Runtime の再配布権。
 

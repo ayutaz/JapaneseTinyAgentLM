@@ -105,17 +105,17 @@ LM の評価には自前の最小 firmware を使い、partition も自分で設
 
 ## 5. 設計への影響
 
-1. **内部 SRAM:** 起動直後の空きは約 155KB、最大連続ブロックは約 98KB です。LM の runtime は、重みを Flash から mmap し、KV cache と activation を PSRAM に置きます。内部 SRAM は GEMV の scratch などに限り、数十 KB 以下に抑えます（[`architecture.md`](architecture.md) §10）。
+1. **内部 SRAM:** 受領時の firmware では、起動直後の空きは約 155KB、最大連続ブロックは約 98KB でした。当初は、重みを Flash から mmap し、KV cache と activation を PSRAM に置いて、内部 SRAM は数十 KB 以下に抑える計画でした。**実装（B4、§11）では、速さのために activation（3M で約 126KB）と tokenizer の作業領域（32KB）を内部 SRAM に置き、KV cache（f32、3M で 458,752 B）を PSRAM に置きました。** 自前の firmware では起動直後の内部 SRAM の空きが約 328KB あり（§8）、3M を読み込んだ後も約 140KB 残ります（[`architecture.md`](architecture.md) §10）。
 2. **Action:** Action schema は K151 の servo 仕様に合わせます。
    - LM はカテゴリ（`direction` / `amount`）だけを出力し、firmware の dispatcher が角度に変換する（[`architecture.md`](architecture.md) §7）。
-   - yaw の正の値を右とする。
+   - yaw の正の値を右とする。実機では右へ回すと yaw の raw が減るので、dispatcher で符号を反転する（§10、2026-09-29 に確認）。
    - pitch は公式の 3°〜87° を中立位置からの相対値に変換する。
    - 連続回転は Action LM から使わせない。
 3. **Firmware の基盤:** K151 では servo が SCS0009、電源制御が PY32L020 経由です。次の2つは、どちらもこの構成に対応しています。
    - 公式の `m5stack/StackChan`（ESP-IDF v5.5.4、MIT）
    - `stackchan-idf`（ESP-IDF v5.5.5 で検証、BSL-1.0）。README に、PY32 の Pin 0 で servo の VM 電源を入れ、200ms 待ってから bus を使う手順が記載されている。
 
-   LM の評価には、これらの servo driver を流用した自前の最小 firmware を使います。
+   LM の評価には、自前の最小 firmware を使います（B3 の `jtalm_eval`、B4 の `jtalm_action`）。Servo の driver は、Action から servo を動かす dispatcher を実装するときに流用します（未実装）。
 
 ## 6. Flash のバックアップ
 
@@ -201,7 +201,7 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 | 計測後の idle（buffer を解放） | 334,847 | 270,336 | 269,964 | 8,386,192 | 8,257,536 |
 
 - 起動直後の内部 SRAM の空きは約 328KB、最大連続ブロックは約 264KB。§4 の受領時 firmware（Arduino + M5Unified、約 155KB / 98KB）より大きいのは、Arduino、M5Unified、TTS の常駐分がないためと考えられる（推測）。
-- 画面、servo、M5Unified を載せると、この値から減る。LM の予算は、B4 でそれらを載せた状態で再度測る。
+- 画面、servo、M5Unified を載せると、この値から減る。それらを載せた状態の memory は、まだ測っていない（B4 は LM だけを載せた。§12）。
 - Flash の mmap は heap を消費しない（312 B の差は計測コードの誤差の範囲）。
 - Main task の stack（8KB）の high-water mark は 6,404 B の余り。
 
@@ -220,7 +220,7 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 - 別の起動で2回測り直しても、差は 0.01% 以下だった（`runs/device/b3_rerun_20260929T065653Z.log`）。
 - Quad PSRAM（80MHz）と QIO Flash（80MHz）の順次読み出しは、どちらも約 31〜33 MB/s で、ほぼ同じ。理論値（4bit × 80MHz = 40 MB/s）の約 8割。
 - ESP32-S3 では Flash と PSRAM が同じ MSPI bus を共有するので、2つを同時に読んでも帯域は足し算にならない（推測。未計測）。
-- **設計への示唆:** 重みは Flash から mmap して読んでも、PSRAM に copy して読むのとほぼ同じ速さになる。PSRAM を KV cache と activation に空けられるので、重みは mmap で読む方針（[`architecture.md`](architecture.md) §10）でよい。
+- **設計への示唆:** 重みは Flash から mmap して読んでも、PSRAM に copy して読むのとほぼ同じ速さになる。PSRAM を KV cache に空けられるので、重みは mmap で読む方針（[`architecture.md`](architecture.md) §10）でよい（B4 で採用。activation は速さのために内部 SRAM に置いた）。
 - 重みを毎 token 全部読む前提では、速度の上限は「32 MB/s ÷ 重みの byte 数」になる。例: INT8 で 3.35MB なら約 9.8 tok/s、INT4 の 5M（約 2.6MB）なら約 12 tok/s。
 
 計測の生 log は `runs/device/b3_boot_20260929T064117Z.log`（Git の管理外）。Firmware の ELF SHA-256 の先頭は `19b3d95c6`。
@@ -294,14 +294,14 @@ Model: `stories3M-q80.bin`（dim 192、hidden 512、6 layer、6 head / 2 KV head
 
 ### 本プロジェクトへの示唆
 
-- 3M 級の INT8 で、CoreS3 の実用速度は **約 6〜7 tok/s**。本プロジェクトの tokenizer（M4）では、JSON の固定の断片を1 token にまとめているので、出力は `look` 1個で 7 token、`[]` で 1 token（平均 4.7 token）になる。生成だけなら約 0.2〜2 秒、入力（約 10 token）を1 token ずつ処理する場合は合計で約 2〜3 秒と見積もれる（推測。自前 runtime での実測は B4）。
+- 3M 級の INT8 で、CoreS3 の実用速度は **約 6〜7 tok/s**。本プロジェクトの tokenizer（M4）では、JSON の固定の断片を1 token にまとめているので、出力は `look` 1個で 7 token、`[]` で 1 token（平均 4.7 token）になる。生成だけなら約 0.2〜2 秒、入力（約 10 token）を1 token ずつ処理する場合は合計で約 2〜3 秒と見積もれる（推測）。→ B4 の実測では、入力のまとめ処理と2 core の併用により、3M INT4 で1件の中央値 1.08〜1.15 秒になった（§11）。
 - 5M を INT8 で載せると、重みの読み出しだけで上限が約 6 tok/s まで下がる。**INT4 化と、重みの読み出し量を減らす工夫（語彙の縮小、embedding と出力層の共有）が速度に直結する。**
 - esp32-llm は KV cache を FP32 で PSRAM に置く（3M、seq_len 512 で 1.57MB）。Action の入出力は短い（M4 の系列は最大 52 token）ので、seq_len を実際の長さに合わせて小さくし、KV cache を INT8 / FP16 にすれば、内部 SRAM に置ける可能性がある（推測）。
 - Prompt（発話）部分の処理は、1 token ずつ forward するのではなく、まとめて処理（batch prefill）して重みの読み出しを共有しないと、入力長に比例して遅くなる。
 
-## 10. Servo の確認の準備（B2）
+## 10. Servo の確認（B2、2026-09-29 に実施）
 
-[ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf)（commit `419385ef1b87`、v0.15.0-alpha.2、2026-09-24）を使います。**起動するとすぐ servo が動くので、書き込みはユーザーの立ち会いのもとで行います。** Build まで済ませ、まだ書き込んでいません。
+[ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf)（commit `419385ef1b87`、v0.15.0-alpha.2、2026-09-24）を使いました。**起動するとすぐ servo が動くので、書き込みはユーザーの立ち会いのもとで行いました。** 2026-09-29 に、ユーザーの立ち会いのもとで書き込んで確認し、確認の後は LM の firmware に書き戻しています（下の「結果」）。
 
 ### Build（2026-09-29、確認済み）
 
@@ -399,7 +399,7 @@ Log に `yaw (id=1) ping OK` と `pitch (id=2) ping OK` が出ることを確認
 
 **5. 元の firmware に戻す（Claude Code）**
 
-NVS と bootctl の領域を消し、B3 の firmware（§8）を書き込みます。bootloader も標準のものに戻ります。
+NVS と bootctl の領域を消し、B3 の firmware（§8）を書き込みます。bootloader も標準のものに戻ります。（2026-09-29 の実施では、Flash 全体を `erase-flash` で消してから、B4 の `jtalm_action` と v0.4 の 3M INT4 を書き込みました。手順は [`firmware/README.md`](../firmware/README.md)。）
 
 ```sh
 uvx --from esptool esptool --chip esp32s3 -p COM3 erase-region 0x9000 0x6000
@@ -422,10 +422,11 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 - **dispatcher での変換:** Action の「右」は yaw の raw を減らす向き、「上」は pitch の raw を増やす向きになる。1 step は 0.3125° なので、yaw は `raw = 460 − deg × 16 / 5`（deg は右が正）、pitch は `raw = 620 + deg × 16 / 5`（deg は上が正）で求める。
 - 確認の後、Flash 全体を消して `jtalm_action`（v0.4 の 3M INT4、confidence gate 0.970）に書き戻した。3つの依頼文で正しく応答することを確認した。NVS は消したので、stackchan-idf の設定は残っていない。
 
-### 結果の使い方
+### 結果の使い方（確定）
 
-- 右へ回したときに raw が**増える**なら、「yaw の正 = 右」（[`architecture.md`](architecture.md) §7）は stackchan-idf の deg の符号とそのまま一致する。**減る**なら、dispatcher で符号を反転する。
-- 手順 4-4 の raw を、この個体の中立位置（yaw の中央、pitch の水平）とする。公式 firmware の pitch の範囲（3°〜87°）との対応は、この raw を基準にして換算する。
+- 右へ回すと raw が**減った**ので、dispatcher で yaw の符号を反転する。Action schema の「yaw の正 = 右」（[`architecture.md`](architecture.md) §7）は変えない。
+- この個体の中立位置（yaw の中央、pitch の水平）は yaw 460 / pitch 620（stackchan-idf の既定値）。公式 firmware の pitch の範囲（3°〜87°）との対応は、この raw を基準にして換算する。
+- 変換式は上の「dispatcher での変換」のとおり。Action から servo を実際に動かす部分は、まだ実装していない（§12）。
 
 ## 11. Action LM の実機での実行（B4、2026-09-29）
 
@@ -545,17 +546,24 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 
 ### 本プロジェクトへの示唆
 
-- **3M（INT4 または INT8）なら、実機で1件あたり約 1.1〜1.3 秒（p90 約 1.5〜1.9 秒）で応答できる。** 採用した v0.4 の 3M INT4 と gate の組み合わせで、実機でも完全一致 94.45%、critical error 0.59%（Python と同じ）。 実用の目安としては使える範囲（推測。音声認識や TTS と合わせた体感は未確認）。
+- **3M（INT4 または INT8）なら、実機で1件あたり約 1.1〜1.3 秒（p90 約 1.5〜1.9 秒）で応答できる。** 採用した v0.4 の 3M INT4 と gate の組み合わせで、実機でも完全一致 94.45%、critical error 0.59%（Python と同じ）。 実用の目安としては使える範囲（推測）。
 - 3M の decode は、INT8 では flash の帯域、INT4 では演算が律速で、どちらも約 0.1 秒 / token。これ以上は、生成する token 数を減らす（Action の表現を短くする）か、層や語彙を小さくするのが効く（推測）。
-- 5M は 3M より約 0.6 秒遅く、内部 SRAM にも余裕がない。精度で 3M を上回らない限り、実機の本命は 3M（[`roadmap.md`](roadmap.md) §12 の結論と同じ）。
+- 5M は 3M より約 0.6 秒遅く、内部 SRAM にも余裕がない。精度でも 3M を上回らなかったので、**Action LM は 3M INT4 に決定した**（2026-09-29、[`roadmap.md`](roadmap.md) §12）。
 - 最も効いたのは prefill のまとめ処理で、prefill は 166 → 88 ms/token、2 core と合わせて 49 ms/token（約 1/3.4）になった。発話が長いほど効果が大きい。
 - 生 log と JSONL は `runs/device/b4/`（Git の管理外）。`full_*.jsonl` が各 model の 200件、`abl_*.jsonl` が上の段階ごとの計測。
 
 ## 12. 未確認事項
 
-- Action を servo の命令に変換して、実機で実際に首を動かす（§10 の変換式を使う。ユーザーの立ち会いが必要）。
-- 画面、servo、M5Unified を載せた状態での SRAM / PSRAM（B4 の servo の部分で測る。LM だけの値は §11）。
-- `-DJTLM_BATCH=8` にしたときの速度と、音声認識・TTS と同時に動かしたときの LM の速度。
+- Action を servo の命令に変換して、実機で実際に首を動かす（§10 の変換式を使う。validator と可動域の確認を含む。ユーザーの立ち会いが必要）。
+- 画面、servo、M5Unified を載せた状態での SRAM / PSRAM（dispatcher の実装時に測る。LM だけの値は §11）。
+- `-DJTLM_BATCH=8` にしたときの速度（5M の内部 SRAM を約 82KB 減らせる）。
+- 消費電流と温度（LM を連続で動かしたとき）。
+- INT8 の KV cache（未実装。今は f32 で PSRAM に置いている）。
 - FCC ID `2AN3WM5STACKCHAN` の個別登録内容。
 
-`stackchan-idf` が K151 に対応しているかどうかは、2026-09-29 に README で確認し、解消しました（§5）。
+音声認識や TTS と同時に動かしたときの速度は、本計画の対象外です（LLM だけを作る。[`roadmap.md`](roadmap.md) §1）。
+
+解消した事項:
+
+- `stackchan-idf` が K151 に対応しているかどうか（2026-09-29 に README で確認。§5）。
+- Yaw の符号と、pitch の中立位置（2026-09-29 に B2 で確認。§10）。

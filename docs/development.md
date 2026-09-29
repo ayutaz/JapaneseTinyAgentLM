@@ -50,7 +50,7 @@
 | PyTorch | 2.14.0（2026-09-02。Python 3.15 まで wheel あり） | 2.14.0+cpu（lock 済み） | Linux は 2.14.0+cu126 |
 | vastai CLI | 1.8.2 | 1.8.2（`uv run vastai`） | 端末に別途入っている 1.5.6 は使わない |
 | esptool | 5.4.0 | `uvx` で都度取得 | 5 系 |
-| ESP-IDF | 6.1（2026-08-27） | 未導入 | **v5.5.5 に固定**（§7） |
+| ESP-IDF | 6.1（2026-08-27） | 直接は導入しない。Docker image `espressif/idf:v5.5.5` で使う（B1） | **v5.5.5 に固定**（§7） |
 
 ## 3. 認証情報
 
@@ -82,14 +82,29 @@ uv run python -m jtalm.infra.job gen_action_v0 --approve-dph 1.10
 uv run python -m jtalm.infra.job train_action_v0 --approve-dph 0.40   # M4 の学習と評価
 ```
 
-- **動き:** 条件に合う最安の offer を選ぶ → instance を作る → 起動を待つ → `HEAD` を `git archive` で転送 → 各手順を実行 → `artifacts/` を回収する。最後に、成功しても失敗しても必ず削除し、削除を確認する。
+| job | 内容 |
+|---|---|
+| `smoke` | GPU 上の torch と vLLM の動作確認（M2.5） |
+| `gen_action_v0`、`gen_action_v0_negation` | データ v0 の生成と、否定の追加生成（M3） |
+| `train_action_v0` | 3M / 5M / 20M の学習と評価（M4） |
+| `train_action_v0_scaling` | 学習データの量の確認（v0 の 25% / 50% / 100% で 3M を学習） |
+| `gen_action_v03`、`train_action_v03` | データ v0.3 の生成（書き手3つ）と、その学習と評価 |
+| `gen_action_v04`、`gen_action_v04b`、`train_action_v04` | データ v0.4 の生成（書き手7つ。v0.4b は disk 不足で失敗した分の生成と全体の検証）と、その学習と評価 |
+
+- **動き:** 条件に合う最安の offer を選ぶ → instance を作る → 起動を待つ → `HEAD` を `git archive` で転送 → 各手順を実行 → `artifacts/` を回収する。最後に、成功しても失敗しても必ず削除し、削除を確認する。失敗したときも `artifacts/` は回収を試みる。
+- **手順の実行:** 各手順は instance 上で `setsid nohup` により SSH の接続から切り離して実行し、終了コードをファイルに書く。手元からは短い SSH 接続でそのファイルを定期的に確認する。vast.ai の SSH 中継が長い接続を切ることがあり、以前はそのたびに手順ごと止まっていたため。起動は marker ファイルで二重に実行されないようにしている。
 - **記録:** 結果は `runs/vast/<job>-<時刻>/`（Git の管理外）に置く。`run.json` には、offer、driver、各手順の終了コードと秒数、時間、費用の見積もり、削除の確認を記録する。失敗したときは、container のログも保存する。
 - **SSH:** 手元の `~/.ssh/id_ed25519_vast` を使う（アカウントに登録済み）。vLLM の image は `/root` の権限が緩く、sshd が `authorized_keys` を拒否するので、起動時（onstart）に権限を直している。
 - **API key:** `vastai` には、コマンドの引数ではなく環境変数で渡す。process の一覧に key が出ないようにするため。
 - **既存の instance:** 同じアカウントに、別のプロジェクトの instance がある。本プロジェクトの実行基盤は、自分で作った instance の ID だけを削除・確認する。
-- **依存:** instance 上では `uv sync --locked --no-dev` を使う（学習のときは `--group train` を足す）。
+- **依存:** instance 上では `uv sync --locked --no-dev` を使う（学習のときは `--group train` を足す）。host の回線が途中で切れることがあるので、`uv sync` は最大3回までやり直す。
+- **失敗への備え:** vast.ai の host の不具合で、何度も失敗した（image の取得が終わらない、offer が作成の直前に貸し出される、SSH の中継が切れる、scp が失敗する）。現在は次のように対処している。
+  - 30分以内に起動しない instance は削除し、次に安い offer でやり直す（最大3回。作成の直前に消えた offer は飛ばす）。失敗した起動の費用も `run.json` の `failed_starts` に記録する。
+  - scp は最大4回までやり直す。
+- **並列化:** 3M〜20M のモデルは batch 64 でも VRAM を 1GB も使わないので、学習の job は同じ GPU で複数の学習を並列に走らせる（学習の設定は変えない）。合成データの生成では、vLLM に同時に 256 件の依頼を送る。
 - **Git の管理外のファイル:** 学習データや tokenizer のように `git archive` に入らないファイルは、`JobSpec.uploads` に書く。job runner が instance を作る前に手元の sha256 を計算し、scp で送ってから instance 上で `sha256sum -c` で照合する。記録は `run.json` の `uploads`。`.env` や project の外のパスは受け付けない。
-- **GPU の選び方:** 学習の job は `gpu_ram>=24` の最安の offer を使う。M4 では Tesla V100 が選ばれ、bf16 の autocast は動いたが、V100 は bf16 の演算に対応していない。速度が必要になったら、query に `compute_cap>=800`（Ampere 以降）を加える。
+- **GPU の選び方:** 学習の job（`train_action_v03`、`train_action_v04`、`train_action_v0_scaling`）は `gpu_ram>=24 compute_cap>=800 compute_cap<=900` の最安の offer を使う。torch の cu126 の wheel には Blackwell（sm_120）の kernel がなく、RTX PRO 4000 の host では最初の学習で失敗したため、Ampere〜Hopper に限る。M4 では Tesla V100 が選ばれ、bf16 の autocast は動いたが、V100 は bf16 の演算に対応していない。
+- **disk:** 生成の job は、大きなモデルを順に download するので disk が足りなくなることがある（`gen_action_v04` は、host の空きが 152GB しかなく3つの書き手が失敗した）。書き手ごとに重みと hf_xet の cache を消して `df` を記録し、`gen_action_v04b` は `disk_space>=320` の host に限った。
 
 1. **実行前の確認:** 学習ならローカルの CPU で数 step の smoke test、データの生成なら少数の生成と検査を通してから instance を借りる。バグで課金されるのを防ぐため。
 2. **作成前の承認:** Instance を作る前に、GPU の種類、時間単価、想定時間、上限費用を提示して承認を得る。
@@ -98,6 +113,21 @@ uv run python -m jtalm.infra.job train_action_v0 --approve-dph 0.40   # M4 の�
 5. **再現性の記録:** 各 run について、commit hash、config、Docker image、GPU の種類、driver、費用、所要時間を記録する。
 6. **Instance の種類:** 最初は on-demand を使う。checkpoint からの resume が確実に動くと確認できてから、interruptible に切り替える。
 7. **成果物の管理:** Checkpoint や学習済みの重みは Git に入れない（`*.pt`、`*.safetensors`、`checkpoints/` などは除外済み）。公開するものは Hugging Face で管理する。
+
+### モデルの学習・評価・書き出しのコマンド
+
+どれも `uv run --group train python -m <module>` で実行します。細かい option は各 module の `--help` を参照してください。
+
+| module | 用途 |
+|---|---|
+| `jtalm.model.tokenizer` | SentencePiece の tokenizer を学習して比べる（`tokenizer/out/`、記録は `datasets/manifests/tokenizer_action_v0.json`） |
+| `jtalm.model.train` | Action LM の学習（`--size 3m/5m/20m`、`--data`、`--train-fraction` など） |
+| `jtalm.model.evaluate` | 評価セットでの評価と、ルールベース・既存モデルとの比較表（`--modes plain grammar gate`。gate の閾値は `--val` の validation で選ぶ） |
+| `jtalm.model.quantize` | INT8 / INT4（group 64）の fake quant の checkpoint と容量の見積もり |
+| `jtalm.model.export` | C の runtime と firmware が読む `.jtlm` ファイルの書き出し |
+| `jtalm.model.parity` | C の runtime と PyTorch の出力の一致の確認（Docker で build して実行） |
+
+C の runtime の build（`make -C runtime/host`、Docker の `espressif/idf:v5.5.5` 内で実行）は [`../runtime/host/README.md`](../runtime/host/README.md)、firmware の build、書き込み、実機での計測（`firmware/tools/lm_serial.py`）は [`../firmware/README.md`](../firmware/README.md) を参照してください。
 
 ## 5. 実機操作のルール
 
@@ -113,7 +143,7 @@ uv run python -m jtalm.infra.job train_action_v0 --approve-dph 0.40   # M4 の�
 | 対象 | ライセンス |
 |---|---|
 | ソースコードと文書（本リポジトリ） | Apache License 2.0（Copyright 2026 ayutaz） |
-| モデルの重み（Hugging Face の `ayousanz` で公開。公開前にユーザーの確認を取る） | **CC BY-SA 4.0**。商用利用は可能。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある |
+| モデルの重み（Hugging Face の `ayousanz` で公開。公開前にユーザーの確認を取る。2026-09-29 時点では保留中） | **CC BY-SA 4.0**。商用利用は可能。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある |
 | 合成データセット（Hugging Face の `japanese-data-analyze` で公開） | **CC BY-SA 4.0**。public、manual gate（[`data.md`](data.md) §6） |
 | 第三者のコード | それぞれの条件に従う（例: 公式 StackChan firmware は MIT、`stackchan-idf` は BSL-1.0）。採用前に確認する |
 
@@ -126,7 +156,7 @@ Hugging Face に公開する repository（データセットもモデルも）�
 | 使える | 使えない |
 |---|---|
 | CC BY-SA、CC BY、CC0、パブリックドメイン、MIT / Apache-2.0 などの寛容なライセンスのデータ | 非営利限定（NC）や改変禁止（ND）のデータ |
-| Apache-2.0 / MIT のオープンモデルで生成したデータ（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-3.1-13b-instruct4。[`data.md`](data.md) §3） | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
+| Apache-2.0 / MIT のオープンモデルで生成したデータ（学習データ v0.4 は Qwen3、calm3-22b、sarashina2.2-3b、ABEJA-Qwen2.5-32b-Japanese、Mistral-Nemo-Japanese、granite-3.3-8b、ELYZA-Shortcut-Qwen-32B の7つ、評価セットは llm-jp-3.1-13b-instruct4。[`data.md`](data.md) §3） | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
 | — | 出典やライセンスが分からないデータ |
 
 - 具体的な方針、規約の調査結果、使うデータとモデルの一覧は [`data.md`](data.md) にまとめています。

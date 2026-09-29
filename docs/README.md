@@ -25,7 +25,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 | 利用者 | Stack-chan などに組み込んで使う**開発者**。組み込みやすさ、仕様の明確さ、再現性を重視する |
 | 入力 | **テキストのみ**。主な対象は漢字仮名交じりの日本語で、英語の命令は評価用に少量だけ扱う |
 | 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
-| 公開 | モデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz)、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate。モデルは公開の前にユーザーの確認を取る |
+| 公開 | モデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz)、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate。モデルは公開の前にユーザーの確認を取る（2026-09-29 時点では、ユーザーの判断で保留中） |
 | 学習データ | Apache-2.0 のオープンモデルと、ライセンスが両立する既存データで作る。Claude Code は、コードの作成と実行だけを担当する（[`data.md`](data.md)） |
 | 期限 | 決まっていない。できるだけ早く作る |
 | 実行体制 | 実装、学習、評価、実機での計測は、すべて **Claude Code** が実行する。学習と合成データの生成は vast.ai で行う。工数は Claude Code の作業時間で見積もる（[`roadmap.md`](roadmap.md) §13） |
@@ -35,16 +35,24 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 | Japanese Action LM | 日本語 text | Action の JSON（0〜2個、`[]` は no-action） | サーボ（視線、うなずき）と表情の制御。対象外や曖昧な入力には no-action を返す | 1 |
 | Japanese Tiny Chat LM | 日本語 text | 短い日本語 text | 短い応答、簡単な会話、状態に応じた発話文の生成 | 2 |
 
-**Action LM の完了条件（暫定。[`roadmap.md`](roadmap.md) §4）**
+**Action LM の完了条件（[`roadmap.md`](roadmap.md) §4）**
 
 - 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action の recall 95%以上と precision 0.90以上、schema 妥当 100%
 - 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
 - M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別の両方で上回る
 - 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たし、servo を実際に動かす
 
+**達成状況（2026-09-29）:** 採用した 3M（v0.4 のデータ、INT4）で、servo を動かすこと以外の条件をすべて満たしました。
+
+- 評価セットで完全一致 94.3%、multi 96.9%、否定 94〜95%、no-action の recall 0.96 / precision 0.98、grammar ありで schema 妥当 100%
+- TinyLM-Bench の16件で 87.5%（実機の標準の gate ありでは 75.0%）。Needle 2（18.8%）、FunctionGemma 270M（37.5%）、MimiModel（6.2%）を上回る
+- ルールベースを、英語（参考値）を除くすべてのカテゴリで上回る
+- INT4 でも精度を保ち、host の C 実装は PyTorch と一致し、実機の出力も評価セット全 1,189件で一致した。1回の応答は中央値 1.08〜1.15 秒
+- 残り: Action から servo を実際に動かすこと（向きと中立の位置は B2 で確認済み）と、画面・servo と同居させたときのメモリーの確認
+
 **公開物（Hugging Face と GitHub）**
 
-- Hugging Face（`ayousanz`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果（公開前にユーザーが確認する）
+- Hugging Face（`ayousanz`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果（公開前にユーザーが確認する。2026-09-29 時点では保留中）
 - Hugging Face（`japanese-data-analyze`、dataset）: 合成データセット。public、manual gate、CC BY-SA 4.0。**2026-09-29 に公開済み**（[`data.md`](data.md) §6）
 - GitHub: 学習と評価の code、ESP32 runtime
 
@@ -168,6 +176,9 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 - [`data.md`](data.md): 学習データの方針、規約の調査結果、使うデータと生成モデル、合成データの公開方法
 - [`research_notes.md`](research_notes.md): 先行例、比較、差別化、市場・新規性の仮説
 - [`roadmap.md`](roadmap.md): 実装順、マイルストーン、評価、gate、今後の調査項目
+- [`../runtime/host/README.md`](../runtime/host/README.md): C の推論 runtime（`.jtlm` 形式、build、PyTorch との一致の確認）
+- [`../firmware/README.md`](../firmware/README.md): CoreS3 向けの firmware（build、書き込み、実機での計測）
+- `../results/`: 評価の比較表と学習の記録（M4 以降）
 
 ## 7. 記述の確度
 
@@ -218,6 +229,10 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | Track B で、第三者のコード（`stackchan-idf`、`esp32-llm` と、それらが指定する依存物）を取得して build し、実機に書き込むことを、ユーザーが明示的に許可した | [`hardware.md`](hardware.md) |
 | 2026-09-29 | Hugging Face に公開する repository（データセットとモデル）は、すべて Community contributions（Discussions と Pull Requests）を off にする。公開済みのデータセットにも設定した | [`data.md`](data.md) §6、[`development.md`](development.md) §6 |
 | 2026-09-29 | モデルの公開先はユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz) に変更する（データセットは `japanese-data-analyze` のまま）。モデルを公開する前には必ずユーザーの確認を取る | [`architecture.md`](architecture.md) §13 |
-| 2026-09-29 | 学習データは v0.4（書き手7つ、47,450件）を採用する。モデルサイズは、精度の面では 3M（INT4）を第一候補とし、B4 の実機速度を見て最終決定する | [`roadmap.md`](roadmap.md) §12 |
+| 2026-09-29 | 学習データは v0.4（書き手7つ、47,450件）を採用する。モデルサイズは、精度の面では 3M（INT4）を第一候補とし、B4 の実機速度を見て最終決定する（→ 同日、3M INT4 に決定。下の行） | [`roadmap.md`](roadmap.md) §12 |
 | 2026-09-29 | 実機では confidence gate を標準で有効にする（v0.4 の 3M で閾値 0.970、致命的な誤りを 2.0% → 0.6%）。閾値は開発者が変えられるようにする | [`roadmap.md`](roadmap.md) §12 |
 | 2026-09-29 | **Action LM のモデルサイズを 3M（INT4）に決定する。** 評価セットの完全一致は 94.3%（5M は 93.3%）、実機の応答は中央値 1.15 秒（5M INT4 は 1.79 秒）で、容量は `.jtlm` で約 2.0MB | [`roadmap.md`](roadmap.md) §12、[`hardware.md`](hardware.md) §11 |
+| 2026-09-29 | 学習データの書き手を増やす。v0.3 で calm3-22b と sarashina2.2-3b を、v0.4 で ABEJA-Qwen2.5-32b-Japanese、Mistral-Nemo-Japanese（CyberAgent）、granite-3.3-8b、ELYZA-Shortcut-Qwen-32B を加え、7つにする（いずれも Apache-2.0 / MIT）。学習データは 47,450件に増やす。当初の「Qwen3 と予備の gpt-oss」「2,000〜10,000件」を置き換える。量の確認で、同じ書き手を増やしても効かないと分かったため | [`data.md`](data.md) §3、§5 |
+| 2026-09-29 | 実機の runtime の構成を決める。配布は1つの `.jtlm` ファイル（設定、tokenizer、RoPE の表、重み）にし、14MB の `model` partition（0x200000）から mmap で読む。KV cache は f32 で PSRAM に、activation は内部 SRAM に置く。入力はまとめて処理し（batch prefill）、行列の計算は2つの core で分ける | [`architecture.md`](architecture.md) §5–10、[`hardware.md`](hardware.md) §11 |
+| 2026-09-29 | vast.ai での学習は compute capability 8.0〜9.0 の GPU（Ampere〜Hopper）に限る。torch の cu126 の wheel に Blackwell（sm_120）の kernel がないため | [`development.md`](development.md) §4 |
+| 2026-09-29 | モデルの公開は、ユーザーの判断で保留する。公開するときは、直前に内容を提示して確認する | [`architecture.md`](architecture.md) §13 |

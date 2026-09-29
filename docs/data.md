@@ -43,7 +43,11 @@ Claude が書いた生成用の指示文（prompt）やコードまで問題に�
 | **`llm-jp/llm-jp-3.1-13b-instruct4`**（bf16、約27GB） | Apache-2.0（確認済み） | **評価セット**の文を書く（学習データには書かない） |
 | **`cyberagent/calm3-22b-chat`**（bf16、45GB） | Apache-2.0（モデルカードで確認済み。CyberAgent が一から学習した日本語モデル） | **学習データ**の文を書く（v0.3 から） |
 | **`sbintuitions/sarashina2.2-3b-instruct-v0.1`**（bf16、6.7GB） | MIT（モデルカードで確認済み。SB Intuitions の日本語モデル） | **学習データ**の文を書く（v0.3 から） |
-| gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備（v0.4 の候補） |
+| **`abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0`**（bf16、65GB） | Apache-2.0（モデルカードで確認済み。Qwen2.5-32B-Instruct に日本語の継続事前学習と追加学習をしたもの） | **学習データ**の文を書く（v0.4 から） |
+| **`cyberagent/Mistral-Nemo-Japanese-Instruct-2408`**（bf16、25GB） | Apache-2.0（モデルカードで確認済み） | **学習データ**の文を書く（v0.4 から） |
+| **`ibm-granite/granite-3.3-8b-instruct`**（bf16、16GB） | Apache-2.0（モデルカードで確認済み） | **学習データ**の文を書く（v0.4 から） |
+| **`elyza/ELYZA-Shortcut-1.0-Qwen-32B`**（bf16、65GB） | Apache-2.0（モデルカードで確認済み） | **学習データ**の文を書く（v0.4 から） |
+| gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備（v0.4 では使わなかった） |
 
 - 生成元を分けることで、生成のくせを暗記しただけのモデルを評価で見抜けるようにしています。
 - 当初は llm-jp-4.1 を評価セット用にする予定でした。しかし llm-jp-4.1 には思考過程を出す（thinking）版しかなく、出力形式の制約と両立させにくいため、同じ llm-jp 系の llm-jp-3.1 の instruct 版に変えました（M3、2026-09-29）。
@@ -115,6 +119,13 @@ uv run python -m jtalm.data.build --raw <run1>/artifacts/raw <run2>/artifacts/ra
     --extra-config configs/action_v0_negation_topup.json                     # 組み立てと manifest
 uv run python -m jtalm.data.publish prepare                                  # 公開用のファイルとカード
 uv run python -m jtalm.data.publish publish --confirm                        # 公開（最終確認のあと）
+
+# v0.3 / v0.4: 学習データだけを追加する（前の版のファイルと評価セットはそのまま残す）
+uv run python -m jtalm.infra.job gen_action_v03 --approve-dph 1.10
+uv run python -m jtalm.data.build --base datasets/action/v0 --raw <run>/artifacts/raw_<writer> ...     --config configs/action_v03_qwen.json --extra-config configs/action_v03_<writer>.json ...     --out datasets/action/v0.3 --manifest datasets/manifests/action_v0.3.json
+uv run python -m jtalm.infra.job gen_action_v04 --approve-dph 1.10
+uv run python -m jtalm.infra.job gen_action_v04b --approve-dph 1.35   # 失敗した書き手の生成と全体の検証
+uv run python -m jtalm.data.build --base datasets/action/v0.3 --raw <run>/artifacts/raw04_<writer> ...     --config configs/action_v04_qwen.json --extra-config configs/action_v04_<writer>.json ...     --out datasets/action/v0.4 --manifest datasets/manifests/action_v0.4.json
 ```
 
 件数と baseline は [`roadmap.md`](roadmap.md) §12 の「M3 の結果」にあります。
@@ -147,7 +158,7 @@ v0 のファイルはそのまま残し、学習データだけを追加しま�
 
 ### v0.4（2026-09-29）
 
-v0.3 に、7つの書き手で書いた文を追加しました（`jtalm.data.build --base datasets/action/v0.3`）。評価セットは v0 と同じです。
+v0.3 に、7つの書き手（新しい4つと、続けて使う3つ）で書いた文を追加しました（`jtalm.data.build --base datasets/action/v0.3`）。評価セットは v0 と同じです。
 
 | 項目 | 内容 |
 |---|---|
@@ -168,7 +179,8 @@ v0.3 に、7つの書き手で書いた文を追加しました（`jtalm.data.bu
 | 公開先 | **[`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)**（2026-09-29 公開） |
 | 公開設定 | **public、manual gate**（利用申請を手動で承認する）。ログインしていない状態でファイルを取得すると HTTP 401 になることを確認済み。**Community contributions（Discussions と Pull Requests）は off**（2026-09-29 に設定し、Discussions の一覧が HTTP 403 になることを確認済み） |
 | 時期 | M3 の完了時（モデルより先） |
-| 件数 | train 7,919 / validation 425 / test 1,039（合成の文だけ） |
+| 件数 | train 7,919 / validation 425 / test 1,039（合成の文だけ。**公開しているのは v0 だけ**） |
+| v0.3 / v0.4 | 公開していない。ファイルは手元の `datasets/action/v0.3`、`datasets/action/v0.4`（Git の管理外）にあり、出典、件数、hash は `datasets/manifests/action_v0.3.json`、`action_v0.4.json` に記録している。公開するかどうかは、モデルの公開と合わせて判断する |
 | ライセンス | **CC BY-SA 4.0**（モデルの重みと同じ。2026-09-29 決定） |
 | データセットカード | 生成に使ったモデルとライセンス、生成方法、検査の規則、件数、既知の限界、Claude Code の役割（pipeline のコードの作成だけ） |
 | 既存データ | MASSIVE などの第三者データは再配布せず、manifest で出典を参照する |

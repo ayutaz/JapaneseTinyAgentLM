@@ -26,12 +26,12 @@ Phase 0 の exit gate は、実機の予算に依存する判断（partition、�
   - ESP-IDF は **v5.5.5** に固定する。K151 に対応している公式 `m5stack/StackChan`（v5.5.4）と `stackchan-idf`（v5.5.5 で検証）に合わせるためで、最新の v6.1 は使わない。
   - LM の評価には、LM runtime と servo 制御だけを持つ**自前の最小 firmware** を使う。
   - Servo の driver は、`stackchan-idf`（BSL-1.0）の `scs_servo` か、公式（MIT）の driver を流用する。
-- 実機を動かして、yaw の符号（公式規約では正の値が右）と pitch の中立角度を確認する。
-- 自前の最小 firmware で、Flash の使用量と、状態ごと（idle / 画面表示 / servo 駆動 / LM 推論）の内部 SRAM・PSRAM の peak を実測し、**LM が使える予算を確定する**。
-- Action vocabulary、値域、no-action policy を定義。→ **完了**（M2。Action schema v0 と `[]` の扱いは `src/jtalm/action/`、評価は `jtalm.eval`。confidence gate は M5 で実装する。[`architecture.md`](architecture.md) §7–8）。
+- 実機を動かして、yaw の符号（公式規約では正の値が右）と pitch の中立角度を確認する。→ **完了**（B2、2026-09-29。中立は yaw raw 460 / pitch raw 620、ロボット自身の右へ回すと yaw の raw が減る。[`hardware.md`](hardware.md) §10）。
+- 自前の最小 firmware で、Flash の使用量と、状態ごと（idle / 画面表示 / servo 駆動 / LM 推論）の内部 SRAM・PSRAM の peak を実測し、**LM が使える予算を確定する**。→ **一部完了**（B3 で idle、B4 で LM 推論を計測。画面・servo と同居させた状態は未計測）。
+- Action vocabulary、値域、no-action policy を定義。→ **完了**（M2。Action schema v0 と `[]` の扱いは `src/jtalm/action/`、評価は `jtalm.eval`。confidence gate は M5 で実装し、v0.4 で閾値 0.970 に調整して実機で標準 ON にした。[`architecture.md`](architecture.md) §7–8）。
 - LM の入力仕様を文書化する。→ **決定済み**（テキストのみ、UTF-8、漢字仮名交じり文が主。[`architecture.md`](architecture.md) §12）。
 - Dataset provenance と license policy を定義。→ **完了**（[`data.md`](data.md)、M3 の manifest `datasets/manifests/action_v0.json`）。
-- 共通 benchmark harness と結果 JSON schema を作る。→ Action の評価器は M2 で実装済み（`jtalm.eval`）。実機の harness と結果の JSON schema は、B2.5 / B3 で作る。
+- 共通 benchmark harness と結果 JSON schema を作る。→ **完了**。Action の評価器は M2（`jtalm.eval`）、実機の harness は B4（`firmware/tools/lm_serial.py`、結果は `results/b4_device/*.summary.json`、実機の出力は `JTALM {json}` の1行）。
 
 ### Exit gate
 
@@ -44,7 +44,7 @@ Phase 0 の exit gate は、実機の予算に依存する判断（partition、�
 
 ### 実験
 
-- Action 用 vocab 2k / 4k / 8k（M4 で固定）。
+- Action 用 vocab 2k / 4k / 8k を比べ、**2k に固定**（M4）。
 - Chat 用 vocab 4k / 8k / 12k / 16k（Chat の段階で固定）。
 - 3M / 5M / 10M / 20M config を同一 code path で生成（20M は PC だけの上限参照）。
 - 小規模 corpus で overfit test、loss curve、resume、determinism を確認。
@@ -97,7 +97,7 @@ TinyLM-Bench の16件は、開発中の smoke test として使います。モ�
 
 ### Model axis
 
-- 3M / 5M / 10M（実機に載せる候補）。
+- 3M / 5M / 10M（実機に載せる候補）。→ **3M INT4 に決定**（2026-09-29、§12）。
 - 20M（必要なら 50M）: 実機には載せない上限参照（学習は vast.ai、評価は PC 上の host だけで行う）。3M / 5M の精度が低いとき、原因が capacity なのか、data や tokenizer なのかを切り分ける（[`architecture.md`](architecture.md) §3）。
 - INT8 / INT4。
 - context 64 / 128 / 256。
@@ -120,7 +120,7 @@ TinyLM-Bench の16件は、開発中の smoke test として使います。モ�
 - 上の目標値は、TinyLM-Bench の検証メモ（94）の提案を**暫定値**として採用したものです。M4 の最初の評価（2026-09-29、§12「M4 の結果」）の後に見直し、値は据え置きました。no-action には **precision 0.90 以上**の目標を加えます（ルールベースは 0.80、M4 の 3M は 0.86）。英語の命令は学習データに入れていないので、参考値として扱います。
 - Critical slot（方向、否定、量）の error budget は別に設定する。
 - OOD / 無関係な入力で誤って動作してしまう率を、許容値以下にする。
-- **既存モデルに勝つこと:** TinyLM-Bench の共通評価（16件）で、Needle 2、FunctionGemma 270M、MimiModel の厳格一致率を上回る。既存モデルは 16件分の出力しか手元にないため、1,189件の評価セットでの比較は、M5 で TinyLM-Bench の host 環境で流せるかを判断する。
+- **既存モデルに勝つこと:** TinyLM-Bench の共通評価（16件）で、Needle 2、FunctionGemma 270M、MimiModel の厳格一致率を上回る。既存モデルは 16件分の出力しか手元にないため、1,189件の評価セットでの比較は未実施（16件でだけ比べている）。→ v0.4 の 3M は 16件で 87.5%、採用した構成（INT4 + grammar + gate）は 75.0% で、3モデル（18.8%、37.5%、6.2%）を上回った。
 - **ルールベースの baseline に勝つこと:** M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別（特に single 60.9%、multi_action 46.9%）の両方で上回る。
 
 Baseline は、単純な手法（random、rule-based parser、小型 classifier / seq2seq）と、既存モデル（TinyLM-Bench の上記3モデル）の両方にします。モデルは、単純な手法と既存モデルの両方を上回ることを要求します。
@@ -324,20 +324,20 @@ Python の実装と C runtime は、同じ評価セットと同じ条件で比�
 
 優先度順:
 
-1. K151 上で、自前の最小 firmware（LM runtime と servo 制御）の Flash / PSRAM map を測り、LM の予算を確定する。
+1. K151 上で、自前の最小 firmware（LM runtime と servo 制御）の Flash / PSRAM map を測り、LM の予算を確定する。→ **一部完了**（B3 で idle、B4 で LM 推論を計測。画面・servo と同居させた状態は未計測）。
    - 1a. Yaw の符号と pitch の中立角度を実機で確認する（**完了**、2026-09-29。[`hardware.md`](hardware.md) §10）。
 2. Needle 2 の artifact format、kernel、grammar の再利用可能性と license。
 3. ESP32-S3 SIMD / ESP-DSP / ESP-NN / ESP-DL を使う quantized GEMV の比較。既存の runtime（esp32-llm の Xtensa PIE INT8 kernel、esp32-mind / esp32-ai の int4 PLE runtime）を流用できるかと、その license も調べる。
-4. MQA/GQA、KV INT8、sliding window、recompute の速度・メモリ trade-off。
+4. MQA/GQA、KV INT8、sliding window、recompute の速度・メモリ trade-off。→ GQA は採用済み。KV cache は f32（PSRAM）のままで、INT8 は未実装。
 5. 日本語 Action dataset の品質の検証。v0 は M3 で作成・公開済み（[`data.md`](data.md)）。残りは、学習結果を見たうえでの人手の抜き取り確認、生成元の偏り、評価セットの難易度の確認。
 6. Rule-based parser、小型 classifier、seq2seq との比較。ルールベースは M3 で測定済み（評価セットで 76.4%）。小型 classifier / seq2seq は未実施。
 7. 既存の日本語 on-device tool-calling model、論文、製品、特許の網羅調査。公開されている小型モデル9種の Windows host での検証は、TinyLM-Bench で済んでいる（[`research_notes.md`](research_notes.md) §3.7）。
 8. Grammar compiler の supported subset と code size。
-9. Flash mmap、microSD streaming、external storage の latency。
+9. Flash mmap、microSD streaming、external storage の latency。→ Flash mmap は計測済み（順次読み出し 31.2 MB/s。B3）。重みは Flash から mmap する方式に決めた。
 10. OTA / rollback / recovery partition を残したまま成立する構成。
 11. Servo safety、privacy、offline data retention の要件。
 12. 開発者が求める latency と品質の水準。
-13. Hugging Face の**モデルの** repository 名、商標、release packaging（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）。ライセンスは決定済み（重みとデータセットは CC BY-SA 4.0）。
+13. Hugging Face の**モデルの** repository 名、商標、release packaging（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）。ライセンスは決定済み（重みとデータセットは CC BY-SA 4.0）。モデルの公開先は user `ayousanz` で、**公開はユーザーの判断で保留中**。
 14. （優先度低）ひらがなだけの入力と、漢字仮名交じり文の比較。入力はテキストのみと決まったので、ひらがなは頑健性の確認用の一部として評価するだけにする。
 
 TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲外として外しました（2026-09-29）。
@@ -348,12 +348,12 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 
 1. （M2 で完了）Action schema v0 を `look` / `set_expression` / `nod` / no-action に絞る。形式は TinyLM-Bench と同じにし、1回の出力は 0〜2個とする（[`architecture.md`](architecture.md) §7）。
 2. （M3 で完了）漢字仮名交じり文を主とした dataset を作る（ひらがなだけの入力は一部）。学習データは 2,000〜10,000件とし、否定と no-action をそれぞれ20%以上にする。multi-action、否定、no-action を独立したカテゴリにし、対比ペアを入れる。データはすべて CC BY-SA 4.0 と両立させ、出典を manifest に記録する。
-3. Tokenizer を先に固定してから、3M と 5M を学習する（vast.ai 上）。実機には載せない上限参照として 20M も学習する。
-4. Grammar なし/ありと confidence gate なし/ありで、カテゴリ別の exact match と no-action を比較する。
-5. INT8 → INT4 の精度差を、カテゴリ別に測る。
-6. TinyLM-Bench の共通評価で、既存モデル（Needle 2、FunctionGemma 270M、MimiModel）と比べる。
-7. 5M INT4 を ESP32-S3 に載せ、Flash、PSRAM、tok/s、latency を測る。
-8. 結果を見て、Action の改善を続けるか（10M Action、データの見直し）、完了条件を満たして Chat へ進むかを決める。
+3. （M4 で完了）Tokenizer を先に固定してから、3M と 5M を学習する（vast.ai 上）。実機には載せない上限参照として 20M も学習する。
+4. （M5、v0.4 で完了）Grammar なし/ありと confidence gate なし/ありで、カテゴリ別の exact match と no-action を比較する。
+5. （M5 で完了）INT8 → INT4 の精度差を、カテゴリ別に測る。
+6. （M4〜v0.4 で完了）TinyLM-Bench の共通評価で、既存モデル（Needle 2、FunctionGemma 270M、MimiModel）と比べる。
+7. （B4 で完了）3M / 5M の INT8 / INT4 を ESP32-S3 に載せ、Flash、PSRAM、tok/s、latency を測る。
+8. （判断済み）結果を見て、Action の改善を続けるか（10M Action、データの見直し）、完了条件を満たして Chat へ進むかを決める。→ 3M（v0.4）で Action の精度の目標をすべて満たした。残りは Action から servo を動かす部分で、その後 Chat へ進む（下の「次の計画」）。
 
 これにより、最も重要な「日本語 Action LM は小型化しても成立するか」を、Full pipeline の複雑さから切り離して検証できます。
 
@@ -364,7 +364,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | 項目 | 状態 |
 |---|---|
 | Private repository の作成、LICENSE（Apache-2.0）、`.gitignore` | 完了 |
-| 設計文書（`docs/`） | 完了（本更新を含む） |
+| 設計文書（`docs/`） | 完了（2026-09-29 の B2 まで反映） |
 | B0 実機の初回調査 | 完了 |
 | `.env` の `VAST_API_KEY` | 設定済み。認証と課金設定を確認済み |
 | `.env` の `HF_TOKEN` | 設定済み。user `ayousanz` の write token で、`japanese-data-analyze` の admin であることも確認済み |
@@ -373,11 +373,14 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |
 | M3 合成データセット | **完了**（2026-09-29）。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
 | M4 Tokenizer と 3M / 5M / 20M の学習 | **完了**（2026-09-29）。下の「M4 の結果」 |
-| Track B | B1、B3（計測）、B2.5 は **完了**、B2 は build まで完了（2026-09-29）。残りは servo の確認（ユーザーの立ち会いが必要）。結果は [`hardware.md`](hardware.md) §7–§10 |
-| M5 grammar と量子化 | **完了**（2026-09-29）。grammar で致命的な誤りを 1/3 に、INT4 でも精度は落ちない。confidence gate は保留 |
+| Track B（B0〜B3） | **完了**（2026-09-29）。B2 の servo の確認は、ユーザーの立ち会いのもとで実施した（中立は yaw 460 / pitch 620、ロボット自身の右へ回すと yaw の raw が減る）。結果は [`hardware.md`](hardware.md) §7–§10 |
+| B4 実機への移植 | **完了**（2026-09-29）。`firmware/jtalm_action/`。評価セット全 1,189件で、実機の出力が host と一致。3M INT4 の1回の依頼は中央値 1.08〜1.15 秒（[`hardware.md`](hardware.md) §11）。Action から servo を動かす部分は未実施 |
+| M5 grammar と量子化 | **完了**（2026-09-29）。grammar で致命的な誤りを 1/3 に、INT4 でも精度は落ちない。confidence gate は v0.4 で閾値 0.970 に調整し、実機で標準 ON（致命的な誤り 2.0% → 0.6%） |
 | データ v0.3 / v0.4 | **完了**。3M で v0.3 は 91〜92%、v0.4 は 94.2〜94.4%（Action の目標値をすべて満たした） |
 | M6 Host C runtime | **完了**（2026-09-29）。3M / 5M の FP32 / INT8 / INT4 で、出力が PyTorch と完全に一致（[`runtime/host/README.md`](../runtime/host/README.md)） |
-| vast.ai の費用（累計） | 約 $3.40（`runs/vast/*/run.json` の合計。M2.5〜M3 が約 $1.03、M4 が約 $0.24、M4 の後の量の確認・v0.3・v0.4 の生成と学習が、失敗した起動を含めて約 $2.13。実行中の v0.4b は含まない。2026-09-29 09:10 UTC 時点） |
+| モデルサイズ | **3M INT4 に決定**（2026-09-29。下の「データ量とモデルサイズの決定」） |
+| モデルの公開 | 公開先は user `ayousanz`。**ユーザーの判断で保留中** |
+| vast.ai の費用（累計） | 約 $4.26（`runs/vast/*/run.json` の 20 run の合計）。M2.5〜M3 が約 $1.03、M4 が約 $0.24、M4 の後が約 $3.00（量の確認 $0.13、v0.3 の生成 $0.68・学習 $0.20、v0.4 の生成 $1.77（v0.4b を含む）・学習 $0.21）。失敗した起動や接続の不具合の分を含む |
 
 ### M1〜M3 の目的と完了条件
 
@@ -486,26 +489,27 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 - すべての構成で、評価セット 1,189件の token 列と出力が PyTorch と一致した（argmax の反転は 0 件）。C の完全一致率は Python と同じ。
 - Tokenizer（SentencePiece の unigram と `nmt_nfkc` の正規化を移植）は、学習データ 9,067、validation 477、評価セット 1,189 の全件と、無作為な 2万件で一致した。
 - ESP32 と同じ float の累積（`-DJTLM_ACC=float`）でも、3M の6つの構成すべてで一致した。
-- 配布形式は `.jtlm`（1ファイルに設定、tokenizer、RoPE の表、重みを入れる）。3M INT4 は 2.0MB、5M INT4 は 3.0MB（どちらも tokenizer の 0.27MB を含む）。作業領域は 3M で 477KB、5M で 416KB（大半は f32 の KV cache）で、token ごとの malloc はない。
-- PC（Docker、1 thread）での速度は、3M FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。ESP32 向けの kernel は B4 で作る。
+- 配布形式は `.jtlm`（1ファイルに設定、tokenizer、RoPE の表、重みを入れる）。3M INT4 は 2.0MB、5M INT4 は 3.0MB（どちらも tokenizer の 0.27MB を含む）。作業領域（B4 で batch prefill を入れた後、`JTLM_BATCH`=16）は 3M で 584,704 B（KV cache 458,752 B と activation など 125,952 B）、5M で 569,344 B で、token ごとの malloc はない。
+- PC（Docker、1 thread）での速度は、3M FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。ESP32 上の速度は B4 で計測した（下の「B4」と [`hardware.md`](hardware.md) §11）。
 
 **6. データ v0.4**（書き手を7つにして 47,450件。[`data.md`](data.md) §5、`results/v04_action`、`results/v04_quant`）:
 
 | model | 全体 | single | multi | negation | no_action | correction | no-action P / R | 対比ペア |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **3M（seed 0 / 1）** | **94.2 / 94.4** | 89.0 / 90.4 | 96.9 / 96.9 | 95.2 / 94.4 | 97.0 / 96.4 | 94.5 / 98.2 | 0.98 / 0.96〜0.99 | 92.5 / 88.8 |
+| **3M（seed 0 / 1）** | **94.2 / 94.4** | 89.0 / 90.4 | 96.9 / 96.9 | 95.2 / 94.4 | 97.0 / 96.4 | 94.5 / 98.2 | 0.98〜0.99 / 0.96 | 92.5 / 88.8 |
 | 5M（seed 0 / 1） | 93.4 / 93.2 | 90.1 / 88.7 | 91.7 / 91.7 | 95.9 / 96.3 | 96.4 / 97.0 | 87.3 / 87.3 | 0.98 / 0.96〜0.97 | 95.0 / 91.2 |
 | 20M | 95.0 | 90.4 | 97.4 | 96.7 | 98.5 | 85.5 | 0.98 / 0.98 | 95.0 |
-| 3M INT4 + grammar（seed 0 / 1） | 94.3 / 94.4 | 89.3 / 91.0 | 97.4 / 96.9 | 95.2 / 94.1 | 97.0 / 96.1 | 92.7 / 98.2 | 0.98 / 0.95〜0.99 | 92.5 / 90.0 |
+| 3M INT4 + grammar（seed 0 / 1） | 94.3 / 94.4 | 89.3 / 91.0 | 97.4 / 96.9 | 95.2 / 94.1 | 97.0 / 96.1 | 92.7 / 98.2 | 0.98〜0.99 / 0.95〜0.96 | 92.5 / 90.0 |
 
 - 3M の推移（2 seed の平均）: v0（0.9万件、書き手1）84.4% → v0.3（1.8万件、書き手3）91.7% → v0.4（4.7万件、書き手7）94.3%。伸びは続いているが、幅は小さくなってきた。
 - **3M で Action の目標値をすべて満たした**（全体 90%以上、multi / 否定 90%以上、no-action の recall 95%以上、precision 0.90以上）。ルールベースは、英語（学習データになく、参考値）を除くすべてのカテゴリで上回った。
 - 5M は 3M を上回らず、20M は +0.7 point にとどまる。INT4 にしても精度は落ちない（3M: 94.2% → 94.3%）。
+- TinyLM-Bench の16件（`results/v04_quant`、`results/v04_gate`）では、3M は 87.5%（2 seed とも、INT4 + grammar でも同じ）、採用した構成（INT4 + grammar + gate）は 75.0% で、Needle 2（18.8%）、FunctionGemma 270M（37.5%）、MimiModel（6.2%）を上回った。
 - grammar ありでも残る致命的な誤りは 2.0%（false_action 23件、うち英語 11件。reverse_direction 1件）。ひらがなだけの雑談を「正面を向く」と答える誤り（確信度 0.70〜0.89）と、「〜してはだめだよ」のような否定を動作の依頼と取り違える誤りが残る。
 
-**confidence gate（v0.4、`results/v04_gate`）:** 書き手7つの validation（2,497件）で閾値を選ぶと 0.970 になり、3M INT4 + grammar に gate をかけると、全体は 94.4%（gate なしは 94.3%）のまま、致命的な誤りが 2.0% → 0.6%（false_action 23 → 7件）に減った。negation は 97.8%、no_action の recall は 99.7% に上がり、single（87.2%）と correction（85.5%）は下がり、no-action の precision は 0.93 になる。誤って動くことを最も避けたいので、**実機では gate を標準で有効にし、閾値は開発者が変えられるようにする**。M4 では gate が逆効果だったが、validation の書き手が1つで、閾値の選び方が実際の分布とずれていたためと考えられる。
+**confidence gate（v0.4、`results/v04_gate`）:** 書き手7つの validation（2,497件）で閾値を選ぶと 0.970 になり、3M INT4 + grammar に gate をかけると、全体は 94.4%（gate なしは 94.3%）のまま、致命的な誤りが 2.0% → 0.6%（false_action 23 → 7件）に減った。negation は 97.8%、no_action カテゴリは 99.7%（no-action の recall 0.99）に上がり、single（87.2%）と correction（85.5%）は下がり、no-action の precision は 0.93 になる。誤って動くことを最も避けたいので、**実機では gate を標準で有効にし、閾値は開発者が変えられるようにする**。M4 では gate が逆効果だったが、validation の書き手が1つで、閾値の選び方が実際の分布とずれていたためと考えられる。
 
-**B4（実機、`results/b4_device`、[`hardware.md`](hardware.md) §11）:** M6 の runtime を CoreS3 に載せ、評価セットの先頭 200件で、実機の出力が host と一致した（3M FP32 / INT8 / INT4、5M INT8 / INT4 のすべてで 200/200）。
+**B4（実機、`results/b4_device`、[`hardware.md`](hardware.md) §11）:** M6 の runtime を CoreS3 に載せ、評価セットの先頭 200件で、実機の出力が host と一致した（M4 の checkpoint で、3M FP32 / INT8 / INT4、5M INT8 / INT4 のすべてで 200/200）。採用した v0.4 の 3M INT4 では、評価セットの全 1,189件で一致した（下）。
 
 | model | decode（ms/token） | 1回の依頼（中央値 / p90） | 内部 SRAM の空き（読み込み後） |
 |---|---:|---:|---:|
@@ -519,7 +523,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 - **採用した構成（v0.4 の 3M INT4、grammar、confidence gate 0.970）を実機の標準にした。** 評価セットの全 1,189件で、実機の出力（gate の前と後の両方）が host と一致し、実機での完全一致は 94.45%、致命的な誤りは 0.59%（Python と同じ）。1回の依頼は中央値 1.08 秒、p90 1.86 秒。
 - 1 token の decode に約 0.1 秒かかるので、応答時間は出力の token 数に比例する。JSON の断片を1 token にまとめた tokenizer（M4）が、そのまま速さに効いている。
 
-**データ量とモデルサイズの候補（2026-09-29）:**
+**データ量とモデルサイズの決定（2026-09-29）:**
 
 - **データ:** v0.4 を採用する。さらに増やす（v0.5、10万件規模）と +1〜2 point と見込まれるが、目標は満たしたので、次は弱点（ひらがなの雑談、否定の言い回し）を狙った追加を優先する。
 - **モデルサイズ:** **3M（INT4、約 2.0MB の `.jtlm`）に決定**（2026-09-29）。精度は 5M より高く（94.3% と 93.3%）、実機では 5M より速い（1回の依頼の中央値 1.15 秒と 1.79 秒）。20M は実機に載らず、精度の差も +0.7 point にとどまる。
@@ -529,29 +533,31 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | 順 | 作業 | 状態 |
 |---|---|---|
 | 1 | データ v0.4: 書き手を 7 つにして約 5 万件に増やす（ABEJA-Qwen2.5-32B-Japanese、Mistral-Nemo-Japanese、granite-3.3-8b、ELYZA-Shortcut-32B、calm3、sarashina2.2、Qwen3） | **完了**（47,450件。1回目は host の disk 不足で3つの書き手が失敗し、成功した4つを回収して `gen_action_v04b` で残りを生成した） |
-| 2 | v0.4 で 3M / 5M / 20M を再学習し、v0 / v0.3 / v0.4 の曲線から、**データ量とモデルサイズの候補**を決める | **完了**（データは v0.4、サイズは 3M が第一候補） |
+| 2 | v0.4 で 3M / 5M / 20M を再学習し、v0 / v0.3 / v0.4 の曲線から、**データ量とモデルサイズの候補**を決める | **完了**（データは v0.4、サイズは 3M が第一候補 → 手順 4 で 3M INT4 に決定） |
 | 3 | 採用するモデルを INT8 / INT4 で確認する | **完了**（3M INT4 + grammar で 94.3 / 94.4%） |
-| 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | **完了**。実機の出力は host と 200/200 一致。3M INT4 は1回の依頼の中央値 1.15 秒（p90 1.53 秒）、5M INT4 は 1.79 秒。**3M INT4 に決定**（[`hardware.md`](hardware.md) §11） |
-| 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | **完了**（2026-09-29）。次は、Action を servo の命令に変換して実機で首を動かす（立ち会いが必要） |
+| 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | **完了**。実機の出力は、採用した構成で評価セット全 1,189件が host と一致（gate の前と後の両方）。3M INT4 は1回の依頼の中央値 1.08〜1.15 秒、5M INT4 は 1.79 秒。**3M INT4 に決定**（[`hardware.md`](hardware.md) §11） |
+| 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | **完了**（2026-09-29） |
+| 6 | Action から servo を動かす dispatcher（[`hardware.md`](hardware.md) §10 の変換式、validator、可動域の制限）を `firmware/jtalm_action` に実装し、実機で首を動かす | 未着手（**ユーザーの立ち会いが必要**） |
+| 7 | 画面、servo、M5Unified と同居させたときの内部 SRAM / PSRAM と速度を測る | 未計測 |
+| 8 | モデルの公開（Hugging Face の user `ayousanz`、CC BY-SA 4.0、Community contributions は off） | **保留（ユーザーの判断）**。公開する場合は、直前に内容を提示して確認を取る |
+| 9 | データ v0.5: 弱点（ひらがなだけの雑談での誤作動、否定の言い回し、英語）を狙って追加する | 検討中 |
+| 10 | Chat LM（10M。事前学習の corpus を決める） | Action の完了後 |
+| 11 | ESP32 の INT8 KV cache（未実装）と、tokenizer の縮小（`.jtlm` の 0.27MB） | 任意 |
 
 - 英語は学習データに入れていないので、完了条件の判定では参考値として扱う（完全一致の全体の値には含まれる）。
 
-**Track B の状況（2026-09-29）:**
-
-- M4 と並行して、B1 → B3 → B2.5 → B2 の準備の順に進めている。Docker Desktop は起動済み。
-- 第三者のコード（`stackchan-idf`、`esp32-llm`、それらが指定する依存物）の取得、build、実機への書き込みは、ユーザーの明示的な許可を得て行う（2026-09-29）。取得したコードは Git の管理外に置く。
-- **B2:** `stackchan-idf` を書き込むと、受領時の firmware が上書きされる。B0 のバックアップ（[`hardware.md`](hardware.md) §6）から戻せる。servo を実際に動かす確認は、ユーザーの立ち会いのもとで行う。
+**Track B の状況（2026-09-29）:** B0〜B4 は完了した。第三者のコード（`stackchan-idf`、`esp32-llm`、それらが指定する依存物）の取得、build、実機への書き込みは、ユーザーの明示的な許可を得て行った。取得したコードは Git の管理外（`firmware/third_party/`）に置いている。実機は、`jtalm_action`（v0.4 の 3M INT4、gate 0.970）の状態で、servo を動かすコードは入っていない。
 
 ### Track A: PC 上の実装マイルストーン
 
 | # | マイルストーン | 成果物 | 完了条件 |
 |---|---|---|---|
-| M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`（権限の設定で作成できず、[`development.md`](development.md) §3 の表で代替）。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
-| M2 | Action schema v0 と評価の土台 | `src/jtalm/action/action_schema_v0.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
-| M2.5 | vast.ai 実行基盤 | `src/jtalm/infra/`（`uv run python -m jtalm.infra.job <job> --approve-dph <上限>`。GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 各手順 → 回収 → 必ず削除 → 費用の記録）。CLI は `uv add --dev vastai`（1.8 系）で lock する。vLLM（`vllm/vllm-openai:v0.30.0`）を使う生成用の構成を含める | 小さな生成と、GPU 上での torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている（学習そのものの確認は M4 で行う） |
-| M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書き、同じモデルが温度 0 で検証する。v0.1 の llm-jp-3.1 による検証は機能しなかったため変更した。評価セットは llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証する）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
+| M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`（権限の設定で作成できず、[`development.md`](development.md) §3 の表で代替）。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版にする（3.13 に固定） | `uv sync --locked` と test がローカルで通る。**完了**（2026-09-29） |
+| M2 | Action schema v0 と評価の土台 | `src/jtalm/action/action_schema_v0.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る。**完了**（2026-09-29） |
+| M2.5 | vast.ai 実行基盤 | `src/jtalm/infra/`（`uv run python -m jtalm.infra.job <job> --approve-dph <上限>`。GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 各手順 → 回収 → 必ず削除 → 費用の記録）。CLI は `uv add --dev vastai`（1.8 系）で lock する。vLLM（`vllm/vllm-openai:v0.30.0`）を使う生成用の構成を含める | 小さな生成と、GPU 上での torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている（学習そのものの確認は M4 で行う）。**完了**（2026-09-29） |
+| M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書き、同じモデルが温度 0 で検証する。v0.1 の llm-jp-3.1 による検証は機能しなかったため変更した。評価セットは llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証する）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない。**完了**（2026-09-29） |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する。**完了**（2026-09-29。§12「M4 の結果」） |
-| M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | §12 冒頭のリストの手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
+| M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | §12 冒頭のリストの手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている。**完了**（2026-09-29。gate は v0.4 で調整） |
 | M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる。**完了**（2026-09-29、`runtime/host/`） |
 
 M3 の評価セットを学習データとは別のモデルと別の prompt で作るのは、同じ生成元のデータで評価すると、生成のくせを暗記しているだけで高得点になるためです。評価セットは評価だけに使い、学習には使いません。
@@ -564,20 +570,22 @@ M3 の評価セットを学習データとは別のモデルと別の prompt で
 | B1 | ESP-IDF の build 環境 | ESP-IDF **v5.5.5** の公式 Docker image（`espressif/idf:v5.5.5`）で build する。ローカルへの導入は不要。書き込みは Windows から `esptool` で行う。**完了**（2026-09-29） |
 | B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する。**完了**（2026-09-29、ユーザーの立ち会いのもとで実施）。中立は yaw 460 / pitch 620、ロボット自身の右へ回すと yaw の raw は減り、上を向くと pitch の raw は増える（[`hardware.md`](hardware.md) §10） |
 | B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う。**完了**（2026-09-29）: stories3M INT8 は forward だけで 6.5〜7.1 tok/s（上流の約半分。CoreS3 は Quad PSRAM のため） |
-| B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate）。**計測の部分は完了**（2026-09-29、`firmware/jtalm_eval/`）: 起動直後の内部 SRAM 空き 335,663 B、PSRAM 空き 8.39MB、14MB の `model` partition を1回で mmap、読み出しは PSRAM 32.8 MB/s、Flash の mmap 31.2 MB/s。servo と画面を載せた状態の計測は B4 で行う |
-| B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、5M INT4 の tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす。**runtime の移植と計測は完了**（2026-09-29、`firmware/jtalm_action/`、[`hardware.md`](hardware.md) §11）。servo を動かす部分は、ユーザーの立ち会いのもとで B2 と合わせて行う |
+| B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate）。**計測の部分は完了**（2026-09-29、`firmware/jtalm_eval/`）: 起動直後の内部 SRAM 空き 335,663 B、PSRAM 空き 8.39MB、14MB の `model` partition を1回で mmap、読み出しは PSRAM 32.8 MB/s、Flash の mmap 31.2 MB/s。servo と画面を載せた状態の計測は未実施（「次の計画」の 7） |
+| B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす。**runtime の移植と計測は完了**（2026-09-29、`firmware/jtalm_action/`、[`hardware.md`](hardware.md) §11）: 3M / 5M × INT8 / INT4 を計測して 3M INT4 に決め、評価セット全 1,189件で host と一致した。servo を動かす部分は未実施（B2 は完了。残りは dispatcher。「次の計画」の 6） |
 
 B2 以降は、実機の firmware を書き込む前に必ずバックアップを取ります（[`development.md`](development.md) §5）。
 
 ### 判断ポイント
 
-M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決めます。
+M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決める計画でした。
 
 - **Action LM が完了条件（§4 の目標値と、既存モデルへの勝利）と実機の基準（Phase 4）を満たした場合:** Action LM を公開し、10M Chat（Base の事前学習を含む）へ進む。
 - **精度が足りない場合:** 20M の上限参照と比べて原因を切り分ける。
   - 20M が大きく上回る場合は、capacity が足りないと判断し、10M Action を試す。
   - 20M も低い場合は、data か tokenizer の問題と判断し、そちらを見直す。
-- **速度:** B2.5 で測った stories3M INT8 の実機速度（forward だけで約 7 tok/s）を基準にし、5M / 10M を実機に載せたときの latency を見積もって、規模の判断に使う。重みを毎 token 読む前提では、速度の上限は約 32 MB/s ÷ 重みの byte 数（B3）なので、INT4 化、入力のまとめ処理（batch prefill）、KV cache の小型化が効く。
+- **速度:** B2.5 で測った stories3M INT8 の実機速度（forward だけで約 7 tok/s）を基準にし、規模の判断に使う。
+
+**結果（2026-09-29）:** M4 では 20M も 3M と同程度だったので、data の問題と判断してデータを見直した（v0.3、v0.4）。v0.4 の 3M で §4 の目標値をすべて満たし、既存モデルにも勝った。実機では 3M INT4 が1回の依頼の中央値 1.08〜1.15 秒で動き（5M INT4 は 1.79 秒）、host と出力が一致した。モデルは 3M INT4 に決めた。公開はユーザーの判断で保留し、次は Action から servo を動かす部分（「次の計画」の 6）、その後に Chat LM へ進む。
 
 ## 13. 工数の見積もり（Claude Code が実行する前提）
 
@@ -607,7 +615,7 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 | B4 | 実機への移植と servo の制御 | 4〜8 h | — | **Servo の動作に立ち会う** |
 | 合計 | | **約 32〜57 h** | GPU で数時間 | |
 
-### M1〜M4 の実績（2026-09-29）
+### M1〜B4 の実績（2026-09-29）
 
 | # | Claude Code の作業時間 | GPU と費用 | 見積もりとの差 |
 |---|---|---|---|
@@ -617,16 +625,21 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 | M3 | 未記録 | A100 80GB で 3回、計 約 1.04 h。$0.50 + $0.31 + $0.17 = 約 $0.98 | 見積もりの前提外だった反復（v0.1 の失敗、否定の追加生成）を含む |
 | M4 | 約 1.3 h（05:33〜06:53 UTC。実装と CPU の smoke test が約 10 分、GPU の job の待ちが約 65 分、分析と記録が約 5 分） | Tesla V100 32GB で 1.085 h、約 $0.24（5モデルの学習と評価） | 見積もり（4〜6 h、GPU で数時間）より大幅に短かった |
 | Track B（B1、B3、B2.5、B2 の build） | 約 1 h（06:27〜07:26 UTC、担当 agent が M4 と並行して実行） | — | 見積もり（B1〜B3 と B2.5 で 5.5〜11 h）より大幅に短かった |
-| 合計 | — | 約 $1.27 | GPU の時間は、見積もり（数時間）より短かった |
+| データの量の確認、v0.3、v0.4 | 約 3.8 h（07:00〜10:47 UTC。GPU の job の待ちと、失敗した起動のやり直しを含む） | 約 $3.00（量の確認 $0.13、v0.3 の生成 $0.68・学習 $0.20、v0.4 の生成 $1.77・学習 $0.21） | 見積もりの前提外（データの反復）。失敗の多くは host の起動や接続の不具合で、実行基盤の再試行を強化した |
+| M5 | 約 1.1 h（commit から推定。07:05〜08:13 UTC ごろ、v0.3 と並行） | — | 見積もり（3〜5 h）より短かった |
+| M6 | 約 1.6 h（08:14〜09:51 UTC、担当 agent） | — | 見積もり（4〜8 h）より短かった |
+| B4 | 約 2.0 h（09:55〜11:53 UTC、担当 agent） | — | 見積もり（4〜8 h）には servo の制御が含まれ、その部分は未実施 |
+| B2（servo の確認） | 約 10 分（14:15〜14:25 UTC ごろ、ユーザーの立ち会いのもと） | — | 見積もり（1〜2 h）より短かった |
+| 合計 | — | 約 $4.26 | GPU の費用は、失敗した起動を含めて小さく収まった |
 
-M1〜M3 の Claude Code の作業時間は計測していないため、「未記録」としています。M4 からは、主な手順の開始と終了の時刻を記録しています。
+M1〜M3 の Claude Code の作業時間は計測していないため、「未記録」としています。M4 からは、主な手順の開始と終了の時刻（commit と job の記録）を元にしています。
 
 ### 速く進めるための並行化
 
 最短の経路（critical path）は M1 → M2 → M2.5 → M3 → M4 → M5 → M6 → B4 です。
 
 - GPU で学習している間（M4）に、Track B の B1〜B3 と B2.5 を進める。
-- 実機の作業のうち、ユーザーの立ち会いが要るのは B2 と B4 の servo の確認だけ。まとめて行えば、待ちを減らせる。
+- 実機の作業のうち、ユーザーの立ち会いが要るのは servo を動かす作業だけ。B2 は完了し、残りは B4 の servo の部分（「次の計画」の 6）。
 - 暦の上での日数は、セッションを開ける時間と、上の確認のタイミングで決まる。
 
 ### Chat LM（Action の完了後）

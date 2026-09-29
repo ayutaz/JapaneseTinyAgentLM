@@ -20,7 +20,7 @@ Action LM の推論を、外部ライブラリに依存しない C11 で実装�
 
 ## Build
 
-C11 のコンパイラがあれば build できます。Windows のこの環境にはネイティブのコンパイラがないので、ESP-IDF の Docker image（gcc 13.3）を使います。
+C11 のコンパイラがあれば build できます。Windows のこの環境にはネイティブのコンパイラがないので、ESP-IDF の Docker image に入っている、host 向けのネイティブの gcc 13.3 を使います（実機向けの firmware は、同じ image の Xtensa 用の cross compiler gcc 14.2 で build します）。
 
 ```sh
 # リポジトリのルートで（Git Bash）
@@ -168,6 +168,7 @@ M4 の checkpoint（`runs/vast/train_action_v0-20260929T054319Z/artifacts/m4/{3m
 - 完全一致の率は、C と Python で同じ値です（表の値）。token 列の一致は、どの行も 1,189 / 1,189 です。logits の絶対値は最大で約 19 です。
 - INT8 / INT4 の比較相手は、`.jtlm` から読み戻した重み（fp16 の scale）で作った Python のモデルです。`jtalm.model.quantize` の fake quant（f32 の scale）で評価した出力とも、1,189件すべてで一致しました。scale を fp16 にしても結果は変わりません。
 - `-DJTLM_ACC=float`（ESP32 向けの設定）で build した場合も、3M の6条件すべてで token 列が 1,189件一致しました（logits の差は最大 3.2e-5）。
+- 採用した v0.4 の 3M（INT4 / INT8、grammar あり）でも、host の C の出力は Python と評価セット全 1,189件で一致し、実機（`firmware/jtalm_action`）の出力も host と全件一致しました（[`../../docs/hardware.md`](../../docs/hardware.md) §11）。
 
 **速度（参考）:** AMD Ryzen 9 5900X の Docker（WSL2）上で1 thread、評価セット全体（prompt と生成を合わせて約 22,500 token）を処理した値です。3M は FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。5M は FP32 で約 470 tok/s、INT8 / INT4 で約 230 tok/s。量子化した重みは group ごとに f32 へ戻してから掛けるので、PC では FP32 より遅くなります。
 

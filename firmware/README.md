@@ -7,7 +7,7 @@ M5Stack CoreS3（StackChan K151）向けの firmware です。実機の構成と
 | `jtalm_eval/` | LM 評価用の最小 firmware（B3）。heap、Flash map、PSRAM / Flash mmap の帯域を `JTALM {json}` 形式で出力する。Servo と Wi-Fi は使わない | Apache-2.0 |
 | `jtalm_action/` | Action LM の firmware（B4）。`model` partition の `.jtlm` を mmap し、serial から受けた1行の発話を grammar 付きの greedy と confidence gate で Action JSON にして、時間と一緒に `JTALM {json}` で返す。LM の本体は `runtime/host/` の source をそのまま build する。Servo と Wi-Fi は使わない | Apache-2.0 |
 | `baselines/esp32_llm/` | [doryiii/esp32-llm](https://github.com/doryiii/esp32-llm) を CoreS3 で動かすための sdkconfig の overlay と patch（B2.5） | Apache-2.0（patch の対象は上流の MIT のコード） |
-| `baselines/stackchan_idf/` | [ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf) を Docker で build するための Node.js の shim（B2） | Apache-2.0 |
+| `baselines/stackchan_idf/` | [ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf) を Docker で build するための Node.js の shim（B2。servo の確認は 2026-09-29 に実施済み） | Apache-2.0 |
 | `tools/serial_capture.py` | Serial log の取得。reset、prompt への自動応答、終了条件を指定できる | Apache-2.0 |
 | `tools/lm_serial.py` | `jtalm_action` に prompt を1件ずつ送り、応答を JSONL に保存する。host の runtime の出力と比べ、latency をまとめる | Apache-2.0 |
 | `third_party/` | 第三者の repository の clone。Git の管理外 | 各 upstream |
@@ -34,6 +34,8 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
 
 ### jtalm_action（B4）
 
+**実機の現在の状態（2026-09-29）:** `jtalm_action` と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。servo を動かすコードは入っていません。
+
 `runtime/host/` を参照するので、repository の root を mount します。
 
 ```sh
@@ -52,6 +54,7 @@ cd ../../..
 # （host 側: prompts200.txt に同じ 200件を1行ずつ書き、
 #   runtime/host/build/jtalm -m <model>.jtlm -i prompts200.txt --grammar > host_d_v04_3m_q4_g64.jsonl）
 uv run --no-project --with pyserial python firmware/tools/lm_serial.py --port COM3 --reset   --cases datasets/action/v0/eval.jsonl --limit 200   --ref runs/device/b4/host_d_v04_3m_q4_g64.jsonl --out runs/device/b4/v04_3m_q4.jsonl
+# --limit を省くと評価セットの全 1,189件を送る（結果の例: results/b4_device/v04_3m_q4_g64_all.summary.json）
 ```
 
 - `model` partition は 14MB なので、5M の FP32（20.5MB）は載りません。3M の FP32（12.9MB）は載ります。
@@ -90,9 +93,9 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
 
 FP32（stories260K）は `sdkconfig.fp32` も `SDKCONFIG_DEFAULTS` に加え、build dir を `build_fp32` にします。FP32 は `espressif/esp-dsp` を Component Registry から取得するので、`IDF_COMPONENT_MANAGER=0` は付けません。SPIFFS の image（`storage.bin`）は INT8 と同じなので、INT8 の後なら app だけを書き込めば足ります。
 
-### stackchan-idf（B2 の準備。書き込むと servo が動く）
+### stackchan-idf（B2。書き込むと servo が動く）
 
-**書き込みは、ユーザーが立ち会うときだけ行います。** 手順は [`docs/hardware.md`](../docs/hardware.md) §10 を参照してください。
+**書き込みは、ユーザーが立ち会うときだけ行います。** 2026-09-29 にユーザーの立ち会いのもとで確認を終えました（中立は yaw 460 / pitch 620、ロボット自身の右へ回すと yaw の raw が減る）。手順と結果は [`docs/hardware.md`](../docs/hardware.md) §10 を参照してください。確認の後は Flash 全体を消して `jtalm_action` に戻しました。
 
 ```sh
 cd firmware/third_party
