@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ayutaz/JapaneseTinyAgentLM/action_schema_v0.json",
+  "title": "JapaneseTinyAgentLM Action schema v0",
+  "type": "array",
+  "maxItems": 2,
+  "items": {
+    "oneOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "arguments"],
+        "properties": {
+          "name": {"const": "look"},
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["direction", "amount"],
+            "properties": {
+              "direction": {"enum": ["left", "right", "up", "down", "center"]},
+              "amount": {"enum": ["slight", "normal", "large"]}
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "arguments"],
+        "properties": {
+          "name": {"const": "set_expression"},
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["expression"],
+            "properties": {
+              "expression": {"enum": ["happy", "sad", "surprised", "neutral"]}
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "arguments"],
+        "properties": {
+          "name": {"const": "nod"},
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["count"],
+            "properties": {
+              "count": {"type": "integer", "minimum": 1, "maximum": 3}
+            }
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,290 @@
+[
+ {
+  "model": "Needle 2 official",
+  "id": "en_look_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_slight_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slight\"}}]",
+  "exact_match": "True"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_multi",
+  "actual_json": "[]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_ordered_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_negation",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_no_action",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_off_topic",
+  "actual_json": "[]",
+  "exact_match": "True"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "en_nod_twice",
+  "actual_json": "[]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_look_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_slight_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_ordered_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_negation",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_no_action",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_off_topic",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "Needle 2 official",
+  "id": "ja_nod_twice",
+  "actual_json": "[{\"name\":\"nod\",\"arguments\":{\"count\":2}}]",
+  "exact_match": "True"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_look_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"right\",\"direction\":\"right\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_slight_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"slight\",\"direction\":\"right\"}}]",
+  "exact_match": "True"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"right\",\"direction\":\"right\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_ordered_multi",
+  "actual_json": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"smile\"}},{\"name\":\"look\",\"arguments\":{\"amount\":\"left\",\"direction\":\"left\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_negation",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"slight\",\"direction\":\"left\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_no_action",
+  "actual_json": "[{\"name\":\"nod\",\"arguments\":{}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_off_topic",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"large\",\"direction\":\"left\"}},{\"name\":\"look\",\"arguments\":{\"amount\":\"large\",\"direction\":\"left\"}},{\"name\":\"look\",\"arguments\":{\"amount\":\"large\",\"direction\":\"left\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "en_nod_twice",
+  "actual_json": "[{\"name\":\"nod\",\"arguments\":{\"count\":2}}]",
+  "exact_match": "True"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_look_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"slight\",\"direction\":\"right\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_slight_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"slight\",\"direction\":\"right\"}}]",
+  "exact_match": "True"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"slight\",\"direction\":\"right\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_ordered_multi",
+  "actual_json": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"smile\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_negation",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"amount\":\"slight\",\"direction\":\"left\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_no_action",
+  "actual_json": "[]",
+  "exact_match": "True"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_off_topic",
+  "actual_json": "[]",
+  "exact_match": "True"
+ },
+ {
+  "model": "FunctionGemma 270M",
+  "id": "ja_nod_twice",
+  "actual_json": "[{\"name\":\"nod\",\"arguments\":{\"count\":2}}]",
+  "exact_match": "True"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_look_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_slight_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slightly\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"slight\"}},{\"name\":\"look\",\"arguments\":{\"direction\":\"large\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_ordered_multi",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}},{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_negation",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_no_action",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"normal\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_off_topic",
+  "actual_json": "[]",
+  "exact_match": "True"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "en_nod_twice",
+  "actual_json": "[{\"name\":\"nod\",\"arguments\":{\"count\":2}},{\"name\":\"nod\",\"arguments\":{\"count\":2}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_look_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_slight_right",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_multi",
+  "actual_json": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"happy\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_ordered_multi",
+  "actual_json": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"happy\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_negation",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_no_action",
+  "actual_json": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"happy\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_off_topic",
+  "actual_json": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"slight\"}}]",
+  "exact_match": "False"
+ },
+ {
+  "model": "MimiModel C",
+  "id": "ja_nod_twice",
+  "actual_json": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"happy\"}}]",
+  "exact_match": "False"
+ }
+]

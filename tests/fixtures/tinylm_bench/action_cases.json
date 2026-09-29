@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "tools": [
+    {
+      "name": "look",
+      "description": "Turn the robot's head to look in a direction. Only call when the user explicitly asks the robot to look or turn its head.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "enum": ["left", "right", "center"],
+            "description": "Direction the robot should face."
+          },
+          "amount": {
+            "type": "string",
+            "enum": ["slight", "normal", "large"],
+            "description": "How far to turn. Use normal unless the request says slightly or strongly."
+          }
+        },
+        "required": ["direction", "amount"]
+      }
+    },
+    {
+      "name": "set_expression",
+      "description": "Change the robot's facial expression.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "enum": ["happy", "sad", "surprised", "neutral"],
+            "description": "Facial expression to display."
+          }
+        },
+        "required": ["expression"]
+      }
+    },
+    {
+      "name": "nod",
+      "description": "Nod the robot's head a specified number of times.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3,
+            "description": "Number of nods, from one to three."
+          }
+        },
+        "required": ["count"]
+      }
+    }
+  ],
+  "cases": [
+    {"id": "en_look_right", "language": "en", "prompt": "Look right.", "expected": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}], "category": "single"},
+    {"id": "en_slight_right", "language": "en", "prompt": "Turn your head slightly to the right.", "expected": [{"name": "look", "arguments": {"direction": "right", "amount": "slight"}}], "category": "single"},
+    {"id": "en_multi", "language": "en", "prompt": "Look right and smile.", "expected": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}, {"name": "set_expression", "arguments": {"expression": "happy"}}], "category": "multi_action"},
+    {"id": "en_ordered_multi", "language": "en", "prompt": "Smile, then look left.", "expected": [{"name": "set_expression", "arguments": {"expression": "happy"}}, {"name": "look", "arguments": {"direction": "left", "amount": "normal"}}], "category": "multi_action"},
+    {"id": "en_negation", "language": "en", "prompt": "Do not look left.", "expected": [], "category": "negation"},
+    {"id": "en_no_action", "language": "en", "prompt": "Do nothing.", "expected": [], "category": "no_action"},
+    {"id": "en_off_topic", "language": "en", "prompt": "Tell me about Mount Fuji.", "expected": [], "category": "no_action"},
+    {"id": "en_nod_twice", "language": "en", "prompt": "Nod twice.", "expected": [{"name": "nod", "arguments": {"count": 2}}], "category": "single"},
+    {"id": "ja_look_right", "language": "ja", "prompt": "右を向いて。", "expected": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}], "category": "single"},
+    {"id": "ja_slight_right", "language": "ja", "prompt": "少し右を向いて。", "expected": [{"name": "look", "arguments": {"direction": "right", "amount": "slight"}}], "category": "single"},
+    {"id": "ja_multi", "language": "ja", "prompt": "右を向いて笑って。", "expected": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}, {"name": "set_expression", "arguments": {"expression": "happy"}}], "category": "multi_action"},
+    {"id": "ja_ordered_multi", "language": "ja", "prompt": "笑ってから左を向いて。", "expected": [{"name": "set_expression", "arguments": {"expression": "happy"}}, {"name": "look", "arguments": {"direction": "left", "amount": "normal"}}], "category": "multi_action"},
+    {"id": "ja_negation", "language": "ja", "prompt": "左を向かないで。", "expected": [], "category": "negation"},
+    {"id": "ja_no_action", "language": "ja", "prompt": "何もしないで。", "expected": [], "category": "no_action"},
+    {"id": "ja_off_topic", "language": "ja", "prompt": "富士山について教えて。", "expected": [], "category": "no_action"},
+    {"id": "ja_nod_twice", "language": "ja", "prompt": "2回うなずいて。", "expected": [{"name": "nod", "arguments": {"count": 2}}], "category": "single"}
+  ]
+}

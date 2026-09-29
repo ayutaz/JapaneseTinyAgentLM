@@ -72,12 +72,13 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | vast.ai の API key（`.env`） | 設定済み。認証を確認済み |
 | Hugging Face の token（`.env` の `HF_TOKEN`） | 設定済み。`japanese-data-analyze` への write 権限を確認済み |
 | M1 リポジトリ基盤（uv、Python 3.13、`uv.lock`、pytest、ruff） | 完了 |
-| M2 以降 | 未着手 |
+| M2 Action schema v0 と評価の土台（validator、角度への変換、評価指標。TinyLM-Bench の結果を再現） | 完了 |
+| M2.5 以降 | 未着手 |
 
 次の作業は、次の順序で進めます。各マイルストーンの目的と完了条件は [`docs/roadmap.md`](docs/roadmap.md) §12 にあります。
 
 1. ~~**M1:** uv によるリポジトリ基盤~~（完了）
-2. **M2:** Action schema v0 と評価の土台
+2. ~~**M2:** Action schema v0 と評価の土台~~（完了）
 3. **M2.5:** vast.ai の実行基盤
 4. **M3:** 合成データセットの作成と Hugging Face への公開
 

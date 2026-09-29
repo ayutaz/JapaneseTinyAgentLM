@@ -270,6 +270,8 @@ v0 の action は `look`、`set_expression`、`nod` の3種類です。
 
 - `center` のとき、`amount` は無視する。正規化では `normal` にそろえる。
 - TinyLM-Bench で既存モデルと比べるときは、ベンチの enum の範囲（`up` / `down` を含まないケース）で評価する。
+- 実装は `src/jtalm/action/`（M2 で実装済み）。schema の本体は `action_schema_v0.json` で、`jtalm.action.validate()` が schema の検査に加えて重複の禁止を確認する。学習の教師データには、`jtalm.action.to_json()` の compact な正規形（key を並べ替え、空白なし）を使う。
+- 本プロジェクトの規則は TinyLM-Bench より厳しい（最大2個、重複の禁止）。そのため、同じ出力でも schema 妥当の数はベンチより少なくなる（例: FunctionGemma はベンチでは 11/16、本プロジェクトでは 10/16）。厳格一致の数は変わらない。
 
 初期 Runtime で `oneOf` や nested array の grammar 実装が重い場合は、固定長の 2 slot（各 slot は action または空）に縮退します。出力を 1 call に減らす縮退は、multi-action を扱えなくなるので採りません。Needle 2 の ESP32 実装にも schema 機能制限があるため、完全な JSON Schema 対応を前提にしません。
 
@@ -500,15 +502,13 @@ JapaneseTinyAgentLM/
 ├── uv.lock
 ├── docs/
 ├── src/jtalm/              # Python パッケージ（import 名は jtalm）
-│   ├── action/             # Action schema の読み込み、validator、正規化、角度への変換（M2）
+│   ├── action/             # Action schema v0（action_schema_v0.json）、validator、正規化、角度への変換（M2）
 │   ├── eval/               # 評価指標、評価セットの読み込み、baseline（M2〜M3）
 │   ├── data/               # 合成データの生成・検査・分割・manifest（M3）
 │   ├── infra/              # vast.ai の検索・起動・転送・回収・削除（M2.5）
 │   ├── tokenizer/          # Tokenizer の学習と評価（M4）
 │   ├── model/              # モデルの定義と config（M4）
 │   └── training/           # 学習 script（M4）
-├── grammar/
-│   └── action.schema.json  # Action schema v0（M2）
 ├── datasets/
 │   ├── manifests/          # データの出典・ライセンス・hash（commit する）
 │   └── action/             # 生成したデータ本体（Git 管理外。Hugging Face で公開）
@@ -520,7 +520,7 @@ JapaneseTinyAgentLM/
 └── backups/                # 実機 Flash のバックアップ（Git 管理外）
 ```
 
-作成済みなのは、`LICENSE`、`.gitignore`、`.python-version`、`pyproject.toml`、`uv.lock`、`docs/`、`src/jtalm/`、`tests/` です（M1 完了時点）。ほかの場所は、各マイルストーンで作ります。
+作成済みなのは、`LICENSE`、`.gitignore`、`.python-version`、`pyproject.toml`、`uv.lock`、`docs/`、`src/jtalm/`（`action/`、`eval/`）、`tests/`（TinyLM-Bench の fixture を含む）です（M2 完了時点）。ほかの場所は、各マイルストーンで作ります。
 
 GitHub はコードと再現手順を1 repository にまとめ、Hugging Face は artifact を用途・サイズ・量子化ごとに分離します。
 

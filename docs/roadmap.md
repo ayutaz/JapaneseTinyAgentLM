@@ -367,14 +367,15 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | `.env` の `VAST_API_KEY` | 設定済み。認証と課金設定を確認済み |
 | `.env` の `HF_TOKEN` | 設定済み。write 権限と、`japanese-data-analyze` の admin であることを確認済み |
 | M1 リポジトリ基盤 | **完了**（2026-09-29） |
-| M2 以降 | 未着手。次は M2 |
+| M2 Action schema v0 と評価の土台 | **完了**（2026-09-29） |
+| M2.5 以降 | 未着手。次は M2.5 |
 
 ### M1〜M3 の目的と完了条件
 
 | # | 目的 | 完了条件 | 状態と結果 |
 |---|---|---|---|
 | M1 | 以降のコード（schema、評価、データ生成、学習）を、ローカルと vast.ai で同じ手順で再現できる環境で動かす | `uv sync --locked` と test がローカルで通る | **完了**。uv 0.12.20、Python 3.13、`uv.lock`（torch 2.14.0 は Windows が CPU 版、Linux が cu126 版）、ruff、pytest。`.env.example` は権限の設定で作成できず、変数は README と [`development.md`](development.md) §3 に記載 |
-| M2 | 「正解」を機械的に判定できるようにし、M3 のデータ検査と、以降のすべての評価の土台にする | TinyLM-Bench の16件の期待値が validator と評価器を通り、座標規約の unit test が通る | 未着手 |
+| M2 | 「正解」を機械的に判定できるようにし、M3 のデータ検査と、以降のすべての評価の土台にする | TinyLM-Bench の16件の期待値が validator と評価器を通り、座標規約の unit test が通る | **完了**。schema（`src/jtalm/action/action_schema_v0.json`）、validator（重複の禁止を含む）、正規化、角度への変換（`jtalm.action.mapping`）、評価指標（`jtalm.eval`）。39件の test が通過。評価器は TinyLM-Bench の厳格一致（Needle 2 が 3/16、FunctionGemma が 6/16、MimiModel が 1/16）を再現した（[`research_notes.md`](research_notes.md) §3.7） |
 | M2.5 | vast.ai の GPU で、生成と学習を安全かつ再現可能に実行し、終わったら確実に削除できるようにする | 小さな生成と GPU 上の torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている | 未着手 |
 | M3 | Action LM の学習データと評価セットを、規約上問題のない方法で作り、baseline を測って公開する | 評価セット 1,000件以上（重要カテゴリ各100件以上）、学習データ 2,000〜10,000件、manifest、rule-based baseline の数値、Hugging Face への公開（public、manual gate） | 未着手 |
 
@@ -383,7 +384,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | # | マイルストーン | 成果物 | 完了条件 |
 |---|---|---|---|
 | M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
-| M2 | Action schema v0 と評価の土台 | `grammar/action.schema.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
+| M2 | Action schema v0 と評価の土台 | `src/jtalm/action/action_schema_v0.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
 | M2.5 | vast.ai 実行基盤 | `infra/vast/`（GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 生成または学習 → 回収 → 削除）。CLI は `uv add --dev vastai`（1.8 系）で lock する。オープンモデルを vLLM などで動かす生成用の構成も含める | 小さな生成と学習で、一連の流れと instance の削除を確認し、費用を記録している |
 | M3 | Dataset v0 と baseline | vast.ai 上で Apache-2.0 / MIT のオープンモデル（Qwen3 が第一候補、予備に gpt-oss）を動かして生成した合成データ 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE などの既存データも使う。**学習データとは別のモデル（llm-jp-4.1）で作る評価セット**、ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
