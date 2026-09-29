@@ -302,6 +302,26 @@ GEN_ACTION_V04B = JobSpec(
     uploads=[f"datasets/raw/v04/raw04_{w}/train_gen.jsonl" for w in V04B_DONE],
 )
 
+# Human-written evaluation set (jtalm.data.human_eval): Qwen3 parses the mined candidates at
+# temperature 0; only items whose parse equals the rule label are kept. The candidates file is
+# gitignored (it holds third-party sentences) and uploaded by scp.
+HUMAN_RAW = "datasets/raw/human_v1"
+VERIFY_HUMAN_V1 = JobSpec(
+    name="verify_human_v1",
+    description="Human-written eval set: Qwen3 verifies mined candidates (rule label must agree)",
+    query=f"gpu_ram>=79 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=160,
+    max_hours=1.0,
+    steps=[
+        sync(),
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-verify", "configs/human_eval_v1.json", HUMAN_RAW),
+        f"mkdir -p artifacts/raw_human && cp {HUMAN_RAW}/train_raw.jsonl artifacts/raw_human/",
+    ],
+    uploads=[f"{HUMAN_RAW}/train_gen.jsonl"],
+)
+
 # Retrain on v0.3 (v0 plus the new writers) and compare with M4 on the same evaluation set.
 ACTION_DATA_V03 = "datasets/action/v0.3"
 V03_RUNS = [
@@ -387,5 +407,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V04,
         GEN_ACTION_V04B,
         TRAIN_ACTION_V04,
+        VERIFY_HUMAN_V1,
     )
 }

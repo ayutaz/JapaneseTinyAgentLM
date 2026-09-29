@@ -1,0 +1,18 @@
+{
+  "dataset_version": "action-human-v1",
+  "seed": 20260930,
+  "per_request": 8,
+  "temperature": 0.0,
+  "top_p": 1.0,
+  "max_tokens": 900,
+  "prompt_version": "human-v1",
+  "train_generator": {"served_name": "human", "hf_id": "human-written corpora (see jtalm.data.human_eval.SOURCES)", "license": "various"},
+  "eval_generator": {"served_name": "llmjp", "hf_id": "llm-jp/llm-jp-3.1-13b-instruct4", "license": "Apache-2.0"},
+  "verifier": {"served_name": "qwen", "hf_id": "Qwen/Qwen3-30B-A3B-Instruct-2507", "license": "Apache-2.0"},
+  "train_verifier": "verifier",
+  "train_quota": {},
+  "eval_quota": {},
+  "eval_pairs": 0,
+  "eval_english": 0,
+  "massive": {"train_negatives": 0, "eval_negatives": 0}
+}
