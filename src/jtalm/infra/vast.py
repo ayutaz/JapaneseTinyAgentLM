@@ -157,15 +157,21 @@ class Ssh:
         local.mkdir(parents=True, exist_ok=True)
         self._scp(["-r", f"{self.dest}:{remote}", str(local)])
 
-    def _scp(self, args: list[str]) -> None:
-        proc = subprocess.run(
-            ["scp", *self.opts, "-P", str(self.target.port), *args],
-            capture_output=True,
-            text=True,
-            timeout=3600,
-        )
-        if proc.returncode != 0:
-            raise VastError(f"scp failed: {proc.stderr[:300]}")
+    def _scp(self, args: list[str], attempts: int = 4) -> None:
+        """Copy with retries: the SSH proxy sometimes drops the first connections after start."""
+        stderr = ""
+        for attempt in range(attempts):
+            proc = subprocess.run(
+                ["scp", *self.opts, "-P", str(self.target.port), *args],
+                capture_output=True,
+                text=True,
+                timeout=3600,
+            )
+            if proc.returncode == 0:
+                return
+            stderr = proc.stderr
+            time.sleep(10 * (attempt + 1))
+        raise VastError(f"scp failed after {attempts} attempts: {stderr[:300]}")
 
 
 def _quote(command: str) -> str:
