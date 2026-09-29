@@ -192,8 +192,9 @@ int jtlm_model_init(jtlm_model *m, const void *image, size_t size) {
 static size_t state_floats(const jtlm_config *c, size_t *kv_each) {
     size_t kv = (size_t)c->n_layers * (size_t)c->max_seq_len * (size_t)(c->n_kv_heads * c->head_dim);
     *kv_each = kv;
-    return 3 * (size_t)c->d_model + (size_t)(c->n_heads * c->head_dim) + 2 * (size_t)c->d_ff +
-           (size_t)c->n_heads * (size_t)c->max_seq_len + (size_t)c->vocab_size + 2 * kv;
+    size_t per_token = 3 * (size_t)c->d_model + (size_t)(c->n_heads * c->head_dim) + 2 * (size_t)c->d_ff;
+    return JTLM_BATCH * per_token + (size_t)c->n_heads * (size_t)c->max_seq_len +
+           (size_t)c->vocab_size + 2 * kv;
 }
 
 size_t jtlm_state_bytes(const jtlm_config *c) {
@@ -201,21 +202,33 @@ size_t jtlm_state_bytes(const jtlm_config *c) {
     return state_floats(c, &kv) * sizeof(float);
 }
 
+size_t jtlm_state_kv_bytes(const jtlm_config *c) {
+    size_t kv;
+    state_floats(c, &kv);
+    return 2 * kv * sizeof(float);
+}
+
 void jtlm_state_init(jtlm_state *s, const jtlm_config *c, void *arena) {
+    size_t small = jtlm_state_bytes(c) - jtlm_state_kv_bytes(c);
+    jtlm_state_init_split(s, c, arena, (char *)arena + small);
+}
+
+void jtlm_state_init_split(jtlm_state *s, const jtlm_config *c, void *arena, void *kv_cache) {
     size_t kv;
     float *p = arena;
-    memset(arena, 0, jtlm_state_bytes(c));
     state_floats(c, &kv);
-    s->x = p, p += c->d_model;
-    s->xb = p, p += c->d_model;
-    s->xb2 = p, p += c->d_model;
-    s->q = p, p += c->n_heads * c->head_dim;
-    s->hb = p, p += c->d_ff;
-    s->hb2 = p, p += c->d_ff;
+    /* The KV cache is not cleared: position t is always written before it is read. */
+    memset(arena, 0, jtlm_state_bytes(c) - jtlm_state_kv_bytes(c));
+    s->x = p, p += JTLM_BATCH * c->d_model;
+    s->xb = p, p += JTLM_BATCH * c->d_model;
+    s->xb2 = p, p += JTLM_BATCH * c->d_model;
+    s->q = p, p += JTLM_BATCH * c->n_heads * c->head_dim;
+    s->hb = p, p += JTLM_BATCH * c->d_ff;
+    s->hb2 = p, p += JTLM_BATCH * c->d_ff;
     s->att = p, p += (size_t)c->n_heads * (size_t)c->max_seq_len;
-    s->logits = p, p += c->vocab_size;
-    s->key_cache = p, p += kv;
-    s->value_cache = p;
+    s->logits = p;
+    s->key_cache = kv_cache;
+    s->value_cache = s->key_cache + kv;
 }
 
 /* -- forward ----------------------------------------------------------------------------------- */
@@ -240,16 +253,20 @@ static void mat_row(const jtlm_mat *w, int bits, int group, int r, float *out) {
     }
 }
 
-/* Adds a . b to four interleaved partial sums (independent chains keep the FPU busy). */
+/* Adds a . b to four interleaved partial sums (independent chains keep the FPU busy). The sums
+ * are kept in locals: acc may alias a or b, so updating acc[] directly would store and reload
+ * it on every step. */
 static void dot_acc(const float *a, const float *b, int n, JTLM_ACC acc[4]) {
+    JTLM_ACC s0 = acc[0], s1 = acc[1], s2 = acc[2], s3 = acc[3];
     int i = 0;
     for (; i + 4 <= n; i += 4) {
-        acc[0] += (JTLM_ACC)a[i] * (JTLM_ACC)b[i];
-        acc[1] += (JTLM_ACC)a[i + 1] * (JTLM_ACC)b[i + 1];
-        acc[2] += (JTLM_ACC)a[i + 2] * (JTLM_ACC)b[i + 2];
-        acc[3] += (JTLM_ACC)a[i + 3] * (JTLM_ACC)b[i + 3];
+        s0 += (JTLM_ACC)a[i] * (JTLM_ACC)b[i];
+        s1 += (JTLM_ACC)a[i + 1] * (JTLM_ACC)b[i + 1];
+        s2 += (JTLM_ACC)a[i + 2] * (JTLM_ACC)b[i + 2];
+        s3 += (JTLM_ACC)a[i + 3] * (JTLM_ACC)b[i + 3];
     }
-    for (; i < n; i++) acc[0] += (JTLM_ACC)a[i] * (JTLM_ACC)b[i];
+    for (; i < n; i++) s0 += (JTLM_ACC)a[i] * (JTLM_ACC)b[i];
+    acc[0] = s0, acc[1] = s1, acc[2] = s2, acc[3] = s3;
 }
 
 static float dot(const float *a, const float *b, int n) {
@@ -258,35 +275,104 @@ static float dot(const float *a, const float *b, int n) {
     return (float)((acc[0] + acc[1]) + (acc[2] + acc[3]));
 }
 
-/* out = W x (W is rows x cols). Quantized rows are dequantized one group at a time. */
-static void matvec(const jtlm_config *c, const jtlm_mat *w, const float *x, float *out) {
-    if (c->bits == 0) {
-        for (int r = 0; r < w->rows; r++) out[r] = dot(w->f + (size_t)r * (size_t)w->cols, x, w->cols);
+/* Row r of a quantized W times x. Each weight is dequantized (code * scale, exact in f32) right
+ * before its multiply, into the same four partial sums as dot_acc, so the result is identical to
+ * dequantizing the row first; this saves storing and reloading it (group % 4 == 0). */
+static float qrow_dot(const jtlm_mat *w, int bits, int group, int r, const float *x) {
+    size_t base = (size_t)r * (size_t)w->cols;
+    JTLM_ACC s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+    for (int g0 = 0; g0 < w->cols; g0 += group) {
+        size_t k = base + (size_t)g0;
+        float sc = fp16_to_f32(w->scale[k / (size_t)group]);
+        const float *xg = x + g0;
+        if (bits == 8) {
+            const int8_t *q = (const int8_t *)w->q + k;
+            for (int j = 0; j < group; j += 4) {
+                s0 += (JTLM_ACC)((float)q[j] * sc) * (JTLM_ACC)xg[j];
+                s1 += (JTLM_ACC)((float)q[j + 1] * sc) * (JTLM_ACC)xg[j + 1];
+                s2 += (JTLM_ACC)((float)q[j + 2] * sc) * (JTLM_ACC)xg[j + 2];
+                s3 += (JTLM_ACC)((float)q[j + 3] * sc) * (JTLM_ACC)xg[j + 3];
+            }
+        } else {
+            const uint8_t *q = w->q + k / 2;
+            for (int j = 0; j < group; j += 4) {
+                int b0 = q[j >> 1], b1 = q[(j >> 1) + 1];
+                s0 += (JTLM_ACC)((float)(((b0 & 0xf) ^ 8) - 8) * sc) * (JTLM_ACC)xg[j];
+                s1 += (JTLM_ACC)((float)(((b0 >> 4) ^ 8) - 8) * sc) * (JTLM_ACC)xg[j + 1];
+                s2 += (JTLM_ACC)((float)(((b1 & 0xf) ^ 8) - 8) * sc) * (JTLM_ACC)xg[j + 2];
+                s3 += (JTLM_ACC)((float)(((b1 >> 4) ^ 8) - 8) * sc) * (JTLM_ACC)xg[j + 3];
+            }
+        }
+    }
+    return (float)((s0 + s1) + (s2 + s3));
+}
+
+/* -- matrix products ------------------------------------------------------------------------- */
+
+static jtlm_parallel_fn g_parallel;
+
+void jtlm_set_parallel(jtlm_parallel_fn run) { g_parallel = run; }
+
+/* OUT[t] = W X[t] for t < n (W is rows x cols; X[t] at x + t * xs, OUT[t] at out + t * os). */
+typedef struct {
+    const jtlm_config *c;
+    const jtlm_mat *w;
+    const float *x;
+    float *out;
+    int n, xs, os;
+} matmul_job;
+
+/* Rows [r0, r1) of a matmul_job. Every (row, vector) dot product is computed exactly as for a
+ * single vector, so the result does not depend on n or on how the rows are split. With several
+ * vectors, each weight is read (and dequantized) once for all of them. */
+static void matmul_rows(void *ctx, int r0, int r1) {
+    const matmul_job *j = ctx;
+    const jtlm_mat *w = j->w;
+    int bits = j->c->bits, group = j->c->group, cols = w->cols;
+    if (bits == 0) {
+        for (int r = r0; r < r1; r++)
+            for (int t = 0; t < j->n; t++)
+                j->out[(size_t)t * (size_t)j->os + (size_t)r] =
+                    dot(w->f + (size_t)r * (size_t)cols, j->x + (size_t)t * (size_t)j->xs, cols);
+        return;
+    }
+    if (j->n == 1 && group % 4 == 0) {
+        for (int r = r0; r < r1; r++) j->out[r] = qrow_dot(w, bits, group, r, j->x);
         return;
     }
     float wg[JTLM_MAX_GROUP];
-    int group = c->group;
-    for (int r = 0; r < w->rows; r++) {
-        size_t base = (size_t)r * (size_t)w->cols;
-        JTLM_ACC acc[4] = {0, 0, 0, 0};
-        for (int g0 = 0; g0 < w->cols; g0 += group) {
+    JTLM_ACC acc[JTLM_BATCH][4];
+    for (int r = r0; r < r1; r++) {
+        size_t base = (size_t)r * (size_t)cols;
+        memset(acc, 0, sizeof(acc));
+        for (int g0 = 0; g0 < cols; g0 += group) {
             size_t k = base + (size_t)g0;
             float sc = fp16_to_f32(w->scale[k / (size_t)group]);
-            if (c->bits == 8) {
+            if (bits == 8) {
                 const int8_t *q = (const int8_t *)w->q + k;
-                for (int j = 0; j < group; j++) wg[j] = (float)q[j] * sc;
+                for (int i = 0; i < group; i++) wg[i] = (float)q[i] * sc;
             } else {
                 const uint8_t *q = w->q + k / 2; /* k is even: group is even */
-                for (int j = 0; j < group; j += 2) {
-                    int b = q[j >> 1];
-                    wg[j] = (float)(((b & 0xf) ^ 8) - 8) * sc;
-                    wg[j + 1] = (float)(((b >> 4) ^ 8) - 8) * sc;
+                for (int i = 0; i < group; i += 2) {
+                    int b = q[i >> 1];
+                    wg[i] = (float)(((b & 0xf) ^ 8) - 8) * sc;
+                    wg[i + 1] = (float)(((b >> 4) ^ 8) - 8) * sc;
                 }
             }
-            dot_acc(wg, x + g0, group, acc);
+            for (int t = 0; t < j->n; t++)
+                dot_acc(wg, j->x + (size_t)t * (size_t)j->xs + (size_t)g0, group, acc[t]);
         }
-        out[r] = (float)((acc[0] + acc[1]) + (acc[2] + acc[3]));
+        for (int t = 0; t < j->n; t++)
+            j->out[(size_t)t * (size_t)j->os + (size_t)r] =
+                (float)((acc[t][0] + acc[t][1]) + (acc[t][2] + acc[t][3]));
     }
+}
+
+static void matmul(const jtlm_config *c, const jtlm_mat *w, const float *x, int xs, float *out,
+                   int os, int n) {
+    matmul_job j = {c, w, x, out, n, xs, os};
+    if (g_parallel && w->rows > 1) g_parallel(matmul_rows, &j, w->rows);
+    else matmul_rows(&j, 0, w->rows);
 }
 
 /* RMSNorm: (x * rsqrt(mean(x^2) + eps)) * weight, rounded as in PyTorch. */
@@ -324,59 +410,75 @@ static void softmax(float *x, int n) {
     for (int i = 0; i < n; i++) x[i] *= inv;
 }
 
-float *jtlm_forward(const jtlm_model *m, jtlm_state *s, int token, int pos) {
+/* Runs n tokens (n <= JTLM_BATCH) at positions pos0 .. pos0 + n - 1, reading each weight once
+ * for all of them. Token t is processed exactly as if it were run alone, so the result does not
+ * depend on the batching. The logits (of the last token) are computed only when want_logits. */
+static void forward_batch(const jtlm_model *m, jtlm_state *s, const int *tokens, int n, int pos0,
+                          int want_logits) {
     const jtlm_config *c = &m->cfg;
-    int d = c->d_model, hd = c->head_dim, kv_dim = c->n_kv_heads * hd;
-    int rep = c->n_heads / c->n_kv_heads, half = hd / 2;
+    int d = c->d_model, hd = c->head_dim, kv_dim = c->n_kv_heads * hd, qd = c->n_heads * hd;
+    int rep = c->n_heads / c->n_kv_heads, half = hd / 2, ff = c->d_ff;
     float scale = (float)(1.0 / sqrt((double)hd));
-    const float *cr = m->rope_cos + (size_t)pos * (size_t)half;
-    const float *sr = m->rope_sin + (size_t)pos * (size_t)half;
 
-    mat_row(&m->embed, c->bits, c->group, token, s->x);
+    for (int t = 0; t < n; t++) mat_row(&m->embed, c->bits, c->group, tokens[t], s->x + t * d);
     for (int l = 0; l < c->n_layers; l++) {
         const jtlm_layer *L = &m->layers[l];
         size_t loff = (size_t)l * (size_t)c->max_seq_len * (size_t)kv_dim;
         float *kc = s->key_cache + loff, *vc = s->value_cache + loff;
-        float *k = kc + (size_t)pos * (size_t)kv_dim, *v = vc + (size_t)pos * (size_t)kv_dim;
+        float *k0 = kc + (size_t)pos0 * (size_t)kv_dim, *v0 = vc + (size_t)pos0 * (size_t)kv_dim;
 
-        rmsnorm(s->xb, s->x, L->attn_norm, d, c->norm_eps);
-        matvec(c, &L->wq, s->xb, s->q);
-        matvec(c, &L->wk, s->xb, k);
-        matvec(c, &L->wv, s->xb, v);
-        for (int h = 0; h < c->n_heads; h++) rope(s->q + h * hd, cr, sr, hd);
-        for (int h = 0; h < c->n_kv_heads; h++) rope(k + h * hd, cr, sr, hd);
+        for (int t = 0; t < n; t++) rmsnorm(s->xb + t * d, s->x + t * d, L->attn_norm, d, c->norm_eps);
+        matmul(c, &L->wq, s->xb, d, s->q, qd, n);
+        matmul(c, &L->wk, s->xb, d, k0, kv_dim, n);
+        matmul(c, &L->wv, s->xb, d, v0, kv_dim, n);
+        for (int t = 0; t < n; t++) {
+            int pos = pos0 + t;
+            const float *cr = m->rope_cos + (size_t)pos * (size_t)half;
+            const float *sr = m->rope_sin + (size_t)pos * (size_t)half;
+            float *q = s->q + t * qd, *k = k0 + (size_t)t * (size_t)kv_dim;
+            for (int h = 0; h < c->n_heads; h++) rope(q + h * hd, cr, sr, hd);
+            for (int h = 0; h < c->n_kv_heads; h++) rope(k + h * hd, cr, sr, hd);
+        }
 
-        for (int h = 0; h < c->n_heads; h++) {
-            const float *qh = s->q + h * hd;
-            int kh = h / rep; /* repeat_interleave */
-            float *att = s->att + (size_t)h * (size_t)c->max_seq_len;
-            for (int t = 0; t <= pos; t++)
-                att[t] = dot(qh, kc + (size_t)t * (size_t)kv_dim + (size_t)kh * (size_t)hd, hd) * scale;
-            softmax(att, pos + 1);
-            float *o = s->xb2 + h * hd;
-            for (int i = 0; i < hd; i++) {
-                JTLM_ACC acc = 0;
-                for (int t = 0; t <= pos; t++)
-                    acc += (JTLM_ACC)att[t] * (JTLM_ACC)vc[(size_t)t * (size_t)kv_dim + (size_t)kh * (size_t)hd + (size_t)i];
-                o[i] = (float)acc;
+        for (int t = 0; t < n; t++) { /* causal: position pos sees 0 .. pos, all written above */
+            int pos = pos0 + t;
+            for (int h = 0; h < c->n_heads; h++) {
+                const float *qh = s->q + t * qd + h * hd;
+                int kh = h / rep; /* repeat_interleave */
+                float *att = s->att + (size_t)h * (size_t)c->max_seq_len;
+                for (int u = 0; u <= pos; u++)
+                    att[u] = dot(qh, kc + (size_t)u * (size_t)kv_dim + (size_t)kh * (size_t)hd, hd) * scale;
+                softmax(att, pos + 1);
+                float *o = s->xb2 + t * d + h * hd;
+                for (int i = 0; i < hd; i++) {
+                    JTLM_ACC acc = 0;
+                    for (int u = 0; u <= pos; u++)
+                        acc += (JTLM_ACC)att[u] * (JTLM_ACC)vc[(size_t)u * (size_t)kv_dim + (size_t)kh * (size_t)hd + (size_t)i];
+                    o[i] = (float)acc;
+                }
             }
         }
-        matvec(c, &L->wo, s->xb2, s->xb);
-        for (int i = 0; i < d; i++) s->x[i] += s->xb[i];
+        matmul(c, &L->wo, s->xb2, d, s->xb, d, n);
+        for (int i = 0; i < n * d; i++) s->x[i] += s->xb[i];
 
-        rmsnorm(s->xb, s->x, L->mlp_norm, d, c->norm_eps);
-        matvec(c, &L->w1, s->xb, s->hb);
-        matvec(c, &L->w3, s->xb, s->hb2);
-        for (int i = 0; i < c->d_ff; i++) {
+        for (int t = 0; t < n; t++) rmsnorm(s->xb + t * d, s->x + t * d, L->mlp_norm, d, c->norm_eps);
+        matmul(c, &L->w1, s->xb, d, s->hb, ff, n);
+        matmul(c, &L->w3, s->xb, d, s->hb2, ff, n);
+        for (int i = 0; i < n * ff; i++) {
             float g = s->hb[i];
             float silu = g / (1.0f + expf(-g));
             s->hb[i] = silu * s->hb2[i];
         }
-        matvec(c, &L->w2, s->hb, s->xb);
-        for (int i = 0; i < d; i++) s->x[i] += s->xb[i];
+        matmul(c, &L->w2, s->hb, ff, s->xb, d, n);
+        for (int i = 0; i < n * d; i++) s->x[i] += s->xb[i];
     }
-    rmsnorm(s->xb, s->x, m->norm, d, c->norm_eps);
-    matvec(c, &m->embed, s->xb, s->logits);
+    if (!want_logits) return;
+    rmsnorm(s->xb, s->x + (n - 1) * d, m->norm, d, c->norm_eps);
+    matmul(c, &m->embed, s->xb, d, s->logits, c->vocab_size, 1);
+}
+
+float *jtlm_forward(const jtlm_model *m, jtlm_state *s, int token, int pos) {
+    forward_batch(m, s, &token, 1, pos, 1);
     return s->logits;
 }
 
@@ -395,16 +497,34 @@ int jtlm_prompt_ids(const jtlm_model *m, const char *text, size_t len, int *ids,
     return n + 3;
 }
 
+float *jtlm_prefill(const jtlm_model *m, jtlm_state *s, const int *prompt, int n_prompt) {
+    if (n_prompt < 1) return NULL;
+    for (int i = 0; i < n_prompt; i += JTLM_BATCH) {
+        int n = n_prompt - i < JTLM_BATCH ? n_prompt - i : JTLM_BATCH;
+        forward_batch(m, s, prompt + i, n, i, i + n == n_prompt);
+    }
+    return s->logits;
+}
+
 int jtlm_generate(const jtlm_model *m, jtlm_state *s, const jtlm_grammar *grammar,
                   const int *prompt, int n_prompt, jtlm_result *r, float *first_logits) {
+    if (n_prompt < 1 || n_prompt >= m->cfg.max_seq_len) {
+        r->n = 0;
+        r->min_prob = 1.0f;
+        return JTLM_ERR_ARG;
+    }
+    float *logits = jtlm_prefill(m, s, prompt, n_prompt);
+    return jtlm_generate_from(m, s, grammar, logits, n_prompt, r, first_logits);
+}
+
+int jtlm_generate_from(const jtlm_model *m, jtlm_state *s, const jtlm_grammar *grammar,
+                       float *logits, int n_prompt, jtlm_result *r, float *first_logits) {
     const jtlm_config *c = &m->cfg;
     int steps = c->max_seq_len - n_prompt;
     if (steps > JTLM_MAX_NEW_TOKENS) steps = JTLM_MAX_NEW_TOKENS;
     r->n = 0;
     r->min_prob = 1.0f;
-    if (n_prompt < 1 || steps <= 0) return JTLM_ERR_ARG;
-    float *logits = NULL;
-    for (int i = 0; i < n_prompt; i++) logits = jtlm_forward(m, s, prompt[i], i);
+    if (n_prompt < 1 || steps <= 0 || !logits) return JTLM_ERR_ARG;
     jtlm_grammar_state st;
     jtlm_grammar_reset(&st);
     for (int step = 0; step < steps; step++) {

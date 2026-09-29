@@ -5,9 +5,11 @@ M5Stack CoreS3（StackChan K151）向けの firmware です。実機の構成と
 | Directory | 内容 | License |
 |---|---|---|
 | `jtalm_eval/` | LM 評価用の最小 firmware（B3）。heap、Flash map、PSRAM / Flash mmap の帯域を `JTALM {json}` 形式で出力する。Servo と Wi-Fi は使わない | Apache-2.0 |
+| `jtalm_action/` | Action LM の firmware（B4）。`model` partition の `.jtlm` を mmap し、serial から受けた1行の発話を grammar 付きの greedy で Action JSON にして、時間と一緒に `JTALM {json}` で返す。LM の本体は `runtime/host/` の source をそのまま build する。Servo と Wi-Fi は使わない | Apache-2.0 |
 | `baselines/esp32_llm/` | [doryiii/esp32-llm](https://github.com/doryiii/esp32-llm) を CoreS3 で動かすための sdkconfig の overlay と patch（B2.5） | Apache-2.0（patch の対象は上流の MIT のコード） |
 | `baselines/stackchan_idf/` | [ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf) を Docker で build するための Node.js の shim（B2） | Apache-2.0 |
 | `tools/serial_capture.py` | Serial log の取得。reset、prompt への自動応答、終了条件を指定できる | Apache-2.0 |
+| `tools/lm_serial.py` | `jtalm_action` に prompt を1件ずつ送り、応答を JSONL に保存する。host の runtime の出力と比べ、latency をまとめる | Apache-2.0 |
 | `third_party/` | 第三者の repository の clone。Git の管理外 | 各 upstream |
 
 ## Build と書き込み
@@ -29,6 +31,33 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
   --port COM3 --reset --seconds 30 --out runs/device/jtalm_eval.log
 ```
+
+### jtalm_action（B4）
+
+`runtime/host/` を参照するので、repository の root を mount します。
+
+```sh
+# Build（Git Bash、repository の root で）
+MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$(pwd -W):/w"   -w /w/firmware/jtalm_action espressif/idf:v5.5.5 idf.py build
+
+# model の書き出し（runs/local/m6/ に 3m_fp32 / 3m_q8_g64 / 3m_q4_g64 .jtlm ができる）
+uv run --group train python -m jtalm.model.export   --ckpt runs/vast/train_action_v0-20260929T054319Z/artifacts/m4/3m/best.pt   --tokenizer tokenizer/out/action_v0_sp2048.model --bits 0 8 4 --out runs/local/m6
+
+# 書き込み（app と model。model を替えるときは 0x200000 だけを書けばよい）
+cd firmware/jtalm_action/build
+uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash   --flash-mode dio --flash-size 16MB --flash-freq 80m   0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin   0x10000 jtalm_action.bin 0x200000 ../../../runs/local/m6/3m_q8_g64.jtlm
+cd ../../..
+
+# 評価セットの先頭 200件を送り、host の出力（runtime/host/build/jtalm --grammar）と比べる
+# （host 側: prompts200.txt に同じ 200件を1行ずつ書き、
+#   runtime/host/build/jtalm -m <model>.jtlm -i prompts200.txt --grammar > host_d_3m_q8_g64.jsonl）
+uv run --no-project --with pyserial python firmware/tools/lm_serial.py --port COM3 --reset   --cases datasets/action/v0/eval.jsonl --limit 200   --ref runs/device/b4/host_d_3m_q8_g64.jsonl --out runs/device/b4/full_3m_q8.jsonl
+```
+
+- `model` partition は 14MB なので、5M の FP32（20.5MB）は載りません。3M の FP32（12.9MB）は載ります。
+- 起動すると `load`（mmap）、`info`（model の設定、image の SHA-256 の先頭 16 桁、arena の置き場所）、`heap` を出し、`ready` の後に入力を待ちます。
+- 1行が1件の発話です（UTF-8、CR / LF の両方を行末とみなす）。応答は `JTALM {"t":"gen","output":...,"ids":[...],"prompt_ids":[...],"n_prompt":...,"n_gen":...,"tok_ms":...,"prefill_ms":...,"decode_ms":...,"total_ms":...,"ms_per_fwd":...,"tok_s":...}` の1行です。最初の要求の後に `heap`（`first_request`）を出します。
+- `!` で始まる行は command です: `!info`、`!heap`、`!grammar 0|1`、`!par 0|1`（行列積を2つの core に分ける。既定は 1）、`!batch 0|1`（prompt のまとめ処理。0 は1 token ずつ）、`!bench`（`expf` と1 step の forward の時間）、`!autoload T S`（DCache の autoload の実験用。既定は off）。
 
 ### esp32-llm（B2.5）
 

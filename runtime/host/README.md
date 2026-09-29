@@ -1,6 +1,6 @@
 # Host C reference runtime（M6）
 
-Action LM の推論を、外部ライブラリに依存しない C11 で実装したものです。PC 上で PyTorch / Python の実装と出力が一致することを確かめる基準（reference）で、ESP32-S3 への移植（B4）の出発点になります。
+Action LM の推論を、外部ライブラリに依存しない C11 で実装したものです。PC 上で PyTorch / Python の実装と出力が一致することを確かめる基準（reference）です。実機（ESP32-S3）の firmware [`firmware/jtalm_action/`](../../firmware/jtalm_action/) も、同じ `model.c` / `tokenizer.c` / `grammar.c` を copy せずにそのまま build します（B4）。
 
 - `python -m jtalm.model.export` が書き出した `.jtlm` ファイル（モデルと tokenizer を1つにまとめたもの）を読みます。
 - UTF-8 の入力を SentencePiece と同じ手順で token に分けます（`nmt_nfkc` の正規化、unigram の Viterbi、byte fallback）。
@@ -107,8 +107,27 @@ decode（id → 文字列）も SentencePiece と同じ規則です（制御用�
 
 - モデルの構造体は、読み込んだファイルの中を指すだけで、何も複製しません。ESP32 では flash を mmap した領域をそのまま渡せます（4 byte 境界に揃っていること）。
 - 書き換える状態は、`jtlm_state_bytes()` の大きさの arena 1つにまとめます。KV cache は `max_seq_len` の分を最初に確保します。token ごとの malloc はありません。
-- arena の大きさ: 3M（d192 × 7層、KV head 2）で 477KB、5M（d256 × 6層）で 416KB。ほとんどが f32 の KV cache です（`層数 × 128 × 2 × kv_heads × head_dim × 4 byte`）。
+- `jtlm_state_init_split()` を使うと、KV cache（`jtlm_state_kv_bytes()`）と残りの小さな buffer を別々の領域に置けます。ESP32 では、KV cache を PSRAM に、よく使う activation を内部 SRAM に置きます。KV cache は、読む前に必ずその位置を書くので、初期化しません。
+- 大きさ（`JTLM_BATCH` = 16 のとき）:
+
+| model | KV cache | 残り（activation × 16 token、attention の score、logits） | 合計 |
+|---|---:|---:|---:|
+| 3M（d192 × 7層、KV head 2） | 458,752 B | 125,952 B | 584,704 B |
+| 5M（d256 × 6層、KV head 2） | 393,216 B | 176,128 B | 569,344 B |
+
+- KV cache は `層数 × 128 × 2 × kv_heads × head_dim × 4 byte` です。残りの大部分は、prompt をまとめて処理するための activation（`JTLM_BATCH × (3 × d_model + d_model + 2 × d_ff) × 4 byte`）です。`-DJTLM_BATCH=8` などで小さくできます（結果は変わりません）。
 - tokenizer の作業領域は呼び出し側が渡します（正規化後の byte 数 + 1 byte あたり 16 byte）。
+
+### Prefill のまとめ処理と並列化（B4）
+
+実機では、重みを flash から読む速さ（約 31 MB/s）と、1 core の演算の速さの両方が律速になります。どちらも、**計算の値を1 bit も変えずに**速くしています。
+
+- **Prefill のまとめ処理:** `jtlm_prefill()` は、prompt を最大 `JTLM_BATCH` token ずつまとめて処理します。重みの各行を1回読み（量子化なら1回 f32 に戻し）、まとめた全 token に掛けます。token ごとの内積の足し方は1 token ずつ処理する場合と同じなので、結果は変わりません。Prompt の途中の token では、出力 head（語彙 × d_model）の計算を省きます（最後の token の logits しか使わないため）。
+- **並列化の hook:** `jtlm_set_parallel()` に関数を渡すと、行列積の出力の行を、その関数が分割して実行します（firmware では2つの core に半分ずつ）。行ごとの計算は分割の仕方によらないので、結果は変わりません。既定（`NULL`）では1 thread で実行します。
+- **内積の kernel:** 部分和を local 変数に持つ（`acc[]` が入力と alias しうるので、配列のままだと毎回 memory に書き戻される）。量子化した重みは、1個ずつ f32 に戻してすぐ掛けます（行を一度 buffer に戻してから掛けるのと同じ値）。
+- `jtlm_prefill()` と `jtlm_generate_from()` は `jtlm_generate()` を2つに分けたもので、呼び出し側が prefill と decode の時間を別々に測れます。
+
+これらの変更の前後で、評価セットの先頭 200件の出力（`--grammar`、6つの model、`double` と `float` の累積、`JTLM_BATCH` = 16 と 3）は byte 単位で同じでした。
 
 ## Python との一致の確認
 
@@ -150,4 +169,6 @@ M4 の checkpoint（`runs/vast/train_action_v0-20260929T054319Z/artifacts/m4/{3m
 - INT8 / INT4 の比較相手は、`.jtlm` から読み戻した重み（fp16 の scale）で作った Python のモデルです。`jtalm.model.quantize` の fake quant（f32 の scale）で評価した出力とも、1,189件すべてで一致しました。scale を fp16 にしても結果は変わりません。
 - `-DJTLM_ACC=float`（ESP32 向けの設定）で build した場合も、3M の6条件すべてで token 列が 1,189件一致しました（logits の差は最大 3.2e-5）。
 
-**速度（参考）:** AMD Ryzen 9 5900X の Docker（WSL2）上で1 thread、評価セット全体（prompt と生成を合わせて約 22,500 token）を処理した値です。3M は FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。5M は FP32 で約 470 tok/s、INT8 / INT4 で約 230 tok/s。量子化した重みは group ごとに f32 へ戻してから掛けるので、PC では FP32 より遅くなります。実機向けの kernel は B4 で作ります。
+**速度（参考）:** AMD Ryzen 9 5900X の Docker（WSL2）上で1 thread、評価セット全体（prompt と生成を合わせて約 22,500 token）を処理した値です。3M は FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。5M は FP32 で約 470 tok/s、INT8 / INT4 で約 230 tok/s。量子化した重みは group ごとに f32 へ戻してから掛けるので、PC では FP32 より遅くなります。
+
+B4 の変更（prefill のまとめ処理と内積の kernel）の後は、評価セットの先頭 200件（約 3,500 token）で、3M が FP32 約 900 tok/s、INT8 / INT4 約 570 tok/s、5M が FP32 約 580 tok/s、INT8 / INT4 約 380 tok/s です（`double` の累積。`-DJTLM_ACC=float` ではそれぞれ約 1.5倍）。実機の速度は [`docs/hardware.md`](../../docs/hardware.md) §11 にあります。

@@ -414,10 +414,117 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 - 右へ回したときに raw が**増える**なら、「yaw の正 = 右」（[`architecture.md`](architecture.md) §7）は stackchan-idf の deg の符号とそのまま一致する。**減る**なら、dispatcher で符号を反転する。
 - 手順 4-4 の raw を、この個体の中立位置（yaw の中央、pitch の水平）とする。公式 firmware の pitch の範囲（3°〜87°）との対応は、この raw を基準にして換算する。
 
-## 11. 未確認事項
+## 11. Action LM の実機での実行（B4、2026-09-29）
+
+M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（Apache-2.0）で CoreS3 に載せました。LM の source は copy せず、`runtime/host/` の `model.c`、`tokenizer.c`、`grammar.c` をそのまま build します（`-DJTLM_ACC=float -ffp-contract=off`）。Wi-Fi、画面、servo は使いません。GPIO も操作しません。作業は 09:55〜11:13 UTC。
+
+### 構成
+
+| 項目 | 内容 | 確度 |
+|---|---|---|
+| Firmware | `jtalm_action`（ELF SHA-256 の先頭 `12c755445`）。ESP-IDF v5.5.5、gcc 14.2（`esp-14.2.0_20260121`）、`-O2`。Cache と clock は §8 と同じ（240MHz、data cache 64KB / line 64B、Flash QIO 80MHz、PSRAM Quad 80MHz） | 確認済み |
+| Flash map | §8 と同じ partition table。app は `0x10000`（246KB）、`.jtlm` は `model` partition（`0x200000`、14MB）に esptool で直接書く。起動時に partition 全体を1回で mmap（`0x3C830000`）し、image をそのまま `jtlm_model_init` に渡す。起動時に image の SHA-256 を計算して log に出す | 実測 |
+| 入出力 | USB-Serial/JTAG の console（driver 経由）。1行の UTF-8 が1件の発話。応答は `JTALM {"t":"gen",...}` の1行（出力、生成した id、prompt の id、tokenize / prefill / decode / 合計の時間）。`!` で始まる行は command（`firmware/README.md`） | 確認済み |
+| 生成 | Action schema v0 の grammar 付きの greedy（host の `--grammar` と同じ） | 確認済み |
+| Task | LM の task を core 1、行列積を半分受け持つ worker を core 0 に置く | 確認済み |
+| 状態の置き場所 | KV cache（f32、`max_seq_len` 128 の分）は PSRAM、残り（16 token 分の activation、attention の score、logits）は内部 SRAM | 実測 |
+| 5M の FP32 | 20.5MB で `model` partition（14MB）に入らないので測っていない | 確認済み |
+
+### 実機と host の一致（実測）
+
+評価セット（`datasets/action/v0/eval.jsonl`）の先頭 200件を送り、host の runtime（`runtime/host/build/jtalm --grammar`、`double` の累積。Python と 1,189件すべてで一致することを確認済み）の出力と比べました。
+
+| model | 重み | 生成した id が一致 | 出力の文字列が一致 |
+|---|---|---:|---:|
+| 3M | FP32 | 200 / 200 | 200 / 200 |
+| 3M | INT8 | 200 / 200 | 200 / 200 |
+| 3M | INT4 | 200 / 200 | 200 / 200 |
+| 5M | INT8 | 200 / 200 | 200 / 200 |
+| 5M | INT4 | 200 / 200 | 200 / 200 |
+
+- 実機の出力は host の C、Python（`jtalm.model.decode.greedy`）と1件残らず同じなので、完全一致の率も [`runtime/host/README.md`](../runtime/host/README.md) の表の値（3M INT4 で 84.78% など）がそのまま実機の値になる。
+- 200件のうち 21件は prompt が 16 token を超え、prefill を2回に分けて処理する経路も通った。
+- 使った model は M4 の checkpoint（`runs/vast/train_action_v0-20260929T054319Z/artifacts/m4/{3m,5m}/best.pt`）。Image の SHA-256 の先頭は、3M が FP32 `de127de6c45ccb4e`、INT8 `a082374abf978e43`、INT4 `692604ceab4edd88`、5M が INT8 `18b912ffe5a76846`、INT4 `9645841b3a3b1fe1`。
+
+### 速度（実測）
+
+評価セットの先頭 200件。1件あたりの prompt は平均 11.97 token（`<s>`、`<act>`、`<out>` を含む。最小 4、最大 27）、生成は平均 6.2〜6.8 token（`</s>` を含む。最大 14）。Prefill は prompt の全 token の処理、decode は生成の2 token 目以降の処理（1 token ずつ）。「帯域の上限」は、重みの byte 数を §8 の 31.2 MB/s で読むのにかかる時間です。
+
+| model | 重み | 重みの byte 数 | decode（ms/token） | decode（tok/s） | 帯域の上限（ms/token） | prefill（ms/token） | 1件の latency の中央値（ms） | p90（ms） | 最大（ms） |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 3M | FP32 | 12.6MB | 410.7 | 2.4 | 404 | 62.8 | 3,488 | 4,107 | 6,618 |
+| 3M | INT8 | 3.26MB | 115.3 | 8.7 | 104 | 49.3 | 1,273 | 1,762 | 2,511 |
+| **3M** | **INT4** | **1.68MB** | **104.5** | **9.6** | 54 | **45.8** | **1,153** | **1,532** | 2,288 |
+| 5M | INT8 | 5.22MB | 178.7 | 5.6 | 167 | 78.0 | 1,991 | 2,409 | 3,659 |
+| 5M | INT4 | 2.69MB | 161.1 | 6.2 | 86 | 72.0 | 1,793 | 2,234 | 3,359 |
+
+- **3M INT4 で、1件の応答は中央値 1.15 秒、p90 1.53 秒。** 何もしない（`[]`）応答は中央値 0.65 秒。内訳の目安は、prefill（約 12 token をまとめて）が約 0.5 秒、生成が 1 token あたり約 0.1 秒。
+- Tokenize は1件あたり平均 2.2ms、state の初期化は 1ms 未満で、どちらも無視できる。
+- FP32 と INT8 の decode は帯域の上限に近い（FP32 は 98%、INT8 は 90%）。INT4 は上限の約 2倍かかっていて、演算（INT4 の復元と積和で 1 weight あたり約 11 命令。disassembly で確認）が律速になっている。そのため INT4 の decode は INT8 より約 10% 速いだけ。
+- **esp32-llm（§9、stories3M INT8、3.35MB）の forward だけで 6.5〜7.1 tok/s（140〜154 ms/token）に対し、3M INT8 の decode は 8.7 tok/s（115 ms/token）で、約 1.2〜1.3倍。** 重みの byte 数はほぼ同じ（3.26MB と 3.35MB）。Prompt も含めた forward 全体（prompt と生成の token の合計 ÷ 時間）では、3M INT8 が 14.1 tok/s、INT4 が 15.4 tok/s。
+- 5M は 3M より 1件あたり約 0.6〜0.7 秒遅い。M4 の時点の精度も 3M の方が高い（[`roadmap.md`](roadmap.md) §12）。
+
+### メモリ（実測、単位 B）
+
+内部 SRAM は `MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT` の値です。
+
+| 段階 | 内部 SRAM の空き | 内部 SRAM の最大連続ブロック | 内部 SRAM の最小空き | PSRAM の空き |
+|---|---:|---:|---:|---:|
+| `app_main` の開始直後 | 317,899 | 262,144 | 285,868 | 8,386,192 |
+| LM task の開始（task 2つの stack、計 22KB の確保後） | 294,651 | 245,760 | 262,620 | 8,386,192 |
+| 3M の読み込み後 | 140,219 | 90,112 | 108,188 | 7,919,240 |
+| 5M の読み込み後 | 90,043 | 39,936 | 58,012 | 7,984,776 |
+
+| 確保するもの | 3M | 5M | 置き場所 |
+|---|---:|---:|---|
+| KV cache（f32、128 token 分） | 458,752 | 393,216 | PSRAM |
+| Activation（16 token 分）、attention の score、logits | 125,952 | 176,128 | 内部 SRAM |
+| Tokenizer の作業領域 | 32,768 | 32,768 | 内部 SRAM |
+| 最初の step の logits の控え（診断用） | 8,192 | 8,192 | PSRAM |
+| 重み（`.jtlm`） | 0（mmap） | 0（mmap） | Flash |
+
+- 1件目の処理の後は、空きと最小空きが読み込み直後より 220 B 減っただけで、その後は変わらない（token ごとの確保はない）。最小空きが空きより約 32KB 少ないのは、起動直後からの値（`app_main` の開始時点ですでに 32KB 少ない）で、LM の処理によるものではない。
+- LM task の stack（16KB）の余りは 13.5KB。
+- 5M は内部 SRAM の最大連続ブロックが約 40KB まで減る。画面や servo を載せるなら、`-DJTLM_BATCH=8` で activation を半分（5M で約 82KB 減）にできる（結果は変わらない。速度への影響は未計測）。
+
+### 速くするために行ったこと（3M、実測）
+
+どの変更も、計算の値を1 bit も変えないものに限りました（host の 200件 × 6 model の出力が byte 単位で同じであること、実機の出力が host と同じであることを、変更のたびに確かめた）。3M INT8、評価セットの先頭 20件（移植直後だけは 10件）。
+
+| 段階 | prefill（ms/token） | decode（ms/token） | 1件の中央値（ms） | p90（ms） |
+|---|---:|---:|---:|---:|
+| 移植直後（host の code のまま、1 core、1 token ずつ。arena はすべて PSRAM）※10件 | 423 | 428 | 4,899 | 7,248 |
+| 内積の kernel の修正、activation を内部 SRAM へ | 166 | 171 | 2,425 | 3,702 |
+| ＋ prefill のまとめ処理 | 88 | 171 | 1,393 | 2,456 |
+| ＋ 2 core（まとめ処理なし） | 110 | 116 | 1,616 | 2,475 |
+| **＋ まとめ処理と 2 core（採用）** | **49** | **116** | **794** | **1,507** |
+
+- **内積の kernel:** 移植直後は、部分和の配列が入力と alias しうるため、積和のたびに部分和を memory に書き戻していた（disassembly で確認）。部分和を local 変数に移し、量子化した重みは1個ずつ f32 に戻してすぐ掛けるようにした。
+- **Prefill のまとめ処理:** prompt を最大 16 token まとめ、重みの各行を1回読んで全 token に掛ける。Prompt の途中の token では出力 head を計算しない。
+- **2 core:** 行列積の出力の行を、core 1（LM task）と core 0（worker）で半分ずつ計算する。同期は task notification。
+- 試して採用しなかったもの:
+
+| 試したこと | 結果 | 判断 |
+|---|---|---|
+| INT4 の復元を、group ごとの 16 値の表引きにする（命令数は約 11 → 7.5 / weight） | decode が 105 → 113 ms/token（1 core では 191 → 202）で、かえって遅い（表の load の待ちと見られる。推測） | 戻した |
+| DCache の autoload（連続した line の先読み。ESP-IDF の既定では off）を model の領域で有効にする | 1 step の forward が、3M INT4 で 109 → 104ms（1 core では 198 → 189ms）。FP32 は 407 → 407ms で変わらない | 効果が約 5% と小さく、ESP-IDF が公開していない cache の register を直接書くので、既定は off のまま（`!autoload` で試せる） |
+
+- `expf`（SiLU と softmax で使う）は1回 1.12µs で、3M の decode では1 token あたり約 6ms（約 6%）。newlib の `expf` は内部で double を使い、ESP32-S3 では double がソフトウェアで計算されるため。値を変えずに速くする方法はないので、そのままにした。
+- 試していないもの: `-O3`、hot な関数の IRAM への配置、FMA（`madd.s`。丸めが1回になり PyTorch と値が変わる）、PIE の SIMD（整数だけなので activation の量子化が必要になり、値が変わる）。
+
+### 本プロジェクトへの示唆
+
+- **3M（INT4 または INT8）なら、実機で1件あたり約 1.2 秒（p90 約 1.5〜1.8 秒）で応答できる。** 実用の目安としては使える範囲（推測。音声認識や TTS と合わせた体感は未確認）。
+- 3M の decode は、INT8 では flash の帯域、INT4 では演算が律速で、どちらも約 0.1 秒 / token。これ以上は、生成する token 数を減らす（Action の表現を短くする）か、層や語彙を小さくするのが効く（推測）。
+- 5M は 3M より約 0.6 秒遅く、内部 SRAM にも余裕がない。精度で 3M を上回らない限り、実機の本命は 3M（[`roadmap.md`](roadmap.md) §12 の結論と同じ）。
+- 最も効いたのは prefill のまとめ処理で、prefill は 166 → 88 ms/token、2 core と合わせて 49 ms/token（約 1/3.4）になった。発話が長いほど効果が大きい。
+- 生 log と JSONL は `runs/device/b4/`（Git の管理外）。`full_*.jsonl` が各 model の 200件、`abl_*.jsonl` が上の段階ごとの計測。
+
+## 12. 未確認事項
 
 - Yaw の符号と、pitch の中立角度を、実機を動かして確認する（[`roadmap.md`](roadmap.md) §12 の B2。手順は §10）。
-- 画面、servo、M5Unified を載せた状態での SRAM / PSRAM（B4 で測る）。
+- 画面、servo、M5Unified を載せた状態での SRAM / PSRAM（B4 の servo の部分で測る。LM だけの値は §11）。
+- `-DJTLM_BATCH=8` にしたときの速度と、音声認識・TTS と同時に動かしたときの LM の速度。
 - FCC ID `2AN3WM5STACKCHAN` の個別登録内容。
 
 `stackchan-idf` が K151 に対応しているかどうかは、2026-09-29 に README で確認し、解消しました（§5）。

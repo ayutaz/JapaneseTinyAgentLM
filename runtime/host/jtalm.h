@@ -24,6 +24,12 @@
 #define JTLM_MAX_GROUP 256
 #define JTLM_MAX_NEW_TOKENS 24 /* jtalm.model.data.MAX_TARGET_TOKENS */
 
+/* Prompt tokens run together by jtlm_prefill, so each weight is read once per JTLM_BATCH tokens
+ * instead of once per token. It sizes the activation buffers in the state. */
+#ifndef JTLM_BATCH
+#define JTLM_BATCH 16
+#endif
+
 enum {
     JTLM_OK = 0,
     JTLM_ERR_FORMAT = -1, /* not a valid .jtlm image */
@@ -81,7 +87,8 @@ typedef struct {
 } jtlm_model;
 
 typedef struct {
-    float *x, *xb, *xb2, *q, *hb, *hb2, *att, *logits;
+    float *x, *xb, *xb2, *q, *hb, *hb2; /* JTLM_BATCH rows each */
+    float *att, *logits;
     float *key_cache, *value_cache; /* [n_layers][max_seq_len][n_kv_heads * head_dim] */
 } jtlm_state;
 
@@ -92,8 +99,22 @@ int jtlm_model_init(jtlm_model *m, const void *image, size_t size);
 size_t jtlm_state_bytes(const jtlm_config *c);
 void jtlm_state_init(jtlm_state *s, const jtlm_config *c, void *arena);
 
+/* The same state in two buffers: the KV cache (jtlm_state_kv_bytes(), the bulk of the state)
+ * and the small, hot rest (jtlm_state_bytes() - jtlm_state_kv_bytes()), e.g. PSRAM and
+ * internal SRAM on the ESP32. Both 8-byte aligned. */
+size_t jtlm_state_kv_bytes(const jtlm_config *c);
+void jtlm_state_init_split(jtlm_state *s, const jtlm_config *c, void *arena, void *kv_cache);
+
 /* Runs one token at position pos (0-based) and returns the logits (vocab_size floats). */
 float *jtlm_forward(const jtlm_model *m, jtlm_state *s, int token, int pos);
+
+/* Optional parallel matrix products (e.g. both cores of the ESP32-S3). run(fn, ctx, n) must call
+ * fn(ctx, begin, end) on disjoint ranges that cover [0, n) and return when all have finished.
+ * Each output row is computed the same way whatever the split, so results do not change.
+ * NULL (the default) runs fn(ctx, 0, n) directly. Global: set it before running a model. */
+typedef void (*jtlm_range_fn)(void *ctx, int begin, int end);
+typedef void (*jtlm_parallel_fn)(jtlm_range_fn fn, void *ctx, int n);
+void jtlm_set_parallel(jtlm_parallel_fn run);
 
 /* Encodes UTF-8 text like SentencePieceProcessor::Encode (no <s>/</s>). Writes at most max_ids
  * ids and returns the total count (which may exceed max_ids), or JTLM_ERR_SPACE when work is
@@ -138,5 +159,12 @@ typedef struct {
  * not NULL, receives the logits of the first generated step (vocab_size floats). */
 int jtlm_generate(const jtlm_model *m, jtlm_state *s, const jtlm_grammar *grammar,
                   const int *prompt, int n_prompt, jtlm_result *r, float *first_logits);
+
+/* The two halves of jtlm_generate, for callers that time them separately: jtlm_prefill runs
+ * the prompt (positions 0 .. n_prompt - 1) and returns the logits of its last position, and
+ * jtlm_generate_from decodes greedily from them. */
+float *jtlm_prefill(const jtlm_model *m, jtlm_state *s, const int *prompt, int n_prompt);
+int jtlm_generate_from(const jtlm_model *m, jtlm_state *s, const jtlm_grammar *grammar,
+                       float *logits, int n_prompt, jtlm_result *r, float *first_logits);
 
 #endif
