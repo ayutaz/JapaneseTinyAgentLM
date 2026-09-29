@@ -219,3 +219,4 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | Hugging Face に公開する repository（データセットとモデル）は、すべて Community contributions（Discussions と Pull Requests）を off にする。公開済みのデータセットにも設定した | [`data.md`](data.md) §6、[`development.md`](development.md) §6 |
 | 2026-09-29 | モデルの公開先はユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz) に変更する（データセットは `japanese-data-analyze` のまま）。モデルを公開する前には必ずユーザーの確認を取る | [`architecture.md`](architecture.md) §13 |
 | 2026-09-29 | 学習データは v0.4（書き手7つ、47,450件）を採用する。モデルサイズは、精度の面では 3M（INT4）を第一候補とし、B4 の実機速度を見て最終決定する | [`roadmap.md`](roadmap.md) §12 |
+| 2026-09-29 | 実機では confidence gate を標準で有効にする（v0.4 の 3M で閾値 0.970、致命的な誤りを 2.0% → 0.6%）。閾値は開発者が変えられるようにする | [`roadmap.md`](roadmap.md) §12 |
