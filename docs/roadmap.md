@@ -516,6 +516,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 
 - 重みは Flash から mmap し、KV cache は PSRAM、activation は内部 SRAM に置く。入力はまとめて処理（batch prefill）し、行列の計算を2つの core で分ける。
 - 3M の decode は esp32-llm の stories3M INT8（6.5〜7.1 tok/s）より 1.2〜1.3 倍速い。`[]` の応答は中央値 0.65 秒。
+- **採用した構成（v0.4 の 3M INT4、grammar、confidence gate 0.970）を実機の標準にした。** 評価セットの全 1,189件で、実機の出力（gate の前と後の両方）が host と一致し、実機での完全一致は 94.45%、致命的な誤りは 0.59%（Python と同じ）。1回の依頼は中央値 1.08 秒、p90 1.86 秒。
 - 1 token の decode に約 0.1 秒かかるので、応答時間は出力の token 数に比例する。JSON の断片を1 token にまとめた tokenizer（M4）が、そのまま速さに効いている。
 
 **データ量とモデルサイズの候補（2026-09-29）:**
