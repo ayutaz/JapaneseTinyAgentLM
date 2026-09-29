@@ -15,7 +15,7 @@ YAW_DEG = {"slight": 10, "normal": 20, "large": 30}
 PITCH_DEG = {"slight": 5, "normal": 10, "large": 15}
 YAW_LIMIT_DEG = 30
 PITCH_LIMIT_DEG = 15
-NOD_PITCH_DEG = 8
+NOD_PITCH_DEG = 14  # 8 was too small to notice on the K151 (motion test, 2026-09-30)
 
 
 @dataclass(frozen=True)
@@ -38,20 +38,22 @@ def look_target(direction: str, amount: str) -> ServoTarget:
     raise ValueError(f"unknown direction: {direction}")
 
 
-def nod_targets(count: int, base_pitch: int = 0, pitch_min: int | None = None) -> list[ServoTarget]:
-    """A nod is a small down-and-back pitch motion around the current pitch, ``count`` times.
+def nod_targets(
+    count: int, base_pitch: int = 0, pitch_min: int | None = None, pitch_max: int | None = None
+) -> list[ServoTarget]:
+    """A nod is a down-and-back pitch swing of ``NOD_PITCH_DEG``, repeated ``count`` times.
 
-    This matches firmware/jtalm_action: the head dips ``NOD_PITCH_DEG`` below ``base_pitch``
-    (not below ``pitch_min``) and comes back, so a nod while looking up stays looking up. When the
-    lower limit leaves less than half a nod of travel, the nod goes up from the limit instead.
-    The schema accepts an integral float count (2.0); it is read as the integer.
+    This matches firmware/jtalm_action: the swing starts from the current pitch, so a nod while
+    looking up stays looking up. Near the lower limit the swing keeps its full amplitude by
+    moving up (base 0 with a -10 limit swings between -10 and +4); the firmware then returns to
+    ``base_pitch``. The schema accepts an integral float count (2.0); it is read as the integer.
     """
     low = base_pitch - NOD_PITCH_DEG
     if pitch_min is not None:
         low = max(low, pitch_min)
-    high = base_pitch
-    if high - low < NOD_PITCH_DEG // 2:
-        high = low + NOD_PITCH_DEG
+    high = low + NOD_PITCH_DEG
+    if pitch_max is not None:
+        high = min(high, pitch_max)
     return [ServoTarget(None, low), ServoTarget(None, high)] * int(count)
 
 

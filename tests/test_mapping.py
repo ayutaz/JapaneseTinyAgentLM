@@ -63,5 +63,7 @@ def test_nod_is_around_the_current_pitch_and_accepts_integral_floats() -> None:
 
     up = nod_targets(2.0, base_pitch=10)
     assert [t.pitch_deg for t in up] == [10 - NOD_PITCH_DEG, 10] * 2
-    at_limit = nod_targets(1, base_pitch=-10, pitch_min=-10)
-    assert [t.pitch_deg for t in at_limit] == [-10, -10 + NOD_PITCH_DEG]
+    near_limit = nod_targets(1, base_pitch=0, pitch_min=-10, pitch_max=15)
+    assert [t.pitch_deg for t in near_limit] == [-10, -10 + NOD_PITCH_DEG]  # full swing, shifted
+    capped = nod_targets(1, base_pitch=-10, pitch_min=-10, pitch_max=2)
+    assert [t.pitch_deg for t in capped] == [-10, 2]
