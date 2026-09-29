@@ -29,6 +29,7 @@ EXPR_NEGATED = {
     "happy": "笑う（嬉しそうな顔をする）",
     "sad": "悲しそうな顔をする",
     "surprised": "驚いた顔をする",
+    "neutral": "真顔になる",
 }
 NO_ACTION_TOPICS = {
     "chitchat": "天気、食べ物、趣味、今日の出来事などについての雑談",
@@ -127,19 +128,49 @@ def multi_specs() -> list[Spec]:
     return specs
 
 
-NEGATABLE = [look(d) for d in LOOK_DESC] + [expression(e) for e in EXPR_NEGATED] + [nod(1)]
+NEGATABLE = [
+    *(look(d) for d in LOOK_DESC),
+    look("right", "slight"),
+    look("left", "slight"),
+    look("right", "large"),
+    look("left", "large"),
+    *(expression(e) for e in EXPR_NEGATED),
+    nod(1),
+    nod(2),
+]
+NEGATED_GENERAL = {
+    "move_head": "首（頭）を動かす",
+    "change_face": "表情を変える",
+    "move_or_face": "首を動かしたり、表情を変えたりする",
+}
+NEGATED_PAIRS = [
+    (look("right"), expression("happy")),
+    (look("up"), nod(1)),
+    (expression("surprised"), look("left")),
+]
 
 
 def negation_specs() -> list[Spec]:
-    return [
-        Spec(
-            f"negation.{_call_id(c)}",
+    """Negated requests (label ``[]``); widened in v0.2 to reduce duplicate sentences."""
+
+    def spec(key: str, what: str) -> Spec:
+        return Spec(
+            f"negation.{key}",
             "negation",
             (),
-            f"ロボットに「{describe_negated(c)}」ことを、しないように頼む（否定の依頼）",
+            f"ロボットに「{what}」ことを、しないように頼む（否定の依頼）",
         )
-        for c in NEGATABLE
+
+    specs = [spec(_call_id(c), describe_negated(c)) for c in NEGATABLE]
+    specs += [spec(f"general.{k}", v) for k, v in NEGATED_GENERAL.items()]
+    specs += [
+        spec(
+            f"pair.{_call_id(a)}+{_call_id(b)}",
+            f"{describe_negated(a)}ことも、{describe_negated(b)}",
+        )
+        for a, b in NEGATED_PAIRS
     ]
+    return specs
 
 
 def correction_specs() -> list[Spec]:

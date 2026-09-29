@@ -94,10 +94,20 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(raw_dir: Path, out_dir: Path, config: dict, massive_dir: Path) -> dict[str, Any]:
+def _load(raw_dirs: list[Path], name: str) -> list[dict]:
+    rows: list[dict] = []
+    for raw_dir in raw_dirs:
+        path = raw_dir / name
+        if path.exists():
+            rows += [json.loads(x) for x in path.open(encoding="utf-8")]
+    return rows
+
+
+def build(raw_dirs: list[Path], out_dir: Path, config: dict, massive_dir: Path) -> dict[str, Any]:
+    """Build from one or more generation runs (e.g. the main run plus a negation top-up)."""
     rng = random.Random(config["seed"])
-    train_raw = [json.loads(x) for x in (raw_dir / "train_raw.jsonl").open(encoding="utf-8")]
-    eval_raw = [json.loads(x) for x in (raw_dir / "eval_raw.jsonl").open(encoding="utf-8")]
+    train_raw = _load(raw_dirs, "train_raw.jsonl")
+    eval_raw = _load(raw_dirs, "eval_raw.jsonl")
 
     stats: dict[str, Counter] = {"train": Counter(), "eval": Counter()}
     train_seen: set[str] = set()
@@ -159,13 +169,15 @@ def main() -> None:
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
     report = build(args.raw, args.out, config, args.massive_dir)
-    generation = args.raw / "generation_summary.json"
+    generation = {
+        f"{raw.parent.parent.name}/{s.name}": json.loads(s.read_text(encoding="utf-8"))
+        for raw in args.raw
+        for s in sorted(raw.glob("summary_*.json"))
+    }
     manifest = {
         **report,
         "config": config,
-        "generation_summary": json.loads(generation.read_text(encoding="utf-8"))
-        if generation.exists()
-        else None,
+        "generation_runs": generation,
         "sources": {
             "synthetic_train": config["train_generator"],
             "synthetic_eval": config["eval_generator"],

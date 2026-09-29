@@ -64,7 +64,7 @@ def test_build_filters_dedups_removes_leaks_and_adds_massive(tmp_path: Path) -> 
     )
     fake_massive(tmp_path / "massive")
     out = tmp_path / "out"
-    report = build(raw, out, CONFIG, tmp_path / "massive")
+    report = build([raw], out, CONFIG, tmp_path / "massive")
 
     train = load_cases(out / "train.jsonl") + load_cases(out / "val.jsonl")
     evals = load_cases(out / "eval.jsonl")

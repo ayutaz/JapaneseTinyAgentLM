@@ -50,8 +50,11 @@ TRAIN_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"  # Apache-2.0, bf16 61GB
 EVAL_MODEL = "llm-jp/llm-jp-3.1-13b-instruct4"  # Apache-2.0, bf16 ~27GB
 
 
-def generate(phase: str) -> str:
-    return f"{UV} run --no-dev python -m jtalm.data.generate --phase {phase} --workers 64"
+def generate(phase: str, config: str = "configs/action_v0.json") -> str:
+    return (
+        f"{UV} run --no-dev python -m jtalm.data.generate --phase {phase} "
+        f"--config {config} --workers 64"
+    )
 
 
 GEN_ACTION_V0 = JobSpec(
@@ -74,4 +77,20 @@ GEN_ACTION_V0 = JobSpec(
     ],
 )
 
-JOBS: dict[str, JobSpec] = {job.name: job for job in (SMOKE, GEN_ACTION_V0)}
+TOPUP_CONFIG = "configs/action_v0_negation_topup.json"
+GEN_ACTION_V0_NEGATION = JobSpec(
+    name="gen_action_v0_negation",
+    description="M3: negation-only top-up for action-v0 (Qwen3 writes and verifies)",
+    query=f"gpu_ram>=79 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=160,
+    max_hours=1.0,
+    steps=[
+        f"{UV} sync --locked --no-dev",
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", TOPUP_CONFIG),
+        generate("train-verify", TOPUP_CONFIG),
+    ],
+)
+
+JOBS: dict[str, JobSpec] = {job.name: job for job in (SMOKE, GEN_ACTION_V0, GEN_ACTION_V0_NEGATION)}
