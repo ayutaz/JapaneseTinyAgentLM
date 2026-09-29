@@ -160,9 +160,12 @@ def build(raw_dirs: list[Path], out_dir: Path, config: dict, massive_dir: Path) 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--raw", type=Path, required=True, help="artifacts/raw from the vast.ai job"
+        "--raw", type=Path, nargs="+", required=True, help="artifacts/raw dirs of vast.ai runs"
     )
     parser.add_argument("--config", type=Path, default=Path("configs/action_v0.json"))
+    parser.add_argument(
+        "--extra-config", type=Path, nargs="*", default=[], help="configs of top-up runs"
+    )
     parser.add_argument("--out", type=Path, default=Path("datasets/action/v0"))
     parser.add_argument("--massive-dir", type=Path, default=Path("datasets/downloads/massive"))
     parser.add_argument("--manifest", type=Path, default=Path("datasets/manifests/action_v0.json"))
@@ -177,6 +180,9 @@ def main() -> None:
     manifest = {
         **report,
         "config": config,
+        "extra_configs": {
+            str(p.as_posix()): json.loads(p.read_text(encoding="utf-8")) for p in args.extra_config
+        },
         "generation_runs": generation,
         "sources": {
             "synthetic_train": config["train_generator"],

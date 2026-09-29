@@ -130,7 +130,7 @@ Action LM (ESP32-S3). Project: JapaneseTinyAgentLM.
 2. オープンモデルに、その意味の日本語の文を様々な言い方で書かせる。
    - train / validation: `{train_gen["hf_id"]}`（{train_gen["license"]}）
    - test: `{eval_gen["hf_id"]}`（{eval_gen["license"]}）と別の prompt。生成元を分け、生成のくせの暗記を評価で見抜けるようにしている
-3. モデルが各文を温度 0 で動作の JSON に変換し、1. の正解と一致した文だけを残す（train は `{train_verifier["hf_id"]}`、test は文を書いていない `{train_gen["hf_id"]}` が検証）。
+3. モデルが各文を温度 0 で動作の JSON に変換し、1. の正解と一致した文だけを残す（train は `{train_verifier["hf_id"]}` による検証。train の文を書いたのと同じモデルなので、意図した正解と一致するかの一貫性の検査として働く。test は、文を書いていない `{train_gen["hf_id"]}` が検証）。
 4. 長さ・文字化け・否定との矛盾を検査し、重複と train/test の重なりを除く。
 
 prompt version: `{PROMPT_VERSION}`
