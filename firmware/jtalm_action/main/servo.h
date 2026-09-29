@@ -32,6 +32,10 @@ int servo_request_on(void);
 // "!wdtest": a dry-run plan that overruns its deadline, to exercise the watchdog.
 int servo_request_wdtest(void);
 
+// "!servo probe" (servo output off only): VM_EN on, ping, read positions, VM_EN off.
+// Never writes a goal or enables torque; logs the IO expander registers.
+int servo_request_probe(void);
+
 // Immediate: abort the running plan, drop queued ones; torque off. power_off also drops
 // VM_EN and returns to dry-run (emergency stop). src names the trigger in the log.
 void servo_stop(const char *src, int power_off);

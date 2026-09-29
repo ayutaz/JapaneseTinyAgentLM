@@ -46,7 +46,8 @@
 #define SCS_REG_PRESENT 0x38
 
 #define QUEUE_LEN 4
-#define POWER_SETTLE_MS 200     // VM_EN on -> bus usable (stackchan-idf README)
+#define POWER_ON_TIMEOUT_MS 3000  // SCS0009 answers ~1 s after VM comes up (stackchan-idf)
+#define POWER_POLL_MS 50
 #define HOLD_MS 500             // torque stays on this long after a plan, then is released
 #define WATCHDOG_MARGIN_MS 2000  // allowed overrun of a plan (the sync move is added)
 #define TORQUE_IDLE_MAX_MS 3000  // backstop: torque on without a running plan
@@ -54,7 +55,7 @@
 #define GUARD_PERIOD_MS 50
 #define TOUCH_PERIOD_MS 100
 
-enum { MSG_PLAN, MSG_ON, MSG_WDTEST };
+enum { MSG_PLAN, MSG_ON, MSG_WDTEST, MSG_PROBE };
 
 typedef struct {
   uint8_t type;
@@ -69,6 +70,9 @@ static volatile int g_output, g_torque, g_active, g_uart_open, g_faults;
 static volatile int64_t g_deadline_us, g_release_us, g_torque_idle_us;
 static double g_yaw, g_pitch;          // commanded (or, in dry-run, simulated) pose, degrees
 static int g_last_raw[2] = {-1, -1};   // last goal written to yaw, pitch
+
+static int g_rx_got;           // bytes received by the last scs_txrx (diagnostics)
+static uint8_t g_rx_last[12];
 
 static int64_t now_us(void) { return esp_timer_get_time(); }
 
@@ -128,6 +132,8 @@ static int scs_txrx(uint8_t id, uint8_t inst, const uint8_t *prm, int n, uint8_t
   int want = 6 + n_data;  // FF FF id len err data... checksum
   if (want > (int)sizeof(rx)) return -1;
   int got = uart_read_bytes(SCS_UART, rx, want, pdMS_TO_TICKS(SCS_TIMEOUT_MS));
+  g_rx_got = got;
+  if (got > 0) memcpy(g_rx_last, rx, got);
   if (got != want || rx[0] != 0xFF || rx[1] != 0xFF || rx[2] != id || rx[3] != n_data + 2) {
     return -1;
   }
@@ -348,28 +354,41 @@ static void run_plan(const msg_t *m) {
   if (r.err) fault(r.err);
 }
 
+// VM_EN on, then ping both servos every POWER_POLL_MS until they answer (the SCS0009 needs
+// about 1 s after its supply comes up), then read their positions. Caller holds g_bus.
+// ping_ms gets the time from VM_EN on to the first answer of yaw and pitch (-1: none).
+static const char *power_up(int raw[2], int ping_ms[2], int *attempts) {
+  raw[0] = raw[1] = ping_ms[0] = ping_ms[1] = -1;
+  *attempts = 0;
+  if (scs_open()) return "uart init failed";
+  if (board_servo_power(1)) return "VM_EN on failed (no IO expander?)";
+  int64_t t0 = now_us();
+  const uint8_t ids[2] = {SCS_ID_YAW, SCS_ID_PITCH};
+  while ((ping_ms[0] < 0 || ping_ms[1] < 0) && now_us() - t0 < POWER_ON_TIMEOUT_MS * 1000LL) {
+    vTaskDelay(pdMS_TO_TICKS(POWER_POLL_MS));
+    ++*attempts;
+    for (int i = 0; i < 2; i++) {
+      if (ping_ms[i] < 0 && scs_ping(ids[i]) == 0) ping_ms[i] = (int)((now_us() - t0) / 1000);
+    }
+  }
+  if (ping_ms[0] < 0 || ping_ms[1] < 0) return "servo does not answer";
+  for (int i = 0; i < 2; i++) {
+    int r = -1;
+    for (int k = 0; k < 3 && r != 0; k++) r = scs_present(ids[i], &raw[i]);
+    if (r != 0) return "servo position read failed";
+  }
+  return NULL;
+}
+
 static void servo_on(const msg_t *m) {
   const char *err = NULL;
-  int raw[2] = {-1, -1};
+  int raw[2] = {-1, -1}, ping_ms[2] = {-1, -1}, attempts = 0;
   if (g_output) {
     err = "already on";
   } else if (xSemaphoreTake(g_bus, pdMS_TO_TICKS(100)) != pdTRUE) {
     err = "bus busy";
   } else {
-    if (scs_open()) {
-      err = "uart init failed";
-    } else if (board_servo_power(1)) {
-      err = "VM_EN on failed (no IO expander?)";
-    } else {
-      vTaskDelay(pdMS_TO_TICKS(POWER_SETTLE_MS));
-      int ok = 0;
-      for (int i = 0; i < 3 && !ok; i++) {
-        ok = !scs_ping(SCS_ID_YAW) && !scs_ping(SCS_ID_PITCH);
-      }
-      if (!ok || scs_present(SCS_ID_YAW, &raw[0]) || scs_present(SCS_ID_PITCH, &raw[1])) {
-        err = "servo does not answer";
-      }
-    }
+    err = power_up(raw, ping_ms, &attempts);
     if (err) {
       board_servo_power(0);
     } else if (m->gen == g_gen) {
@@ -386,12 +405,57 @@ static void servo_on(const msg_t *m) {
   }
   out_lock();
   printf(
-      "JTALM {\"t\":\"servo\",\"state\":\"%s\",\"err\":%s%s%s,\"present\":[%d,%d]"
-      ",\"deg\":[%.1f,%.1f]}\n",
-      g_output ? "on" : "off", err ? "\"" : "", err ? err : "null", err ? "\"" : "", raw[0],
-      raw[1], raw[0] < 0 ? 0.0 : act_yaw_deg(raw[0]), raw[1] < 0 ? 0.0 : act_pitch_deg(raw[1])
+      "JTALM {\"t\":\"servo\",\"state\":\"%s\",\"err\":%s%s%s,\"ping_ms\":[%d,%d],\"polls\":%d"
+      ",\"present\":[%d,%d],\"deg\":[%.1f,%.1f]}\n",
+      g_output ? "on" : "off", err ? "\"" : "", err ? err : "null", err ? "\"" : "", ping_ms[0],
+      ping_ms[1], attempts, raw[0], raw[1], raw[0] < 0 ? 0.0 : act_yaw_deg(raw[0]),
+      raw[1] < 0 ? 0.0 : act_pitch_deg(raw[1])
   );
   out_unlock();
+}
+
+static void print_regs(const char *step) {
+  uint8_t py[16], aw[8];
+  board_regs(py, 16, aw, 8);
+  out_lock();
+  printf("JTALM {\"t\":\"probe\",\"step\":\"%s\",\"vm_en\":%d,\"py32\":[", step,
+         board_servo_power_state());
+  for (int i = 0; i < 16; i++) printf(i ? ",%d" : "%d", py[i]);
+  fputs("],\"aw9523\":[", stdout);
+  for (int i = 0; i < 8; i++) printf(i ? ",%d" : "%d", aw[i]);
+  fputs("]}\n", stdout);
+  out_unlock();
+}
+
+// "!servo probe" (servo output off only): power up, ping, read the positions, power off.
+// Never writes a goal or enables torque.
+static void probe(void) {
+  if (g_output || xSemaphoreTake(g_bus, pdMS_TO_TICKS(100)) != pdTRUE) {
+    out_lock();
+    printf("JTALM {\"t\":\"probe\",\"step\":\"skipped\",\"output\":%d}\n", g_output);
+    out_unlock();
+    return;
+  }
+  print_regs("before");
+  int raw[2], ping_ms[2], attempts;
+  const char *err = power_up(raw, ping_ms, &attempts);
+  print_regs("powered");
+  int off = board_servo_power(0);
+  xSemaphoreGive(g_bus);
+  out_lock();
+  printf(
+      "JTALM {\"t\":\"probe\",\"step\":\"result\",\"err\":%s%s%s,\"ping_ms\":[%d,%d]"
+      ",\"polls\":%d,\"present\":[%d,%d],\"deg\":[%.1f,%.1f],\"rx_got\":%d,\"rx\":[",
+      err ? "\"" : "", err ? err : "null", err ? "\"" : "", ping_ms[0], ping_ms[1], attempts,
+      raw[0], raw[1], raw[0] < 0 ? 0.0 : act_yaw_deg(raw[0]),
+      raw[1] < 0 ? 0.0 : act_pitch_deg(raw[1]), g_rx_got
+  );
+  for (int i = 0; i < g_rx_got && i < (int)sizeof(g_rx_last); i++) {
+    printf(i ? ",%d" : "%d", g_rx_last[i]);
+  }
+  printf("],\"vm_off\":%d}\n", off);
+  out_unlock();
+  print_regs("after");
 }
 
 static void release_if_idle(void) {
@@ -434,6 +498,8 @@ static void dispatcher_task(void *arg) {
       servo_on(&m);
     } else if (m.type == MSG_WDTEST) {
       wdtest();
+    } else if (m.type == MSG_PROBE) {
+      probe();
     } else {
       run_plan(&m);
     }
@@ -499,6 +565,8 @@ static int request(int type) {
 int servo_request_on(void) { return request(MSG_ON); }
 
 int servo_request_wdtest(void) { return request(MSG_WDTEST); }
+
+int servo_request_probe(void) { return request(MSG_PROBE); }
 
 int servo_output_on(void) { return g_output; }
 

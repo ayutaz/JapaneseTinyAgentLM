@@ -491,6 +491,8 @@ static void run_command(lm_t *lm, const char *line) {
     }
     lm->pose_yaw = lm->pose_pitch = 0;
     dispatch(lm, "servo_on", kCenter, strlen(kCenter));
+  } else if (!strcmp(line, "!servo probe")) {
+    if (servo_output_on() || servo_request_probe() != 0) emit_error("probe: servo output off only");
   } else if (!strcmp(line, "!wdtest")) {
     if (servo_output_on() || servo_request_wdtest() != 0) emit_error("wdtest: dry-run only");
   } else {

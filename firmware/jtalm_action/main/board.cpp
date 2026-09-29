@@ -24,6 +24,10 @@ constexpr uint32_t kPy32Freq = 100000;
 constexpr uint8_t kPy32RegVersion = 0x02;
 constexpr uint8_t kPy32RegModeLow = 0x03;  // 1 = output
 constexpr uint8_t kPy32RegOutLow = 0x05;
+constexpr uint8_t kPy32RegPullUpLow = 0x09;
+constexpr uint8_t kPy32RegPullDownLow = 0x0B;
+constexpr uint8_t kAw9523Addr = 0x58;  // CoreS3 IO expander (BUS_EN, BOOST_EN)
+constexpr uint32_t kAw9523Freq = 400000;
 constexpr uint8_t kVmEnMask = 1u << 0;
 
 constexpr int kW = 320, kH = 240;
@@ -95,6 +99,9 @@ extern "C" int board_init(board_info_t *info) {
     info->vm_out_before = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegOutLow, kPy32Freq);
     M5.In_I2C.bitOff(kPy32Addr, kPy32RegOutLow, kVmEnMask, kPy32Freq);
     M5.In_I2C.bitOn(kPy32Addr, kPy32RegModeLow, kVmEnMask, kPy32Freq);
+    // Same pin setup as stackchan-idf (pull-down off, pull-up on).
+    M5.In_I2C.bitOff(kPy32Addr, kPy32RegPullDownLow, kVmEnMask, kPy32Freq);
+    M5.In_I2C.bitOn(kPy32Addr, kPy32RegPullUpLow, kVmEnMask, kPy32Freq);
     info->vm_mode_after = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegModeLow, kPy32Freq);
     info->vm_out_after = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegOutLow, kPy32Freq);
   }
@@ -136,6 +143,15 @@ extern "C" int board_servo_power_state(void) {
   uint8_t mode = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegModeLow, kPy32Freq);
   uint8_t out = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegOutLow, kPy32Freq);
   return (mode & kVmEnMask) && (out & kVmEnMask) ? 1 : 0;
+}
+
+extern "C" void board_regs(uint8_t *py32, int n_py32, uint8_t *aw9523, int n_aw9523) {
+  for (int i = 0; i < n_py32; i++) {
+    py32[i] = g_py32 ? M5.In_I2C.readRegister8(kPy32Addr, i, kPy32Freq) : 0;
+  }
+  for (int i = 0; i < n_aw9523; i++) {
+    aw9523[i] = M5.In_I2C.readRegister8(kAw9523Addr, i, kAw9523Freq);
+  }
 }
 
 extern "C" int board_touched(void) {

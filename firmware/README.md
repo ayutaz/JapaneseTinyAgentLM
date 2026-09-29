@@ -36,7 +36,7 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
 
 ### jtalm_action（B4、A1〜A3）
 
-**実機の現在の状態（2026-09-29）:** A1〜A3 の `jtalm_action`（app の SHA-256 `7122ab82…6dde2df8`、ELF `237aea6ae`）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** 首を動かす確認はまだ行っていません（[`docs/hardware.md`](../docs/hardware.md) §12 の手順で、ユーザーの立ち会いのもとで行う）。
+**実機の現在の状態（2026-09-29）:** A1〜A3 の `jtalm_action`（app の SHA-256 `125e375c…28f0bf1e3f`）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** servo の電源を入れて ping と位置の読み取りまでは確かめました（首は動かしていない）。首を動かす確認はまだ行っていません（[`docs/hardware.md`](../docs/hardware.md) §12 の手順で、ユーザーの立ち会いのもとで行う）。
 
 `runtime/host/` を参照するので、repository の root を mount します。画面には M5Unified と M5GFX を使い、`third_party/stackchan-idf` の submodule（下の stackchan-idf の手順で取得したもの）をそのまま build します（`CMakeLists.txt` の `M5UNIFIED_DIR` / `M5GFX_DIR`）。
 
@@ -65,7 +65,7 @@ uv run --no-project --with pyserial python firmware/tools/lm_serial.py --port CO
 - **Confidence gate:** 生成した token の確率の最小値（`min_prob`。grammar で制約する前の確率）が閾値より小さいと、`output` を `[]` にします（`jtalm.model.evaluate` の `gate` と同じ）。`raw` は gate をかける前の出力です。閾値は `sdkconfig.defaults` の `CONFIG_JTALM_GATE_PERMILLE`（千分率、既定 970 = 0.970。`main/Kconfig.projbuild`）で決め、実行中は `!gate 0.97` で変えられます（0 で off）。`lm_serial.py` は、host の出力に同じ gate をかけたものとも比べます。
 - `!` で始まる行は command です: `!info`、`!heap`、`!grammar 0|1`、`!gate <閾値>`、`!par 0|1`（行列積を2つの core に分ける。既定は 1）、`!batch 0|1`（prompt のまとめ処理。0 は1 token ずつ）、`!bench`（`expf` と1 step の forward の時間）、`!autoload T S`（DCache の autoload の実験用。既定は off）。
 - **Dispatcher（A1〜A3）:** `gen` の行の後に、gate の後の `output` を実機で検査して計画した結果を `JTALM {"t":"act","seq":..,"valid":..,"err":..,"calls":[..],"from":[yaw,pitch],"steps":[..],"to":[..],"total_ms":..,"queued":..,"servo":"dry"|"on"}` の1行で出します（角度は度、右と上が正。`steps` の各 move は目標の角度、raw、時間 ms、soft limit で制限したか）。計画は dispatcher の task が順に実行し、表情を変えるたびに `face`（表情、画面 320×240 の CRC-32、描画と転送の時間）、終わると `act_done`（実際の時間、中断したか、servo の実際の位置）を出します。`gen` の行の中身と LM の処理は B4 と同じです。
-- **Servo の command:** `!servo on`（servo の電源を入れて ping し、今の位置から正面へゆっくり戻す。**首が動く**）、`!center`（正面へ）、`!act <json>`（LM を通さずに Action JSON を実行する）。次の3つは LM の処理中でもすぐに効きます: `!stop` と `!servo off`（実行中と待ち行列の計画を捨て、torque を切り、servo の電源を切って dry-run に戻る）、`!relax`（torque だけを切る）、`!servo`（状態。`vm_en` は IO expander から読み返した servo 電源の状態）。**画面に触れても `!stop` と同じになります。** `!wdtest` は dry-run のときだけ、期限を過ぎる計画を流して watchdog を確かめます。
+- **Servo の command:** `!servo on`（servo の電源を入れて ping し、今の位置から正面へゆっくり戻す。**首が動く**）、`!center`（正面へ）、`!act <json>`（LM を通さずに Action JSON を実行する）。次の3つは LM の処理中でもすぐに効きます: `!stop` と `!servo off`（実行中と待ち行列の計画を捨て、torque を切り、servo の電源を切って dry-run に戻る）、`!relax`（torque だけを切る）、`!servo`（状態。`vm_en` は IO expander から読み返した servo 電源の状態）。**画面に触れても `!stop` と同じになります。** `!wdtest` は dry-run のときだけ、期限を過ぎる計画を流して watchdog を確かめます。`!servo probe` は servo の出力が off のときだけ、電源を入れて ping し、位置を読んで電源を切ります（goal も torque も送らない。IO expander の register も出す）。
 - 設計（角度、制限、動きの滑らかさ、うなずき、watchdog）と計測結果は [`docs/hardware.md`](../docs/hardware.md) §12 にあります。
 
 ```sh

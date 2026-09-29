@@ -40,6 +40,9 @@ int board_servo_power(int on);
 // VM_EN as read back from the IO expander: 1 on, 0 off, -1 unknown.
 int board_servo_power_state(void);
 
+// Raw registers for diagnostics: PY32L020 0..n_py32-1 and AW9523 0..n_aw9523-1.
+void board_regs(uint8_t *py32, int n_py32, uint8_t *aw9523, int n_aw9523);
+
 // 1 while the screen is touched (polls the touch controller).
 int board_touched(void);
 

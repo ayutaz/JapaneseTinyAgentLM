@@ -571,8 +571,8 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 | Torque | 計画を始める直前に、今の位置を目標にしてから torque を入れる（跳ねない）。今の位置が計画の始点から 1° 以上ずれていれば、まず始点へ同じ滑らかさで動く（`sync_ms`）。計画の 0.5 秒後に torque を切る（止まっている間は torque を切るのは stackchan-idf と同じ） | 未実測（servo を動かしていない） |
 | 停止 | `!stop` / `!servo off`、**画面への touch**、servo の通信の error、watchdog で、実行中と待ち行列の計画を捨て、torque を切り（broadcast と各 ID）、VM_EN を切って dry-run に戻る。`!relax` は torque だけを切る。これらは LM の処理中でもすぐに効く（serial の読み取りを別の task にした） | dry-run で確認済み（touch は未確認） |
 | Watchdog | 監視の task（core 1、priority 7、50ms ごと）が、計画の予定時間 + 2 秒（始点への移動の時間を足す）を過ぎても終わらない実行と、計画がないのに torque が 3 秒以上入っている状態を止める | dry-run で確認済み（`!wdtest`） |
-| Servo の driver（`main/servo.c`） | 自前（Apache-2.0）。UART1、TX=G6、RX=G7、1Mbps。ping、torque、goal（位置、時間）、今の位置の読み取り。応答は checksum と ID を確かめる。register と byte の順（big-endian）は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした。UART は `!servo on` まで開かない | 未実測（servo を動かしていない） |
-| Servo の電源 | 起動時に PY32L020 の VM_EN（pin 0）を、出力の値を 0 にしてから出力にする（一瞬も on にならない順序）。起動時に読んだ値は mode 1 / output 0 で、もともと off だった。`!servo on` で on、200ms 待って ping | 実測（読み返し） |
+| Servo の driver（`main/servo.c`） | 自前（Apache-2.0）。UART1、TX=G6、RX=G7、1Mbps。ping、torque、goal（位置、時間）、今の位置の読み取り。応答は checksum と ID を確かめる。register と byte の順（big-endian）は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした。UART は `!servo on` まで開かない | ping と位置の読み取りは実測（下の「電源と ping の確認」）。goal と torque は未実測 |
+| Servo の電源 | 起動時に PY32L020 の VM_EN（pin 0）を、出力の値を 0 にしてから出力にする（一瞬も on にならない順序）。起動時に読んだ値は mode 1 / output 0 で、もともと off だった。pull-down を切って pull-up を入れる（stackchan-idf と同じ設定）。`!servo on` で on にし、両方の servo が ping に答えるまで 50ms ごとに ping する（最大 3 秒）。答えるまでに約 0.85 秒かかる | 実測 |
 | 画面（A2） | M5Unified 0.2.17 / M5GFX 0.2.23（MIT、stackchan-idf の submodule をそのまま build）。320×240 の RGB565 の frame（153,600 B）を PSRAM に置き、描いてから全体を転送する。起動時は neutral。顔は白い線で、neutral（丸い目、横一文字の口）、happy（`^ ^` の目、笑った口）、sad（小さい目、内側が上がった眉、への字の口）、surprised（大きい目、開いた口） | 実測（CRC と時間）。**見た目は未確認** |
 
 - Command と `act` / `face` / `act_done` の行の形式は [`firmware/README.md`](../firmware/README.md) にあります。
@@ -588,10 +588,26 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 | Validator（`!act` で 400件） | valid / invalid の判定と計画が 400 / 400 で Python と一致。valid 251、invalid 149（JSON でない、配列でない、3個以上、重複、未知の tool や key、enum の外、`count` が 0 / 4 / 1.5 / `true` / `"2"` など） |
 | 顔 | 4種類とも frame の CRC-32 が毎回同じで、互いに異なる（neutral `b799fb2a`、happy `0005cc0b`、sad `4fee8a51`、surprised `24d9d978`）。描画 8〜10ms、転送 34ms |
 | 停止 | `!stop` と `!relax` で、実行中の計画が次の 20ms の区切りで中断した。`!wdtest`（期限 100ms の計画が 1 秒止まる）で watchdog が `fault` を出し、停止した |
-| Servo の電源と UART | 作業の間ずっと `vm_en` 0、UART は未使用（`uart` 0） |
+| Servo の電源と UART | 下の「電源と ping の確認」以外は、ずっと `vm_en` 0 |
 | `firmware/tools/servo_test.py`（dry-run） | 下の手順の 28項目を最後まで流せた（停止なし。最後は `state` off、`vm_en` 0） |
 
-生 log と JSONL は `runs/device/a1/`（Git の管理外）にあります（`eval200.*`、`eval200_dispatch.summary.json`、`fuzz.*`、`servo_test_dry.*`、`commands.log`）。
+生 log と JSONL は `runs/device/a1/`（Git の管理外）にあります（`eval200.*`、`eval200_dispatch.summary.json`、`fuzz.*`、`servo_test_dry.*`、`commands.log`、`probe1.log`、`probe2.log`）。
+
+### 電源と ping の確認（2026-09-29 16:04 UTC、ユーザーの立ち会いのもとで実施）
+
+最初の動作確認では、`!servo on` が `servo does not answer` で止まった（首は動いていない。VM_EN はすぐに切った）。
+
+- **原因:** VM_EN を入れてから ping するまでの待ちが 200ms しかなかった。SCS0009 は電源が入ってから約 1 秒たたないと ping に答えない（stackchan-idf は 1.5 秒待つ）。電源の経路（CoreS3 の AW9523 の BUS_EN と BOOST_EN、PY32 の pin の設定）、UART の pin と速度、packet の形は stackchan-idf と同じだった（AW9523 の register 0x00〜0x05 は `1F 8F 07 83 18 0C` で B2 の log と一致）。
+- **修正:** 電源を入れた後、両方の servo が答えるまで 50ms ごとに ping する（最大 3 秒）。あわせて、VM_EN の pin の pull-up を stackchan-idf と同じにした。
+- **確認:** 電源を入れて ping し、位置を読んで電源を切る command（`!servo probe`。servo の出力が off のときだけ動く。goal も torque も送らない）で2回確かめた。
+
+| 回 | 最初の応答（yaw / pitch） | 今の位置の raw（yaw / pitch） | 角度（右と上が正） |
+|---:|---|---|---|
+| 1 | 854ms / 855ms | 491 / 629 | −9.7° / +2.8° |
+| 2 | 852ms / 853ms | 491 / 630 | −9.7° / +3.1° |
+
+- torque を入れていないので、首は置かれた位置のまま（ロボットから見て約 10° 左、ほぼ水平）。`!servo on` の後は、ここから正面（460 / 620）へ 380ms かけて戻る計画になる（同期の移動）。
+- 確認の後は VM_EN を切り、dry-run に戻した。修正後の firmware でも、評価セットの先頭 30件で LM の出力と計画が一致した。
 
 ### メモリと速度（画面あり、servo は dry-run、実測）
 
@@ -677,7 +693,7 @@ uv run --no-project --with pyserial python firmware/tools/servo_test.py --port C
 
 ## 13. 未確認事項
 
-- 実機で実際に首を動かす確認（§12 の手順。ユーザーの立ち会いが必要）。SCS の driver、torque の入れ方と切り方、touch による停止は、まだ実機で試していない。
+- 実機で実際に首を動かす確認（§12 の手順。ユーザーの立ち会いが必要）。SCS の driver のうち goal の書き込みと torque の入れ方・切り方、touch による停止は、まだ実機で試していない（電源、ping、位置の読み取りは確認済み）。
 - 顔の見た目（§12。CRC と時間は測った）。
 - `-DJTLM_BATCH=8` にしたときの速度（5M の内部 SRAM を約 82KB 減らせる）。
 - 消費電流と温度（LM を連続で動かしたとき）。
