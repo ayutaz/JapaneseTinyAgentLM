@@ -226,7 +226,7 @@ def run(args: argparse.Namespace) -> dict:
         _write(out / "train_raw.jsonl", rows)
     summary = {
         "phase": args.phase,
-        "prompt_version": prompts.PROMPT_VERSION,
+        "prompt_version": cfg.get("prompt_version", prompts.PROMPT_VERSION),
         "rows": len(rows),
         "sec": round(time.time() - t0),
         **stats,
