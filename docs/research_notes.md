@@ -239,13 +239,44 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 未検証事項:
 
-- 同様の日本語 MCU action model、製品、論文、特許の網羅調査。
-- 3M〜10M で日本語の否定、相対表現、複合命令が十分理解できるか（→ Action の範囲では検証済み。3M で否定 94〜95%、multi-action 97%。ただし評価セットも LLM が書いた文で、人が書いた文での評価はまだない）。
+- 同様の日本語 MCU action model、製品、論文、特許の網羅調査（→ 2026-09-30 に公開情報を調査した。§6.1。特許と非公開の製品は未調査）。
+- 3M〜10M で日本語の否定、相対表現、複合命令が十分理解できるか（→ Action の範囲では検証済み。3M で否定 94〜95%、multi-action 97%。人が書いた文 1,159件でも完全一致 98.4%、誤って動くのは 1.1%。ただし人が書いた正例は 62件と少ない）。
 - 入力ミス、変換ミス、表記ゆれを含む入力での action accuracy。
 - Chat 品質が利用価値を持つ水準に達するか。
 - CoreS3 単体で Flash / PSRAM / latency / battery が成立するか（→ LM 単体の Flash、PSRAM、latency は実測で成立。画面・servo と同居させたときのメモリーと、battery は未確認）。
 - ユーザーが cloud model より local model を選ぶ条件。
 - データ・モデル・第三者 Runtime の再配布権。
+
+### 6.1 先行例の調査（2026-09-30）
+
+公開情報（英語・日本語・中国語の web、GitHub、Hugging Face、arXiv、Qiita / Zenn、M5Stack / スタックチャンのコミュニティ）を調べた結果です。「世界初」は主張できません。範囲を絞った主張だけが、「調べた範囲では」の条件つきで成り立ちます。
+
+**主張できないこと（先行例がある）:**
+
+| 主張 | 先行例 |
+|---|---|
+| マイコンで動く最初の言語モデル | esp32-llm（DaveBben、2024、英語）、esp32-ai（slvDev、2026-08、28.9M、英語）、atome-lm（ESP32 / STM32、英語。Python と C の出力の完全一致も主張）、p-for-llm（ESP32-P4、英語）など |
+| マイコンで動く最初の tool calling の言語モデル | Needle 2（45M）と Needle 3（29〜121M）の ESP32-S3 移植（pdev-labs、andrisgauracs、vipul-sharma20、PruhaNLP、iammrduncan など）。英語（Needle 3 は英語と欧州の6言語）で、grammar による制約つきの tool calling もある |
+| マイコンで動く最初のオフラインの日本語の命令理解 | Picovoice Rhino（日本語の音声から意図を読み取る。Arduino Nano 33 BLE Sense など Cortex-M。言語モデルではなく、文法とスロットに基づく）。Cyberon DSpotter、Sensory（日本語の MCU 対応は一次ソースで未確認） |
+| 最初のローカル LM で動くスタックチャン、ローカルの function calling | AI_StackChan_Ex の Module LLM モード（2024-12、AX630C の NPU の追加モジュールで SmolLM-360M の function calling）、ローカル LLM 版の AI スタックチャン（LAN 上の ollama） |
+| 最初の超小型の日本語 LM | 日本語 TinyStories（ohtaman、2023-12、1.3M〜62M、PC）、slm-ja-1m（2026-09、1M、PC） |
+| ESP32-S3 で動く最初の日本語のニューラルモデル | sanoTTS-jp（559K の日本語 TTS が CoreS3 で実時間動作。言語モデルではない） |
+
+**調べた範囲で先行例が見つからなかったこと（主張するときの表現）:**
+
+1. 「日本語の発話からロボットの動作呼び出し（JSON）を決める言語モデルを、ESP32-S3 単体（NPU・外部モジュール・ネットワークなし）で動かした公開事例は、2026年9月30日時点の私たちの調査では見つからなかった。」
+2. 「日本語入力を扱う tool calling 型の言語モデルを、マイコン上だけで動かした公開事例も見つからなかった（Needle 2 / 3 の ESP32 移植は英語と欧州の言語のみ）。」
+3. 「日本語のテキストを扱う Transformer の言語モデルを、マイコン上で完結して動かした公開例も見当たらなかった（言語モデルではない日本語の処理の先行例はある）。」
+4. 「スタックチャンの ESP32-S3 本体だけで、日本語の指示から首振り・表情・うなずきを選ぶ言語モデルを動かした例は見つからなかった（Module LLM などの外付け NPU を使う例はある）。」
+
+**比較するときの注意:**
+
+- 大きさは「ESP32 で動く Needle 2 / 3（29〜45M）の約 1/10〜1/15」と書く。「最小の tool calling のモデル」とは書かない。
+- 応答時間（約 1.1 秒と、Needle の ESP32 移植の 23〜47 秒）は実測の事実として書けるが、Needle は英語の汎用 tool calling（prompt に schema を入れる方式）で、本モデルは schema を固定した Action 専用であることを併記する。
+- TinyLM-Bench の16件の比較は、Needle が日本語を扱わないことを示すものとして書き、「tool calling の能力で上回った」とは書かない。
+- confidence gate、grammar、INT4、マイコン上の tokenizer、実機と PC の出力の一致は、それぞれ単独では新しくない（組み合わせと日本語への適用が本プロジェクトの特徴）。
+
+**調べきれていないこと:** X / YouTube / Discord など検索に出にくい投稿（日本語の llama2.c を ESP32 で動かした個人の投稿があり得る）、非公開の商用製品（日本語の NLU を MCU に載せた製品）、有料・非索引の論文（IEICE / IPSJ の国内発表、J-STAGE）、中国語圏の事例、特許。Needle 3 は対応言語を増やす予定なので、公開の直前に調べ直す。
 
 ## 7. GitHub / Hugging Face 公開方針
 
