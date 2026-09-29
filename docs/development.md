@@ -9,10 +9,10 @@
 | 環境 | 用途 | 用途外 |
 |---|---|---|
 | ローカルの開発 PC | コード作成、unit test、CPU での短い smoke test、小規模モデルの評価、実機への書き込みと計測 | 本番の学習 |
-| vast.ai（GPU instance） | Tokenizer の学習、Base / SFT の学習、学習時の評価 | 認証情報や private data の保管 |
+| vast.ai（GPU instance） | 合成データの生成（オープンモデルの推論）、Tokenizer の学習、Base / SFT の学習、学習時の評価 | 認証情報や private data の保管 |
 | 実機（M5 スタックチャン K151） | Flash / memory / 速度 / 電力の計測、end-to-end の評価 | — |
 
-学習は vast.ai で行うと決めています。ローカルの GPU は本番の学習には使いません。
+学習と合成データの生成は vast.ai で行うと決めています。ローカルの GPU は、本番の学習にも生成にも使いません。
 
 ## 2. Python 環境（uv）
 
@@ -85,7 +85,8 @@
 | 対象 | ライセンス |
 |---|---|
 | ソースコードと文書（本リポジトリ） | Apache License 2.0（Copyright 2026 ayutaz） |
-| モデルの重み（Hugging Face で公開） | **CC BY-SA 4.0**。商用利用は可能。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある |
+| モデルの重み（Hugging Face の `japanese-data-analyze` で公開） | **CC BY-SA 4.0**。商用利用は可能。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある |
+| 合成データセット（Hugging Face の `japanese-data-analyze` で公開） | **CC BY-SA 4.0**。public、manual gate（[`data.md`](data.md) §6） |
 | 第三者のコード | それぞれの条件に従う（例: 公式 StackChan firmware は MIT、`stackchan-idf` は BSL-1.0）。採用前に確認する |
 
 ### 学習データの条件
@@ -95,7 +96,7 @@
 | 使える | 使えない |
 |---|---|
 | CC BY-SA、CC BY、CC0、パブリックドメイン、MIT / Apache-2.0 などの寛容なライセンスのデータ | 非営利限定（NC）や改変禁止（ND）のデータ |
-| Apache-2.0 / MIT のオープンモデル（Qwen3、llm-jp-4.1、gpt-oss）で生成したデータ | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
+| Apache-2.0 / MIT のオープンモデルで生成したデータ（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-4.1。[`data.md`](data.md) §3） | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
 | — | 出典やライセンスが分からないデータ |
 
 - 具体的な方針、規約の調査結果、使うデータとモデルの一覧は [`data.md`](data.md) にまとめています。

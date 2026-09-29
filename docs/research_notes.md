@@ -182,7 +182,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 | slvDev/esp32-ai | TinyStories text generation | 28.9M stored | 14.9MB、4-bit PLE | 9.88 tok/s | instruction/action 向けでない | 一次ソース確認済み |
 | esp32-mind | TinyStories text generation | 11.5M | int4（group 128）、5.97MB | 14.22 tok/s | 日本語・action ではない | 速度は一次ソース、規模は TinyLM-Bench で確認 |
 | doryiii/esp32-llm | Tiny Llama experiment | 3.1M（stories3M） | INT8（group 64）、3.35MB | 約12 tok/s（上流の値） | 3M / 5M 規模の実機速度の基準に使える | 規模は TinyLM-Bench で確認、速度は未確認 |
-| JapaneseTinyAgentLM | 日本語 Chat + Action | 3M〜20M 候補 | INT8/INT4候補、1.5〜5MB | 未計測 | 日本語、共有 Base、K151 向けの Action（multi-action、否定、no-action を重視） | 設計目標 |
+| JapaneseTinyAgentLM | 日本語 Chat + Action | 3M〜10M（実機の候補。20M は PC だけの上限参照） | INT8/INT4候補、1.5〜5MB | 未計測 | 日本語、共有 Base、K151 向けの Action（multi-action、否定、no-action を重視） | 設計目標 |
 
 数値比較では prompt length、prefill、decode、CPU clock、PSRAM mode、出力長、temperature を固定した共通 benchmark が必要です。
 
@@ -209,7 +209,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 ### 仮説D: Embodied command に限定するとユーザー価値を作りやすい
 
-「右を向く」「うなずく」「嬉しそうに話す」「温度を読む」のような身体性のある command は、単なる TinyStories 生成より用途が明確です。ただし、実際の需要、誤動作許容度、応答速度要求はユーザー調査が必要です。
+「右を向く」「うなずく」「嬉しそうな表情にする」のような身体性のある command は、単なる TinyStories 生成より用途が明確です。ただし、実際の需要、誤動作許容度、応答速度要求はユーザー調査が必要です。
 
 ## 6. 市場優位性・新規性の現時点の見立て
 
@@ -219,16 +219,16 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 - ESP32-S3 上の日本語特化 Language-to-Action。
 - 3M / 5M / 10M / 20M を同一条件で比較し、日本語 Action に必要な最小規模を示す。
-- ASR の正規化ひらがな / モーラ列を直接入力する end-to-end pipeline 設計。
+- （対象外）ASR の正規化ひらがな / モーラ列を直接入力する end-to-end pipeline 設計。入力をテキストのみとしたため、本計画では扱わない。
 - Chat と Action を共通 Base から派生し、後から Unified 化する比較研究。
 - ASR / LM / TTS の PSRAM workspace 時分割による CoreS3 完全オフライン統合（将来の統合計画。本計画の対象外）。
-- Stack-chan の Servo / Face / Speech に特化した安全な no-op と grammar 制約。
+- K151 の Servo と表情に特化した、安全な no-action、grammar 制約、confidence gate。
 
 未検証事項:
 
 - 同様の日本語 MCU action model、製品、論文、特許の網羅調査。
 - 3M〜10M で日本語の否定、相対表現、複合命令が十分理解できるか。
-- Ralomi 誤認識を含む end-to-end action accuracy。
+- 入力ミス、変換ミス、表記ゆれを含む入力での action accuracy。
 - Chat 品質が利用価値を持つ水準に達するか。
 - CoreS3 単体で Flash / PSRAM / latency / battery が成立するか。
 - ユーザーが cloud model より local model を選ぶ条件。

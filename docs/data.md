@@ -18,7 +18,7 @@
 
 両社とも利用しているのはサブスクリプション（個人向けの規約）です。以下は一次情報の原文と照合した要点で、法的な助言ではありません。
 
-| | Claude Code（Pro / Max） | Codex（ChatGPT Plus / Pro） | Apache-2.0 のオープンモデル |
+| | Claude Code（Pro / Max） | Codex（ChatGPT Plus / Pro） | Apache-2.0 / MIT のオープンモデル |
 |---|---|---|---|
 | 出力を学習に使うこと | **Usage Policy:** "Utilization of inputs and outputs to train an AI model (e.g., "model scraping" or "model distillation") without prior authorization from Anthropic" を禁止。競合するモデルに限定していない | **Terms of Use:** "Use Output to develop models that compete with OpenAI." を禁止。競合の定義はない | 制限なし（gpt-oss の利用ポリシーは法令の遵守のみ） |
 | 公式の補足 | ヘルプ記事は「競合しないモデルなら可」としつつ、禁止例に "Using Outputs as training targets for models" を挙げている | Terms of Use は "Automatically or programmatically extract data or Output" も禁止している | — |
@@ -39,9 +39,9 @@ Claude が書いた生成用の指示文（prompt）やコードまで問題に�
 
 | モデル | ライセンス | 用途 |
 |---|---|---|
-| Qwen3（例: Qwen3-32B） | Apache-2.0（確認済み） | 正例、言い換え、否定文の生成（第一候補） |
-| llm-jp-4.1（8B / 33B など） | Apache-2.0（確認済み） | 日本語の言い換え。評価セットは、学習データとは別系統のこのモデルで作る |
-| gpt-oss-20b / 120b | Apache-2.0（確認済み） | 予備 |
+| Qwen3（例: Qwen3-32B） | Apache-2.0（確認済み） | **学習データ**の生成（正例、言い換え、否定文）。第一候補 |
+| gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備 |
+| llm-jp-4.1（8B / 33B など） | Apache-2.0（確認済み） | **評価セット専用**。学習データには使わない。生成元を分けることで、生成のくせの暗記を評価で見抜けるようにする |
 
 使わないモデル:
 
@@ -80,12 +80,12 @@ Action を呼ぶ日本語のデータで、ライセンス上そのまま使え�
 3. ルールで検査する。
    - Schema の妥当性。
    - 入力文に含まれる方向や量の語と、JSON の値が一致しているか。
-   - 否定の語を含む入力は `[]` になっているか。
+   - 否定された action が出力に含まれていないか。例えば「右を向かないで」は `[]`、「右ではなく左を向いて」は left の `look` になっているか。
    - 重複、長すぎる文、文字化けを除く。
 4. テンプレート（生成の元になったパターン）単位で、学習・検証・評価に分割する。
 5. 出典、ライセンス、生成モデル、prompt の版、件数、hash を manifest（`datasets/manifests/`）に記録する。
 
-評価セットは、学習データとは別のモデル（llm-jp-4.1）と別の prompt で生成し、既存の人手データ（MASSIVE など）と組み合わせます。
+評価セットは、学習データとは別のモデル（llm-jp-4.1）と別の prompt で生成し、既存の人手データ（MASSIVE など）と組み合わせます。既存データは公式の split を使い、学習の負例には train、評価には test を使って、両者が重ならないようにします。
 
 ## 6. Hugging Face への公開
 
@@ -94,6 +94,7 @@ Action を呼ぶ日本語のデータで、ライセンス上そのまま使え�
 | 対象 | §5 で作った合成データ（正例、否定、言い換え）と manifest |
 | 公開先 | Hugging Face の organization **[`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze)**。repository の名前は M3 で決める |
 | 公開設定 | **public、manual gate**（利用申請を手動で承認する） |
+| 時期 | M3 の完了時。モデルより先に公開する |
 | ライセンス | **CC BY-SA 4.0**（モデルの重みと同じ。2026-09-29 決定） |
 | データセットカード | 生成に使ったモデルとライセンス、生成方法、検査の規則、件数、既知の限界、Claude Code の役割（pipeline のコードの作成だけ） |
 | 既存データ | MASSIVE などの第三者データは再配布せず、manifest で出典を参照する |

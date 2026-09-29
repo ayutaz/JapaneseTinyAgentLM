@@ -4,27 +4,34 @@
 
 ## 1. システム境界
 
-本プロジェクトのモデルは text-in / text-out または text-in / action-out です。音声 I/O やデバイス driver は統合先の責務です。
+本プロジェクトのモデルは text-in / action-out（Action LM）または text-in / text-out（Chat LM）です。入力はテキストのみで、音声の入出力は本計画の範囲外です。
 
 ```text
-                        CoreS3 / ESP32-S3
+                     CoreS3 / ESP32-S3（M5 スタックチャン K151）
 
- Mic ──> Ralomi ──> normalized Japanese text
+ 日本語テキスト（serial、PC では UTF-8 のファイルか stdin）
                            │
               ┌────────────┴────────────┐
+              ▼                         ▼
+      Japanese Action LM         Japanese Tiny Chat LM
+     （最初に完成させる）        （Action の完成後）
               │                         │
               ▼                         ▼
-      Japanese Tiny Chat LM      Japanese Action LM
-              │                         │
-              ▼                         ▼
-        response text              validated JSON
-              │                         │
-              ▼                   ┌─────┴─────┐
-        sanoTTS-jp                 ▼           ▼
-                               Servo         Face/Sensor
+  grammar + confidence gate        短い日本語の応答
+              │                    （テキストとして返す）
+              ▼
+   validator（schema、可動域）
+              │
+              ▼
+   dispatcher（カテゴリ → 角度）
+        ┌─────┴─────┐
+        ▼           ▼
+  Servo（SCS0009）   表情（画面）
 ```
 
 初期実装では Chat と Action の同時常駐を要求しません。評価用 Firmware は用途別の build profile を持ち、最終段階で Unified Model を検討します。
+
+将来 ASR や TTS と統合する場合は、入力の前段に音声認識を、Chat の出力の後段に音声合成をつなぎます。これは本計画の対象外です（[`README.md`](README.md) §5）。
 
 対象の実機は M5 スタックチャン K151 です（[`hardware.md`](hardware.md)）。
 
@@ -42,7 +49,7 @@
 
 - 入力: 短い日本語指示・発話・状態文
 - 出力: 短い日本語応答
-- 目標規模: 10M / 20M を中心に比較
+- 目標規模: 実機の候補は 10M。20M は PC での品質比較（2-bit 量子化で 5MB に収まる可能性はあるが、kernel と品質が成立した場合のみ。§6）
 - 目標 context: 128〜256 tokens
 - 生成長: 原則 16〜64 tokens
 - 世界知識より、短い自然な応答、キャラクター一貫性、不要な断定の抑制を優先
@@ -63,11 +70,11 @@
 
 ```text
 <chat>
-きょうつかれた
-→ おつかれさま。ゆっくりやすもう。
+今日は疲れた
+→ お疲れさま。ゆっくり休もう。
 
 <action>
-みぎをむいて
+右を向いて
 → [{"name":"look","arguments":{"direction":"right","amount":"normal"}}]
 ```
 
@@ -81,10 +88,10 @@ INT4 の理論的な重み本体は、1 parameter あたり約0.5 byteです。�
 |---:|---:|---|---|
 | 3M | 約1.5MB | Action 最小構成 | 限定語彙・限定 schema なら検証価値あり |
 | 5M | 約2.5MB | Action 主候補、Chat 下限実験 | Action の第一候補。Chat はかなり厳しい可能性 |
-| 10M | 約5MB | Action 高精度、Chat 主候補 | CoreS3 全体予算では境界領域 |
-| 20M | 約10MB | Chat 品質比較 | 他 component と同居しにくく、外部 storage や強い量子化が必要 |
+| 10M | 約5MB | Action 高精度、Chat 主候補 | LM 予算（§9）の上限 |
+| 20M | 約10MB | Action の上限参照、Chat の品質比較 | **PC のみ。実機には載せない**（INT4 では LM 予算を超える） |
 
-設計上は 3M / 5M / 10M / 20M を同じ training code で比較可能にします。最初から全サイズを完走させず、5M Action と 10M Chat の feasibility を優先します。
+設計上は 3M / 5M / 10M / 20M を同じ training code で比較可能にします。最初から全サイズを完走させず、最初の1周は 3M / 5M の Action と、PC だけの 20M 上限参照に限ります。10M Chat は、Action LM の完成後に取り組みます。
 
 TinyLM-Bench の検証メモ（`94_model_validation_and_advantage_ja.md`）では、量子化後の容量を 4〜8MB とする案が出ていました。本計画では、LM 予算（§9）の 1.5〜5MB を優先します。8MB は INT4 で約 16M parameter に相当し、Action 専用のモデルとしては大きすぎるためです。
 
@@ -109,7 +116,7 @@ TinyLM-Bench の 91 は、Action 専用のモデルを 10M〜50M で学習する
 
 | 用途 | 候補 vocab | 理由 |
 |---|---:|---|
-| Action / ひらがな入力 | 2,048 / 4,096 / 8,192 | 語彙表と LM head を小さくしやすい |
+| Action | 2,048 / 4,096 / 8,192 | 語彙表と LM head を小さくしやすい |
 | Chat / 一般日本語 | 4,096 / 8,192 / 12,288 / 16,384 | 漢字・頻出 subword と系列長の折衷 |
 | Unified | 4,096 を基準、8,192 と比較 | 共通化と日本語圧縮率のバランス |
 
@@ -187,9 +194,10 @@ GQA/MQA、短い context、INT8 KV は PSRAM 削減に大きく効きます。�
 - 同じ action call の重複を拒否する。FunctionGemma は、話題外の入力に同じ `look` を何度も返していた。
 - Tool の範囲外の要求（例:「部屋の電気を消して」）には no-action を返す。
 
-v1 では tool を 8〜16 種類に広げます。候補は、K151 の周辺機器を使う `shake_head`（首を横に振る）、`look_around`、`set_led`（RGB LED）、`stop`（動作の停止）などです。追加する前に、TinyLM-Bench 互換の部分（v0 の3種類）の評価が崩れないことを確認します。
 - Grammar が構文を保証しても、意味的安全性は confidence gate（§8）と実行側 validator が保証する。
 - Action 実行前に、デバイス状態、速度制限、可動域、衝突条件を確認する。
+
+v1 では tool を 8〜16 種類に広げます。候補は、K151 の周辺機器を使う `shake_head`（首を横に振る）、`look_around`、`set_led`（RGB LED）、`stop`（動作の停止）などです。追加する前に、TinyLM-Bench 互換の部分（v0 の3種類）の評価が崩れないことを確認します。
 
 ### Action schema v0
 
@@ -263,7 +271,7 @@ v0 の action は `look`、`set_expression`、`nod` の3種類です。
 - `center` のとき、`amount` は無視する。正規化では `normal` にそろえる。
 - TinyLM-Bench で既存モデルと比べるときは、ベンチの enum の範囲（`up` / `down` を含まないケース）で評価する。
 
-初期 Runtime で `oneOf` や nested array の grammar 実装が重い場合、1応答1 tool call の flat schema または固定長 action slot に縮退します。Needle 2 の ESP32 実装にも schema 機能制限があるため、完全な JSON Schema 対応を前提にしません。
+初期 Runtime で `oneOf` や nested array の grammar 実装が重い場合は、固定長の 2 slot（各 slot は action または空）に縮退します。出力を 1 call に減らす縮退は、multi-action を扱えなくなるので採りません。Needle 2 の ESP32 実装にも schema 機能制限があるため、完全な JSON Schema 対応を前提にしません。
 
 ### 座標の規約と角度への変換（K151）
 
@@ -283,7 +291,7 @@ Action LM はカテゴリだけを出力し、firmware の dispatcher が K151 �
 - `nod` は pitch を小さく往復させ、回数は `count` に従う。
 - 連続回転（PWM mode）や raw position は、Action LM から指定させない。
 
-符号の規約は、実機を動かして確認してから確定します（[`roadmap.md`](roadmap.md) Phase 0）。
+符号の規約は、実機を動かして確認してから確定します（[`roadmap.md`](roadmap.md) §12 の B2）。
 
 ### 例
 
@@ -317,7 +325,7 @@ Action LM はカテゴリだけを出力し、firmware の dispatcher が K151 �
 Action mode では、各生成 step で grammar により許可 token をマスクします。目標は次の3段階です。
 
 1. JSON 構文が常に parse 可能。
-2. Action type、必須 field、enum、数値範囲が schema に一致。
+2. Action の `name`、必須 field、enum、値の範囲が schema に一致。
 3. 実行側 validator が device policy と現在状態を確認。
 
 Grammar は誤った意味を正しくしません。たとえば「左を向いて」に `"direction":"right"` を返した出力は、構文上正しくても意味的に誤りです。そのため exact match、slot accuracy、方向・量・否定・参照表現の評価が必要です。
@@ -372,7 +380,7 @@ Full offline 構成は範囲上限を足すと 16MB を超えます。統合す�
 - TTS/ASR の profile 縮小
 - 機能別 Firmware build の採用
 
-20M INT4 の約10MBはモデル単体でも支配的で、Full offline の標準構成には現実的でない可能性が高いです。20M は品質上限を測る研究用比較、または外部 storage 前提とします。
+20M INT4 の約10MBはモデル単体でも支配的で、LM 予算（1.5〜5MB）を超えます。本計画では、20M は PC だけで学習する上限参照と品質比較に使い、実機には載せません（§3）。
 
 ## 10. PSRAM / SRAM と時分割 workspace
 

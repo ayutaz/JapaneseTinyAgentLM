@@ -25,9 +25,10 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 | 利用者 | Stack-chan などに組み込んで使う**開発者**。組み込みやすさ、仕様の明確さ、再現性を重視する |
 | 入力 | **テキストのみ**。主な対象は漢字仮名交じりの日本語で、英語の命令は評価用に少量だけ扱う |
 | 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
-| 公開 | Hugging Face でオープンモデルとして公開する。重みは **CC BY-SA 4.0**（商用利用可） |
+| 公開 | Hugging Face の organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。モデルの重みと合成データセットは、どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate |
+| 学習データ | Apache-2.0 のオープンモデルと、ライセンスが両立する既存データで作る。Claude Code は、コードの作成と実行だけを担当する（[`data.md`](data.md)） |
 | 期限 | 決まっていない。できるだけ早く作る |
-| 実行体制 | 実装、学習、評価、実機での計測は、すべて **Claude Code** が実行する。工数は Claude Code の作業時間で見積もる（[`roadmap.md`](roadmap.md) §13） |
+| 実行体制 | 実装、学習、評価、実機での計測は、すべて **Claude Code** が実行する。学習と合成データの生成は vast.ai で行う。工数は Claude Code の作業時間で見積もる（[`roadmap.md`](roadmap.md) §13） |
 
 | 派生モデル | 入力 | 出力 | 主用途 | 順序 |
 |---|---|---|---|---|
@@ -38,12 +39,12 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 
 - 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
 - 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
-- 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たす
+- 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たし、servo を実際に動かす
 
 **公開物（Hugging Face と GitHub）**
 
-- Hugging Face: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果
-- Hugging Face（dataset）: 合成データセット。public、manual gate で公開する（[`data.md`](data.md) §6）
+- Hugging Face（`japanese-data-analyze`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果
+- Hugging Face（`japanese-data-analyze`、dataset）: 合成データセット。public、manual gate、CC BY-SA 4.0 で公開する（[`data.md`](data.md) §6）
 - GitHub: 学習と評価の code、ESP32 runtime
 
 開発者向けの追加の公開物として、次の2つがあります。これらは**モデルが完成してから判断します**。まずはモデルを作ることを優先します。
@@ -131,7 +132,9 @@ VLA は通常 **Vision-Language-Action** を指し、画像または映像をモ
 
 Stack-chan がカメラを搭載していても、カメラが model graph に接続されていない限り VLA とは呼びません。将来 Vision encoder を追加した場合は別途 VLA branch として再定義します。
 
-## 5. Ralomi との役割分担
+## 5. 参考: 将来の ASR / TTS との統合（本計画の対象外）
+
+本計画の入力は UTF-8 のテキストのみで、Ralomi（ASR）にも sanoTTS-jp（TTS）にも依存しません（2026-09-29 決定）。この節は、将来の別計画のための記録として残しています。
 
 `ayutaz/Ralomi` は、ESP32-S3 向け日本語 ASR を目指す別プロジェクトです。本プロジェクトとは repository、学習目的、artifact、評価指標を分離します。
 
@@ -154,12 +157,12 @@ JapaneseTinyAgentLM
 - Artifact 予算案は Tiny 約2MB以下、Standard 約8MB以下、Large 約16MB以下。ただし合格済みモデルの実測サイズではない。
 - Stack-chan では Tiny 相当、最大発話 5〜8秒、W8A8、PSRAM peak 2.5MB 以下を初期目標候補とする。
 
-最初の LM 実験は ASR を PC / 固定テキスト入力に置き換えて独立に進めます。Ralomi の仕様変更を LM 開発の blocker にしません。
+Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 
 ## 6. 文書の読み方
 
 - [`architecture.md`](architecture.md): モデル構成、Action schema、Runtime、Flash/PSRAM 設計
-- [`hardware.md`](hardware.md): 対象の実機（K151）の構成、Phase 0 の初回調査の計測値、Flash のバックアップ
+- [`hardware.md`](hardware.md): 対象の実機（K151）の構成、初回調査（B0）の計測値、Flash のバックアップ
 - [`development.md`](development.md): uv、vast.ai、認証情報、実機操作の運用ルール
 - [`data.md`](data.md): 学習データの方針、規約の調査結果、使うデータと生成モデル、合成データの公開方法
 - [`research_notes.md`](research_notes.md): 先行例、比較、差別化、市場・新規性の仮説
@@ -183,7 +186,7 @@ JapaneseTinyAgentLM
 
 | 日付 | 決定 | 詳細 |
 |---|---|---|
-| 2026-09-29 | ソースコードと文書のライセンスを Apache License 2.0（Copyright 2026 ayutaz）とする。データと重みは別途決める | [`../LICENSE`](../LICENSE) |
+| 2026-09-29 | ソースコードと文書のライセンスを Apache License 2.0（Copyright 2026 ayutaz）とする。データと重みは別途決める（→ 同日、重みと合成データセットは CC BY-SA 4.0 に決定） | [`../LICENSE`](../LICENSE) |
 | 2026-09-29 | GitHub の private repository `ayutaz/JapaneseTinyAgentLM` で管理する | — |
 | 2026-09-29 | 学習は vast.ai で行う。API key は `.env` の `VAST_API_KEY` から読む | [`development.md`](development.md) §3–4 |
 | 2026-09-29 | Python は uv で管理し、依存の追加は `uv add` だけを使う（`uv pip` は使わない） | [`development.md`](development.md) §2 |
@@ -201,6 +204,6 @@ JapaneseTinyAgentLM
 | 2026-09-29 | **ゴールを確定する。** 実用のためのモデルとし、利用者は開発者とする。入力はテキストのみとする。Action LM を実機で完成させてから Chat LM に取り組む。期限は設けず、できるだけ早く作る。実装と学習はすべて Claude Code が実行する | 本文書 §1 |
 | 2026-09-29 | モデルの重みは Hugging Face で **CC BY-SA 4.0**（商用利用可）で公開する。学習データは CC BY-SA 4.0 と両立するものだけを使う | [`development.md`](development.md) §6 |
 | 2026-09-29 | まずモデルを作ることを優先する。開発者向けの追加の公開物（ESP-IDF の component、fine-tuning の手順）は、モデルが完成してから判断する | 本文書 §1、[`roadmap.md`](roadmap.md) §9 |
-| 2026-09-29 | 学習データの中身は、Apache-2.0 / MIT のオープンモデル（Qwen3、llm-jp-4.1、gpt-oss）と、ライセンスが両立する既存データ（MASSIVE など）で作る。Claude Code はコードの作成と実行だけを担当し、文章やラベルは書かない。Codex（ChatGPT のプラン）はデータの中身の作成に使わない | [`data.md`](data.md) §1–2 |
+| 2026-09-29 | 学習データの中身は、Apache-2.0 / MIT のオープンモデル（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-4.1）と、ライセンスが両立する既存データ（MASSIVE など）で作る。Claude Code はコードの作成と実行だけを担当し、文章やラベルは書かない。Codex（ChatGPT のプラン）はデータの中身の作成に使わない | [`data.md`](data.md) §1–2 |
 | 2026-09-29 | 合成データは vast.ai 上で生成し、Hugging Face に public、manual gate でアップロードする | [`data.md`](data.md) §5–6 |
 | 2026-09-29 | Hugging Face の公開先は organization `japanese-data-analyze` とする。合成データセットのライセンスは CC BY-SA 4.0 とする | [`data.md`](data.md) §6、[`architecture.md`](architecture.md) §13 |
