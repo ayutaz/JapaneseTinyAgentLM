@@ -505,7 +505,7 @@ JapaneseTinyAgentLM/
 │   ├── action/             # Action schema v0（action_schema_v0.json）、validator、正規化、角度への変換（M2）
 │   ├── eval/               # 評価指標、評価セットの読み込み、baseline（M2〜M3）
 │   ├── data/               # 合成データの生成・検査・分割・manifest（M3）
-│   ├── infra/              # vast.ai の検索・起動・転送・回収・削除（M2.5）
+│   ├── infra/              # vast.ai の job runner、vastai と SSH の wrapper、job の定義（M2.5）
 │   ├── tokenizer/          # Tokenizer の学習と評価（M4）
 │   ├── model/              # モデルの定義と config（M4）
 │   └── training/           # 学習 script（M4）

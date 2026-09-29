@@ -73,7 +73,20 @@
 
 ## 4. vast.ai の運用ルール
 
-実行基盤は `infra/vast/` に置く予定です（[`roadmap.md`](roadmap.md) の M2.5）。vast.ai は、学習に加えて合成データの生成にも使います（[`data.md`](data.md) §5）。
+実行基盤は `src/jtalm/infra/` にあります（[`roadmap.md`](roadmap.md) の M2.5、完了済み）。vast.ai は、学習に加えて合成データの生成にも使います（[`data.md`](data.md) §5）。
+
+```sh
+# job の一覧は src/jtalm/infra/jobs.py。--approve-dph は承認した時間単価の上限（これを超える GPU は選ばない）
+uv run python -m jtalm.infra.job smoke --approve-dph 0.35
+uv run python -m jtalm.infra.job gen_action_v0 --approve-dph 1.10
+```
+
+- **動き:** 条件に合う最安の offer を選ぶ → instance を作る → 起動を待つ → `HEAD` を `git archive` で転送 → 各手順を実行 → `artifacts/` を回収する。最後に、成功しても失敗しても必ず削除し、削除を確認する。
+- **記録:** 結果は `runs/vast/<job>-<時刻>/`（Git の管理外）に置く。`run.json` には、offer、driver、各手順の終了コードと秒数、時間、費用の見積もり、削除の確認を記録する。失敗したときは、container のログも保存する。
+- **SSH:** 手元の `~/.ssh/id_ed25519_vast` を使う（アカウントに登録済み）。vLLM の image は `/root` の権限が緩く、sshd が `authorized_keys` を拒否するので、起動時（onstart）に権限を直している。
+- **API key:** `vastai` には、コマンドの引数ではなく環境変数で渡す。process の一覧に key が出ないようにするため。
+- **既存の instance:** 同じアカウントに、別のプロジェクトの instance がある。本プロジェクトの実行基盤は、自分で作った instance の ID だけを削除・確認する。
+- **依存:** instance 上では `uv sync --locked --no-dev` を使う（学習のときは `--group train` を足す）。
 
 1. **実行前の確認:** 学習ならローカルの CPU で数 step の smoke test、データの生成なら少数の生成と検査を通してから instance を借りる。バグで課金されるのを防ぐため。
 2. **作成前の承認:** Instance を作る前に、GPU の種類、時間単価、想定時間、上限費用を提示して承認を得る。

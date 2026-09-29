@@ -368,7 +368,8 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | `.env` の `HF_TOKEN` | 設定済み。write 権限と、`japanese-data-analyze` の admin であることを確認済み |
 | M1 リポジトリ基盤 | **完了**（2026-09-29） |
 | M2 Action schema v0 と評価の土台 | **完了**（2026-09-29） |
-| M2.5 以降 | 未着手。次は M2.5 |
+| M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |
+| M3 | 着手（生成用の pipeline は実装済み） |
 
 ### M1〜M3 の目的と完了条件
 
@@ -376,7 +377,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 |---|---|---|---|
 | M1 | 以降のコード（schema、評価、データ生成、学習）を、ローカルと vast.ai で同じ手順で再現できる環境で動かす | `uv sync --locked` と test がローカルで通る | **完了**。uv 0.12.20、Python 3.13、`uv.lock`（torch 2.14.0 は Windows が CPU 版、Linux が cu126 版）、ruff、pytest。`.env.example` は権限の設定で作成できず、変数は README と [`development.md`](development.md) §3 に記載 |
 | M2 | 「正解」を機械的に判定できるようにし、M3 のデータ検査と、以降のすべての評価の土台にする | TinyLM-Bench の16件の期待値が validator と評価器を通り、座標規約の unit test が通る | **完了**。schema（`src/jtalm/action/action_schema_v0.json`）、validator（重複の禁止を含む）、正規化、角度への変換（`jtalm.action.mapping`）、評価指標（`jtalm.eval`）。39件の test が通過。評価器は TinyLM-Bench の厳格一致（Needle 2 が 3/16、FunctionGemma が 6/16、MimiModel が 1/16）を再現した（[`research_notes.md`](research_notes.md) §3.7） |
-| M2.5 | vast.ai の GPU で、生成と学習を安全かつ再現可能に実行し、終わったら確実に削除できるようにする | 小さな生成と GPU 上の torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている | 未着手 |
+| M2.5 | vast.ai の GPU で、生成と学習を安全かつ再現可能に実行し、終わったら確実に削除できるようにする | 小さな生成と GPU 上の torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている | **完了**。`jtalm.infra.job smoke` が RTX 3090（$0.153/h、driver 580、CUDA 13.0）で成功した。torch 2.14.0+cu126 で CUDA が使えることと、vLLM v0.30.0 による JSON 制約つきの生成を確認し、instance は自動で削除された（0.208 時間、約 $0.032）。1回目は、vLLM の image の `/root` の権限のせいで SSH が拒否されて失敗した（約 $0.023）。起動時（onstart）に権限を直すよう修正した。費用の合計は約 $0.055 |
 | M3 | Action LM の学習データと評価セットを、規約上問題のない方法で作り、baseline を測って公開する | 評価セット 1,000件以上（重要カテゴリ各100件以上）、学習データ 2,000〜10,000件、manifest、rule-based baseline の数値、Hugging Face への公開（public、manual gate） | 未着手 |
 
 ### Track A: PC 上の実装マイルストーン
@@ -385,8 +386,8 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 |---|---|---|---|
 | M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
 | M2 | Action schema v0 と評価の土台 | `src/jtalm/action/action_schema_v0.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
-| M2.5 | vast.ai 実行基盤 | `infra/vast/`（GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 生成または学習 → 回収 → 削除）。CLI は `uv add --dev vastai`（1.8 系）で lock する。オープンモデルを vLLM などで動かす生成用の構成も含める | 小さな生成と学習で、一連の流れと instance の削除を確認し、費用を記録している |
-| M3 | Dataset v0 と baseline | vast.ai 上で Apache-2.0 / MIT のオープンモデル（Qwen3 が第一候補、予備に gpt-oss）を動かして生成した合成データ 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE などの既存データも使う。**学習データとは別のモデル（llm-jp-4.1）で作る評価セット**、ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
+| M2.5 | vast.ai 実行基盤 | `src/jtalm/infra/`（`uv run python -m jtalm.infra.job <job> --approve-dph <上限>`。GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 各手順 → 回収 → 必ず削除 → 費用の記録）。CLI は `uv add --dev vastai`（1.8 系）で lock する。vLLM（`vllm/vllm-openai:v0.30.0`）を使う生成用の構成を含める | 小さな生成と、GPU 上での torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている（学習そのものの確認は M4 で行う） |
+| M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書いて llm-jp が検証、評価セットは llm-jp-3.1-13b-instruct4 が書いて Qwen3 が検証）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
 | M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | §12 冒頭のリストの手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
 | M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |

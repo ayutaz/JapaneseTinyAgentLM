@@ -39,9 +39,13 @@ Claude が書いた生成用の指示文（prompt）やコードまで問題に�
 
 | モデル | ライセンス | 用途 |
 |---|---|---|
-| Qwen3（例: Qwen3-32B） | Apache-2.0（確認済み） | **学習データ**の生成（正例、言い換え、否定文）。第一候補 |
+| **`Qwen/Qwen3-30B-A3B-Instruct-2507`**（bf16、61GB） | Apache-2.0（確認済み） | **学習データ**の文を書く。**評価セット**の文を検証する |
+| **`llm-jp/llm-jp-3.1-13b-instruct4`**（bf16、約27GB） | Apache-2.0（確認済み） | **評価セット**の文を書く（学習データには書かない）。**学習データ**の文を検証する |
 | gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備 |
-| llm-jp-4.1（8B / 33B など） | Apache-2.0（確認済み） | **評価セット専用**。学習データには使わない。生成元を分けることで、生成のくせの暗記を評価で見抜けるようにする |
+
+- 生成元を分けることで、生成のくせを暗記しただけのモデルを評価で見抜けるようにしています。
+- 当初は llm-jp-4.1 を評価セット用にする予定でした。しかし llm-jp-4.1 には思考過程を出す（thinking）版しかなく、出力形式の制約と両立させにくいため、同じ llm-jp 系の llm-jp-3.1 の instruct 版に変えました（M3、2026-09-29）。
+- Qwen3 は FP8 版ではなく bf16 版を使います。FP8 を扱える GPU が $1.10/h 以下でほとんど借りられず、A100（Ampere）でも確実に動かすためです。
 
 使わないモデル:
 
@@ -60,7 +64,7 @@ Action を呼ぶ日本語のデータで、ライセンス上そのまま使え�
 
 | データ | ライセンス | 内容 |
 |---|---|---|
-| [AmazonScience/massive](https://huggingface.co/datasets/AmazonScience/massive)（ja-JP） | CC BY 4.0（確認済み） | 16,521 件。アラーム、家電、雑談などの依頼を人手で日本語化したもの。tool の範囲外の依頼の負例 |
+| [AmazonScience/massive](https://huggingface.co/datasets/AmazonScience/massive)（ja-JP） | CC BY 4.0（確認済み） | 16,521 件。アラーム、家電、雑談などの依頼を人手で日本語化したもの。tool の範囲外の依頼の負例。v0 で使用（頭や顔の動作に触れる19件を除いた 16,502 件から抽出） |
 | [apple/mkqa](https://github.com/apple/ml-mkqa)（ja） | CC BY-SA 3.0 | 質問 1万件（人手翻訳） |
 | [AmazonScience/mintaka](https://github.com/amazon-science/mintaka)（ja） | CC BY 4.0 | 質問 2万件 |
 | JCommonsenseQA、JSQuAD | CC BY-SA 4.0 | 人手で作った質問文 |
@@ -75,17 +79,25 @@ Action を呼ぶ日本語のデータで、ライセンス上そのまま使え�
 
 ## 5. 生成と検査の流れ
 
-1. Claude Code が生成 pipeline のコードを作る（prompt、生成の設定、検査の規則）。
-2. vast.ai の GPU instance で、vLLM などを使って §3 のモデルを動かし、文章とラベルを生成する。
-3. ルールで検査する。
-   - Schema の妥当性。
-   - 入力文に含まれる方向や量の語と、JSON の値が一致しているか。
-   - 否定された action が出力に含まれていないか。例えば「右を向かないで」は `[]`、「右ではなく左を向いて」は left の `look` になっているか。
-   - 重複、長すぎる文、文字化けを除く。
-4. テンプレート（生成の元になったパターン）単位で、学習・検証・評価に分割する。
-5. 出典、ライセンス、生成モデル、prompt の版、件数、hash を manifest（`datasets/manifests/`）に記録する。
+v0 の実装は `src/jtalm/data/`（M3）です。
 
-評価セットは、学習データとは別のモデル（llm-jp-4.1）と別の prompt で生成し、既存の人手データ（MASSIVE など）と組み合わせます。既存データは公式の split を使い、学習の負例には train、評価には test を使って、両者が重ならないようにします。
+1. **正解を先に決める（label-first）:** `jtalm.data.specs` が、意図（spec）とその正解の JSON をプログラムで網羅的に決める。
+   - single: 20 通り
+   - multi_action: 順序つきの2動作、126 通り
+   - negation: 9 通り
+   - correction: 16 通り（「A ではなく B」と、一部だけを否定する依頼）
+   - no_action: 8 つの話題
+2. **文を書かせる:** vast.ai の GPU instance で、vLLM（v0.30.0）を使って §3 のモデルを動かし、spec の意味の日本語の文を書かせる。出力は JSON に制約する（`response_format`）。
+   - 学習データは Qwen3 が書く。
+   - 評価セットは llm-jp が、別の言い方の指示で書く。評価セットには、否定の有無だけが違う対比ペアと、少量の英語も含める。
+3. **別のモデルで検証する:** 文を書かなかったほうのモデルに、各文を Action の JSON へ変換させる。1. の正解と一致した文だけを残す。
+   - モデルは1つずつ GPU に載せる（`jtalm.data.generate` の4段階）。
+4. **軽い検査:**
+   - 長さ、文字化け、否定との矛盾（肯定の命令に否定の語がある、否定の依頼に否定の語がない）を検査する。
+   - 重複と、学習データと評価セットの重なりを除く。
+   - 方向や量のキーワードで正解を確かめる検査は、**わざと入れない**。入れると、キーワードの規則で解ける文ばかりが残り、ルールベースの baseline が不当に高い点を取るため。
+5. **MASSIVE の負例を加える:** 学習には train、評価には test を使い、両者が重ならないようにする。
+6. **分割と記録:** 学習データの 5% を検証（validation）に分ける。出典、ライセンス、生成モデル、prompt の版、件数、hash、ルールベースの baseline の評価結果を、manifest（`datasets/manifests/action_v0.json`）に記録する。
 
 ## 6. Hugging Face への公開
 
