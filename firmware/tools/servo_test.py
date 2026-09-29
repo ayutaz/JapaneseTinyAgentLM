@@ -166,8 +166,9 @@ def main() -> int:
                 print(f"servo on: {s}", flush=True)
                 if s.get("state") != "on":
                     raise Stopped(f"servo on failed: {s}")
-                a = dev.wait_for("act", 10.0, keep)
-                dev.wait_for("act_done", a["total_ms"] / 1000.0 + 10.0, keep)
+                # The device prints the centering plan ('act') before the 'servo' record, so
+                # wait_for("servo") has already passed it; wait for its completion instead.
+                dev.wait_for("act_done", 15.0, keep)
                 check(keep)
             for i, (label, line, expect) in enumerate(items):
                 print(f"[{i + 1}/{len(items)}]", end=" ", flush=True)
