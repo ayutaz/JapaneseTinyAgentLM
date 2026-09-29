@@ -212,7 +212,15 @@ HF_CACHE = "$HOME/.cache/huggingface/hub"
 
 
 def _drop_weights(hf_id: str) -> str:
-    return f"rm -rf {HF_CACHE}/models--{hf_id.replace('/', '--')}"
+    """Delete a writer's weights and the hf_xet chunk cache, and log free disk space.
+
+    In gen_action_v04 the disk (200GB) still filled up after four writers, so ELYZA, calm3 and
+    Qwen3 could not be downloaded; the xet cache is now removed too and ``df`` is logged.
+    """
+    return (
+        f"rm -rf {HF_CACHE}/models--{hf_id.replace('/', '--')} $HOME/.cache/huggingface/xet; "
+        "df -h / /root 2>/dev/null | tail -n 2"
+    )
 
 
 def _v04_steps() -> list[str]:
@@ -244,6 +252,46 @@ GEN_ACTION_V04 = JobSpec(
     disk_gb=200,
     max_hours=3.0,
     steps=_v04_steps(),
+)
+
+# v0.4b: finish v0.4 after the disk ran out. The four writers that succeeded (ABEJA,
+# Mistral-Nemo-JA, granite, sarashina2.2) are uploaded from datasets/raw/v04 (gitignored) and only
+# verified; ELYZA, calm3 and Qwen3 write again on a larger disk.
+V04B_DONE = ["abeja", "nemoja", "granite", "sarashina"]
+V04B_WRITERS = [w for w in V04_WRITERS if w[0] in ("elyza", "calm3")]
+
+
+def _v04b_steps() -> list[str]:
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", f"{UV} sync --locked --no-dev"]
+    for name, hf_id, mem in V04B_WRITERS:
+        cfg = f"configs/action_v04_{name}.json"
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", cfg, f"artifacts/raw04_{name}")
+        steps += [
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        "mkdir -p artifacts && cp -r datasets/raw/v04/raw04_* artifacts/",
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v04_qwen.json", "artifacts/raw04_qwen"),
+    ]
+    for name in V04B_DONE + [n for n, _, _ in V04B_WRITERS] + ["qwen"]:
+        out = f"artifacts/raw04_{name}"
+        verify = generate("train-verify", f"configs/action_v04_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    return steps
+
+
+GEN_ACTION_V04B = JobSpec(
+    name="gen_action_v04b",
+    description="Data v0.4 (finish): ELYZA / calm3 / Qwen3 write, Qwen3 verifies all seven writers",
+    query=f"gpu_ram>=79 {BASE_QUERY}".replace("disk_space>=120", "disk_space>=320"),
+    image=VLLM_IMAGE,
+    disk_gb=300,
+    max_hours=2.5,
+    steps=_v04b_steps(),
+    uploads=[f"datasets/raw/v04/raw04_{w}/train_gen.jsonl" for w in V04B_DONE],
 )
 
 # Retrain on v0.3 (v0 plus the new writers) and compare with M4 on the same evaluation set.
@@ -329,6 +377,7 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V03,
         TRAIN_ACTION_V03,
         GEN_ACTION_V04,
+        GEN_ACTION_V04B,
         TRAIN_ACTION_V04,
     )
 }
