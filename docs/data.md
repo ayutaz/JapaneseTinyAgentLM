@@ -39,13 +39,14 @@ Claude が書いた生成用の指示文（prompt）やコードまで問題に�
 
 | モデル | ライセンス | 用途 |
 |---|---|---|
-| **`Qwen/Qwen3-30B-A3B-Instruct-2507`**（bf16、61GB） | Apache-2.0（確認済み） | **学習データ**の文を書く。**評価セット**の文を検証する |
-| **`llm-jp/llm-jp-3.1-13b-instruct4`**（bf16、約27GB） | Apache-2.0（確認済み） | **評価セット**の文を書く（学習データには書かない）。**学習データ**の文を検証する |
+| **`Qwen/Qwen3-30B-A3B-Instruct-2507`**（bf16、61GB） | Apache-2.0（確認済み） | **学習データ**の文を書き、温度 0 で検証する。**評価セット**の文を検証する |
+| **`llm-jp/llm-jp-3.1-13b-instruct4`**（bf16、約27GB） | Apache-2.0（確認済み） | **評価セット**の文を書く（学習データには書かない） |
 | gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備 |
 
 - 生成元を分けることで、生成のくせを暗記しただけのモデルを評価で見抜けるようにしています。
 - 当初は llm-jp-4.1 を評価セット用にする予定でした。しかし llm-jp-4.1 には思考過程を出す（thinking）版しかなく、出力形式の制約と両立させにくいため、同じ llm-jp 系の llm-jp-3.1 の instruct 版に変えました（M3、2026-09-29）。
 - Qwen3 は FP8 版ではなく bf16 版を使います。FP8 を扱える GPU が $1.10/h 以下でほとんど借りられず、A100（Ampere）でも確実に動かすためです。
+- **学習データの検証役の変更（v0.2）:** 当初は学習データを llm-jp-3.1 で検証する計画でした。しかし1回目の生成（v0.1）で、llm-jp-3.1-13B は雑談や否定の文にもほぼ毎回動作を出力し、検証役として機能しませんでした（no_action の 1,382 件中 1,192 件が不一致）。そこで v0.2 では、学習データも Qwen3 が温度 0 で検証します。書いたモデルと同じですが、「意図した正解と一致する文だけを残す」一貫性の検査として働きます。評価セットは、これまでどおり llm-jp が書き、文を書いていない Qwen3 が検証します。
 
 使わないモデル:
 
@@ -90,23 +91,41 @@ v0 の実装は `src/jtalm/data/`（M3）です。
 2. **文を書かせる:** vast.ai の GPU instance で、vLLM（v0.30.0）を使って §3 のモデルを動かし、spec の意味の日本語の文を書かせる。出力は JSON に制約する（`response_format`）。
    - 学習データは Qwen3 が書く。
    - 評価セットは llm-jp が、別の言い方の指示で書く。評価セットには、否定の有無だけが違う対比ペアと、少量の英語も含める。
-3. **別のモデルで検証する:** 文を書かなかったほうのモデルに、各文を Action の JSON へ変換させる。1. の正解と一致した文だけを残す。
+3. **検証する:** 各文を、温度 0 で Action の JSON へ変換させ、1. の正解と一致した文だけを残す。
+   - 評価セットは、文を書いていない Qwen3 が検証する。
+   - 学習データは Qwen3 が検証する（v0.2。理由は §3）。
    - モデルは1つずつ GPU に載せる（`jtalm.data.generate` の4段階）。
+   - 生成の指示（prompt の版 action-v0.2）では、spec ごとに必ず文に入れる要素を指定する。量の言葉（少し、大きく）、うなずく回数、2つの動作の順序、言い直しの形（「〜じゃなくて〜」など）が対象。v0.1 では、これが抜けた文が多かった。
 4. **軽い検査:**
    - 長さ、文字化け、否定との矛盾（肯定の命令に否定の語がある、否定の依頼に否定の語がない）を検査する。
    - 重複と、学習データと評価セットの重なりを除く。
    - 方向や量のキーワードで正解を確かめる検査は、**わざと入れない**。入れると、キーワードの規則で解ける文ばかりが残り、ルールベースの baseline が不当に高い点を取るため。
 5. **MASSIVE の負例を加える:** 学習には train、評価には test を使い、両者が重ならないようにする。
 6. **分割と記録:** 学習データの 5% を検証（validation）に分ける。出典、ライセンス、生成モデル、prompt の版、件数、hash、ルールベースの baseline の評価結果を、manifest（`datasets/manifests/action_v0.json`）に記録する。
+7. **否定の追加生成:** v0.2 の1回目の生成では、negation が 15.4% で目標（20%以上）に届かなかった。否定の spec を 9 → 21 に増やし（量つきの否定、全般の否定、2つの動作をまとめた否定など）、否定だけを追加で生成した（`configs/action_v0_negation_topup.json`）。`build` は複数回の生成をまとめて扱う。
+
+実行のコマンド:
+
+```sh
+uv run python -m jtalm.infra.job gen_action_v0 --approve-dph 1.10            # 生成と検証（vast.ai）
+uv run python -m jtalm.infra.job gen_action_v0_negation --approve-dph 1.10   # 否定の追加生成
+uv run python -m jtalm.data.build --raw <run1>/artifacts/raw <run2>/artifacts/raw \
+    --extra-config configs/action_v0_negation_topup.json                     # 組み立てと manifest
+uv run python -m jtalm.data.publish prepare                                  # 公開用のファイルとカード
+uv run python -m jtalm.data.publish publish --confirm                        # 公開（最終確認のあと）
+```
+
+件数と baseline は [`roadmap.md`](roadmap.md) §12 の「M3 の結果」にあります。
 
 ## 6. Hugging Face への公開
 
 | 項目 | 内容 |
 |---|---|
 | 対象 | §5 で作った合成データ（正例、否定、言い換え）と manifest |
-| 公開先 | Hugging Face の organization **[`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze)**。repository の名前は M3 で決める |
-| 公開設定 | **public、manual gate**（利用申請を手動で承認する） |
-| 時期 | M3 の完了時。モデルより先に公開する |
+| 公開先 | **[`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)**（2026-09-29 公開） |
+| 公開設定 | **public、manual gate**（利用申請を手動で承認する）。ログインしていない状態でファイルを取得すると HTTP 401 になることを確認済み |
+| 時期 | M3 の完了時（モデルより先） |
+| 件数 | train 7,919 / validation 425 / test 1,039（合成の文だけ） |
 | ライセンス | **CC BY-SA 4.0**（モデルの重みと同じ。2026-09-29 決定） |
 | データセットカード | 生成に使ったモデルとライセンス、生成方法、検査の規則、件数、既知の限界、Claude Code の役割（pipeline のコードの作成だけ） |
 | 既存データ | MASSIVE などの第三者データは再配布せず、manifest で出典を参照する |

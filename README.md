@@ -27,7 +27,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | 成果物 | 内容 | 公開先とライセンス |
 |---|---|---|
 | **Japanese Action LM** | 日本語の命令 → Action の JSON（0〜2個、`[]` が no-action）。Action は `look` / `set_expression` / `nod` の3種類。3M〜10M parameter、量子化後 1.5〜5MB | Hugging Face、CC BY-SA 4.0 |
-| **合成データセット** | Action LM の学習データ。オープンモデルで生成する | Hugging Face、**public、manual gate**、CC BY-SA 4.0。M3 の時点で公開する |
+| **合成データセット** | Action LM の学習データ。オープンモデルで生成する | [Hugging Face](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)、**public、manual gate**、CC BY-SA 4.0（2026-09-29 公開） |
 | **ESP32 用の推論 runtime** | K151 の上で動かし、Action を servo の動きに変える | GitHub（本リポジトリ。現在は private で、公開の時期は Phase 7 で判断）、Apache-2.0 |
 | **Japanese Tiny Chat LM** | 短い日本語の応答。実機の候補は 10M（20M は PC での品質比較）。Action LM の完成後に作る | Hugging Face、CC BY-SA 4.0 |
 
@@ -54,7 +54,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 
 ## 学習データの方針
 
-- 文章と正解ラベルは、**Apache-2.0 / MIT のオープンモデル**を vast.ai 上で動かして生成する。学習データは Qwen3（予備に gpt-oss）、評価セットは別のモデル（llm-jp-4.1）と別の prompt で作る。
+- 文章と正解ラベルは、**Apache-2.0 / MIT のオープンモデル**を vast.ai 上で動かして生成する。学習データは Qwen3（予備に gpt-oss）、評価セットは別のモデル（llm-jp-3.1-13b-instruct4）と別の prompt で作る。
 - no-action の負例には、ライセンスが両立する既存の人手データ（MASSIVE の日本語など）を使う。
 - **Claude Code は、生成・検査・分割のコードを作って実行するだけ**で、学習データの文章やラベルは書かない。Codex（ChatGPT のプラン）もデータの中身には使わない。どちらも、利用規約で出力を学習に使うことに制限があるため。
 - すべてのデータの出典とライセンスを manifest に記録する。
@@ -74,14 +74,16 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | M1 リポジトリ基盤（uv、Python 3.13、`uv.lock`、pytest、ruff） | 完了 |
 | M2 Action schema v0 と評価の土台（validator、角度への変換、評価指標。TinyLM-Bench の結果を再現） | 完了 |
 | M2.5 vast.ai の実行基盤（GPU での torch と vLLM の動作確認、自動削除、費用の記録） | 完了 |
-| M3 合成データセット | 着手（pipeline は実装済み） |
+| M3 合成データセット（学習 9,544 件、評価 1,189 件、ルールベースの baseline 76.4%） | 完了。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
+| M4 以降（学習） | 未着手 |
 
 次の作業は、次の順序で進めます。各マイルストーンの目的と完了条件は [`docs/roadmap.md`](docs/roadmap.md) §12 にあります。
 
 1. ~~**M1:** uv によるリポジトリ基盤~~（完了）
 2. ~~**M2:** Action schema v0 と評価の土台~~（完了）
 3. ~~**M2.5:** vast.ai の実行基盤~~（完了）
-4. **M3:** 合成データセットの作成と Hugging Face への公開
+4. ~~**M3:** 合成データセットの作成と Hugging Face への公開~~（完了）
+5. **M4:** Tokenizer と 3M / 5M / 20M の学習（vast.ai）。並行して Track B（ESP-IDF の環境、servo の座標の確認）
 
 > [!IMPORTANT]
 > 2026-09-29 時点では、LM の性能、LM を含めた Flash / PSRAM の使用量、速度、電力はまだ検証していません。文書中の「目標値」「実測値」「確認済み事実」を区別してください。

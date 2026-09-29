@@ -44,7 +44,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 **公開物（Hugging Face と GitHub）**
 
 - Hugging Face（`japanese-data-analyze`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果
-- Hugging Face（`japanese-data-analyze`、dataset）: 合成データセット。public、manual gate、CC BY-SA 4.0 で公開する（[`data.md`](data.md) §6）
+- Hugging Face（`japanese-data-analyze`、dataset）: 合成データセット。public、manual gate、CC BY-SA 4.0。**2026-09-29 に公開済み**（[`data.md`](data.md) §6）
 - GitHub: 学習と評価の code、ESP32 runtime
 
 開発者向けの追加の公開物として、次の2つがあります。これらは**モデルが完成してから判断します**。まずはモデルを作ることを優先します。
@@ -204,6 +204,8 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | **ゴールを確定する。** 実用のためのモデルとし、利用者は開発者とする。入力はテキストのみとする。Action LM を実機で完成させてから Chat LM に取り組む。期限は設けず、できるだけ早く作る。実装と学習はすべて Claude Code が実行する | 本文書 §1 |
 | 2026-09-29 | モデルの重みは Hugging Face で **CC BY-SA 4.0**（商用利用可）で公開する。学習データは CC BY-SA 4.0 と両立するものだけを使う | [`development.md`](development.md) §6 |
 | 2026-09-29 | まずモデルを作ることを優先する。開発者向けの追加の公開物（ESP-IDF の component、fine-tuning の手順）は、モデルが完成してから判断する | 本文書 §1、[`roadmap.md`](roadmap.md) §9 |
-| 2026-09-29 | 学習データの中身は、Apache-2.0 / MIT のオープンモデル（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-4.1）と、ライセンスが両立する既存データ（MASSIVE など）で作る。Claude Code はコードの作成と実行だけを担当し、文章やラベルは書かない。Codex（ChatGPT のプラン）はデータの中身の作成に使わない | [`data.md`](data.md) §1–2 |
+| 2026-09-29 | 学習データの中身は、Apache-2.0 / MIT のオープンモデル（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-4.1）と、ライセンスが両立する既存データ（MASSIVE など）で作る。Claude Code はコードの作成と実行だけを担当し、文章やラベルは書かない。Codex（ChatGPT のプラン）はデータの中身の作成に使わない （→ M3 で、評価セットは llm-jp-3.1、学習データの検証は Qwen3 に変更。下の行） | [`data.md`](data.md) §1–2 |
 | 2026-09-29 | 合成データは vast.ai 上で生成し、Hugging Face に public、manual gate でアップロードする | [`data.md`](data.md) §5–6 |
 | 2026-09-29 | Hugging Face の公開先は organization `japanese-data-analyze` とする。合成データセットのライセンスは CC BY-SA 4.0 とする | [`data.md`](data.md) §6、[`architecture.md`](architecture.md) §13 |
+| 2026-09-29 | M3 の実行結果による変更。評価セットは llm-jp-3.1-13b-instruct4 が書く（llm-jp-4.1 は thinking 版しかないため）。学習データは Qwen3-30B-A3B-Instruct-2507（bf16）が書き、温度 0 で検証する（llm-jp-3.1 は検証役として機能しなかったため）。否定の spec を 21 通りに増やし、否定だけを追加で生成する | [`data.md`](data.md) §3、§5 |
+| 2026-09-29 | 合成データセットを [`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) として公開した（public、manual gate、CC BY-SA 4.0） | [`roadmap.md`](roadmap.md) §12 |

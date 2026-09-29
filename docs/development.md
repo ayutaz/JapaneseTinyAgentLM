@@ -121,7 +121,7 @@ uv run python -m jtalm.infra.job gen_action_v0 --approve-dph 1.10
 | 使える | 使えない |
 |---|---|
 | CC BY-SA、CC BY、CC0、パブリックドメイン、MIT / Apache-2.0 などの寛容なライセンスのデータ | 非営利限定（NC）や改変禁止（ND）のデータ |
-| Apache-2.0 / MIT のオープンモデルで生成したデータ（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-4.1。[`data.md`](data.md) §3） | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
+| Apache-2.0 / MIT のオープンモデルで生成したデータ（学習データは Qwen3 と予備の gpt-oss、評価セットは llm-jp-3.1-13b-instruct4。[`data.md`](data.md) §3） | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
 | — | 出典やライセンスが分からないデータ |
 
 - 具体的な方針、規約の調査結果、使うデータとモデルの一覧は [`data.md`](data.md) にまとめています。

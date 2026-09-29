@@ -369,7 +369,9 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | M1 リポジトリ基盤 | **完了**（2026-09-29） |
 | M2 Action schema v0 と評価の土台 | **完了**（2026-09-29） |
 | M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |
-| M3 | 着手（生成用の pipeline は実装済み） |
+| M3 合成データセット | **完了**（2026-09-29）。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
+| M4 以降 | 未着手。次は M4（Tokenizer と 3M / 5M / 20M の学習）。並行して Track B（B1、B2） |
+| vast.ai の費用（M2.5〜M3 の累計） | 約 $1.03（承認済みの上限 約 $4 の範囲内） |
 
 ### M1〜M3 の目的と完了条件
 
@@ -378,7 +380,28 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | M1 | 以降のコード（schema、評価、データ生成、学習）を、ローカルと vast.ai で同じ手順で再現できる環境で動かす | `uv sync --locked` と test がローカルで通る | **完了**。uv 0.12.20、Python 3.13、`uv.lock`（torch 2.14.0 は Windows が CPU 版、Linux が cu126 版）、ruff、pytest。`.env.example` は権限の設定で作成できず、変数は README と [`development.md`](development.md) §3 に記載 |
 | M2 | 「正解」を機械的に判定できるようにし、M3 のデータ検査と、以降のすべての評価の土台にする | TinyLM-Bench の16件の期待値が validator と評価器を通り、座標規約の unit test が通る | **完了**。schema（`src/jtalm/action/action_schema_v0.json`）、validator（重複の禁止を含む）、正規化、角度への変換（`jtalm.action.mapping`）、評価指標（`jtalm.eval`）。39件の test が通過。評価器は TinyLM-Bench の厳格一致（Needle 2 が 3/16、FunctionGemma が 6/16、MimiModel が 1/16）を再現した（[`research_notes.md`](research_notes.md) §3.7） |
 | M2.5 | vast.ai の GPU で、生成と学習を安全かつ再現可能に実行し、終わったら確実に削除できるようにする | 小さな生成と GPU 上の torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている | **完了**。`jtalm.infra.job smoke` が RTX 3090（$0.153/h、driver 580、CUDA 13.0）で成功した。torch 2.14.0+cu126 で CUDA が使えることと、vLLM v0.30.0 による JSON 制約つきの生成を確認し、instance は自動で削除された（0.208 時間、約 $0.032）。1回目は、vLLM の image の `/root` の権限のせいで SSH が拒否されて失敗した（約 $0.023）。起動時（onstart）に権限を直すよう修正した。費用の合計は約 $0.055 |
-| M3 | Action LM の学習データと評価セットを、規約上問題のない方法で作り、baseline を測って公開する | 評価セット 1,000件以上（重要カテゴリ各100件以上）、学習データ 2,000〜10,000件、manifest、rule-based baseline の数値、Hugging Face への公開（public、manual gate） | 未着手 |
+| M3 | Action LM の学習データと評価セットを、規約上問題のない方法で作り、baseline を測って公開する | 評価セット 1,000件以上（重要カテゴリ各100件以上）、学習データ 2,000〜10,000件、manifest、rule-based baseline の数値、Hugging Face への公開（public、manual gate） | **完了**。詳細は下の「M3 の結果」 |
+
+### M3 の結果（2026-09-29）
+
+| 項目 | 結果 |
+|---|---|
+| 学習データ | train 9,067 件 + validation 477 件 = 9,544 件。negation 24.3%、no_action 24.5%（うち MASSIVE ja-JP 1,148 件）、multi_action 22.0%、single 17.3%、correction 12.0% |
+| 評価セット | 1,189 件。single 335、multi_action 192、negation 270、no_action 337（うち MASSIVE test 150）、correction 55。英語 35 件、対比ペア 80 組 |
+| 生成 | action-v0.2 の prompt。学習データは Qwen3-30B-A3B-Instruct-2507 が書いて温度 0 で検証し、評価セットは llm-jp-3.1-13b-instruct4 が書いて Qwen3 が検証した |
+| ルールベースの baseline（評価セット） | 完全一致 76.4%。single 60.9%、multi_action 46.9%、negation 88.1%、no_action 99.1%、correction 76.4%。no-action の precision 0.80 / recall 0.94。対比ペアの正解率 0.84 |
+| manifest | `datasets/manifests/action_v0.json`（件数、落とした理由の内訳、sha256、設定、3回の生成の記録、baseline の詳細） |
+| 公開 | [`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)。train 7,919 / validation 425 / test 1,039（合成の文だけで、MASSIVE は含めない）。public、manual gate、CC BY-SA 4.0 |
+
+生成は3回行いました。
+
+| 回 | 内容 | GPU | 時間 | 費用 | 結果 |
+|---|---|---|---:|---:|---|
+| 1（v0.1） | 学習データを llm-jp で検証 | A100 80GB | 0.496 h | $0.50 | llm-jp-3.1 が検証役として機能せず、残った件数が少なすぎた（学習データ 1,906 件） |
+| 2（v0.2） | 指示を改善し、学習データを Qwen3 で検証 | A100 80GB | 0.352 h | $0.31 | 学習データ 8,540 件、評価セット 1,189 件。negation が 15.4% で目標に届かず |
+| 3（追加） | 否定の spec を 9 → 21 に増やし、否定だけを追加で生成 | A100 80GB | 0.193 h | $0.17 | negation が 24.3% になり、すべての条件を満たした |
+
+M4 で Action LM が超えるべき基準は、このルールベースの baseline（完全一致 76.4%）と、TinyLM-Bench の既存モデルの結果です。特に multi_action（46.9%）と single（60.9%）で、差をつける余地が大きくあります。
 
 ### Track A: PC 上の実装マイルストーン
 

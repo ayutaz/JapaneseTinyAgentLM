@@ -520,7 +520,7 @@ JapaneseTinyAgentLM/
 └── backups/                # 実機 Flash のバックアップ（Git 管理外）
 ```
 
-作成済みなのは、`LICENSE`、`.gitignore`、`.python-version`、`pyproject.toml`、`uv.lock`、`docs/`、`src/jtalm/`（`action/`、`eval/`）、`tests/`（TinyLM-Bench の fixture を含む）です（M2 完了時点）。ほかの場所は、各マイルストーンで作ります。
+作成済みなのは、`LICENSE`、`.gitignore`、`.python-version`、`pyproject.toml`、`uv.lock`、`configs/`、`docs/`、`src/jtalm/`（`action/`、`eval/`、`data/`、`infra/`）、`datasets/manifests/`、`tests/`（TinyLM-Bench の fixture を含む）です（M3 完了時点）。`tokenizer/`、`model/`、`training/`、`runtime/` は M4 以降で作ります。
 
 GitHub はコードと再現手順を1 repository にまとめ、Hugging Face は artifact を用途・サイズ・量子化ごとに分離します。
 
@@ -532,7 +532,7 @@ japanese-data-analyze/JapaneseTinyAgentLM-10M-Action
 japanese-data-analyze/JapaneseTinyAgentLM-10M-Base
 japanese-data-analyze/JapaneseTinyAgentLM-10M-Chat
 japanese-data-analyze/JapaneseTinyAgentLM-10M-Unified
-japanese-data-analyze/<合成データセット>                        # HF の dataset（public、manual gate。名前は M3 で決める）
+japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth       # HF の dataset（public、manual gate。M3 で公開済み）
 ```
 
 Hugging Face の公開先は、organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。repository の名前は未確定で、既存の名称、商標、repository との衝突を公開前に確認します。
