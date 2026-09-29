@@ -459,6 +459,7 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 
 - 比較相手は host の C（`double` の累積）。host の C の出力は、Python（`best_q4_g64.pt` / `best_q8_g64.pt` の `grammar`）と 1,189件すべてで一致した（`-DJTLM_ACC=float` でも同じ）。
 - **実機の INT4 ＋ gate の出力を評価すると、完全一致 94.45%、critical error 0.59%。** Python（`jtalm.model.evaluate --modes gate`）の 94.4% / 0.6% と同じ値。Gate をかけない場合は 94.28% / 2.02%。
+- 実機の出力を Python の `gate` の予測（`v04/3m/best_q4_g64.pt`）と直接比べても、gate 後の出力と gate 前の出力は 1,189件すべて一致した（先頭 200件では 200 / 200、gate で `[]` にしたのは 11件）。実機と host の `min_prob` の差は最大 1.4e-5 で、gate の判定が host（`double`）や Python と食い違った例はない。0.970 に最も近い値は 0.970307。
 - `min_prob` が 0.970 から 1e-4 以内の例は1件もなく、C と Python の確率のわずかな差（最大 1e-5 程度）で gate の判定が変わるおそれはない。Python が validation で選んだ閾値（INT4 で 0.97004）と 0.970 のどちらでも、評価セットの結果は同じ。
 - 速度は M4 の 3M INT4 と同じ（decode 105.4 ms/token、prefill 45.4 ms/token）。評価セット全体（prompt 平均 14.8 token、生成 平均 5.5 token）で、1件の latency は中央値 1,075ms、p90 1,859ms、最大 4,134ms。出力が `[]` の件は中央値 724ms。先頭 200件だけでは中央値 1,222ms、p90 1,434ms。
 - 作業の終わりに、実機はこの firmware（`bf5d82461`）と v0.4 の 3M INT4 の状態にしてある。
