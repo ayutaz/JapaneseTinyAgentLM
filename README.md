@@ -71,11 +71,12 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | ゴール、ライセンス、学習データの方針の決定 | 完了（2026-09-29） |
 | vast.ai の API key（`.env`） | 設定済み。認証を確認済み |
 | Hugging Face の token（`.env` の `HF_TOKEN`） | 設定済み。`japanese-data-analyze` への write 権限を確認済み |
-| 実装 | 未着手 |
+| M1 リポジトリ基盤（uv、Python 3.13、`uv.lock`、pytest、ruff） | 完了 |
+| M2 以降 | 未着手 |
 
-次の作業は、次の順序で進めます（[`docs/roadmap.md`](docs/roadmap.md) §12）。
+次の作業は、次の順序で進めます。各マイルストーンの目的と完了条件は [`docs/roadmap.md`](docs/roadmap.md) §12 にあります。
 
-1. **M1:** uv によるリポジトリ基盤
+1. ~~**M1:** uv によるリポジトリ基盤~~（完了）
 2. **M2:** Action schema v0 と評価の土台
 3. **M2.5:** vast.ai の実行基盤
 4. **M3:** 合成データセットの作成と Hugging Face への公開
@@ -109,9 +110,15 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 
 ## 開発環境
 
-- Python は **uv** で管理し、依存の追加は `uv add` だけを使う（`uv pip` は使わない）。
+- Python（3.13）は **uv** で管理し、依存の追加は `uv add` だけを使う（`uv pip` は使わない）。
 - 学習と合成データの生成は **vast.ai** で行う。
 - 秘密情報はリポジトリ直下の `.env` に置く（Git の管理外）。
+
+```sh
+uv sync --locked --all-groups   # 環境を作る（学習用の torch も入れる場合）
+uv run ruff check .             # lint
+uv run pytest                   # test
+```
 
 | 変数 | 用途 |
 |---|---|

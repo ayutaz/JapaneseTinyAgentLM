@@ -495,48 +495,32 @@ JapaneseTinyAgentLM/
 ├── README.md
 ├── LICENSE                 # Apache-2.0
 ├── .gitignore
+├── .python-version         # 3.13
 ├── pyproject.toml          # uv 管理（依存は uv add のみ）
 ├── uv.lock
 ├── docs/
-├── infra/
-│   └── vast/               # vast.ai の検索・起動・転送・回収・削除
-├── tokenizer/
-│   ├── train_tokenizer.py
-│   └── eval_tokenizer.py
-├── model/
-│   ├── architecture.py
-│   └── config.py
-├── training/
-│   ├── pretrain.py
-│   ├── sft_chat.py
-│   └── sft_action.py
-├── datasets/
-│   ├── manifests/
-│   ├── chat/
-│   └── action/
+├── src/jtalm/              # Python パッケージ（import 名は jtalm）
+│   ├── action/             # Action schema の読み込み、validator、正規化、角度への変換（M2）
+│   ├── eval/               # 評価指標、評価セットの読み込み、baseline（M2〜M3）
+│   ├── data/               # 合成データの生成・検査・分割・manifest（M3）
+│   ├── infra/              # vast.ai の検索・起動・転送・回収・削除（M2.5）
+│   ├── tokenizer/          # Tokenizer の学習と評価（M4）
+│   ├── model/              # モデルの定義と config（M4）
+│   └── training/           # 学習 script（M4）
 ├── grammar/
-│   ├── action.schema.json
-│   └── compile_grammar.py
-├── export/
-│   ├── quantize.py
-│   └── export_model.py
+│   └── action.schema.json  # Action schema v0（M2）
+├── datasets/
+│   ├── manifests/          # データの出典・ライセンス・hash（commit する）
+│   └── action/             # 生成したデータ本体（Git 管理外。Hugging Face で公開）
+├── configs/                # 生成と学習の設定
 ├── runtime/
-│   ├── host/
-│   └── esp32/
-├── eval/
-│   ├── chat/
-│   ├── action/
-│   └── device/
-├── configs/
-│   ├── base_3m.yaml
-│   ├── base_5m.yaml
-│   ├── base_10m.yaml
-│   └── base_20m.yaml
+│   ├── host/               # Host C reference runtime（M6）
+│   └── esp32/              # ESP32 の firmware と runtime（Track B）
 ├── tests/
 └── backups/                # 実機 Flash のバックアップ（Git 管理外）
 ```
 
-`LICENSE`、`.gitignore`、`docs/` は作成済みです。その他は計画段階です。
+作成済みなのは、`LICENSE`、`.gitignore`、`.python-version`、`pyproject.toml`、`uv.lock`、`docs/`、`src/jtalm/`、`tests/` です（M1 完了時点）。ほかの場所は、各マイルストーンで作ります。
 
 GitHub はコードと再現手順を1 repository にまとめ、Hugging Face は artifact を用途・サイズ・量子化ごとに分離します。
 

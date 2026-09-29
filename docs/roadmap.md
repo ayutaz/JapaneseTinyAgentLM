@@ -366,7 +366,17 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | B0 実機の初回調査 | 完了 |
 | `.env` の `VAST_API_KEY` | 設定済み。認証と課金設定を確認済み |
 | `.env` の `HF_TOKEN` | 設定済み。write 権限と、`japanese-data-analyze` の admin であることを確認済み |
-| M1 以降 | 未着手。次は M1 と M2 |
+| M1 リポジトリ基盤 | **完了**（2026-09-29） |
+| M2 以降 | 未着手。次は M2 |
+
+### M1〜M3 の目的と完了条件
+
+| # | 目的 | 完了条件 | 状態と結果 |
+|---|---|---|---|
+| M1 | 以降のコード（schema、評価、データ生成、学習）を、ローカルと vast.ai で同じ手順で再現できる環境で動かす | `uv sync --locked` と test がローカルで通る | **完了**。uv 0.12.20、Python 3.13、`uv.lock`（torch 2.14.0 は Windows が CPU 版、Linux が cu126 版）、ruff、pytest。`.env.example` は権限の設定で作成できず、変数は README と [`development.md`](development.md) §3 に記載 |
+| M2 | 「正解」を機械的に判定できるようにし、M3 のデータ検査と、以降のすべての評価の土台にする | TinyLM-Bench の16件の期待値が validator と評価器を通り、座標規約の unit test が通る | 未着手 |
+| M2.5 | vast.ai の GPU で、生成と学習を安全かつ再現可能に実行し、終わったら確実に削除できるようにする | 小さな生成と GPU 上の torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている | 未着手 |
+| M3 | Action LM の学習データと評価セットを、規約上問題のない方法で作り、baseline を測って公開する | 評価セット 1,000件以上（重要カテゴリ各100件以上）、学習データ 2,000〜10,000件、manifest、rule-based baseline の数値、Hugging Face への公開（public、manual gate） | 未着手 |
 
 ### Track A: PC 上の実装マイルストーン
 

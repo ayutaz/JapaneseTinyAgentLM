@@ -1,0 +1,55 @@
+[project]
+name = "jtalm"
+version = "0.1.0"
+description = "Japanese tiny Action / Chat language models for ESP32-S3 (M5Stack StackChan K151)"
+authors = [{ name = "ayutaz" }]
+license = "Apache-2.0"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "huggingface-hub>=2.0.0",
+    "jsonschema>=4.26.0",
+    "openai>=3.20.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.20,<0.13.0"]
+build-backend = "uv_build"
+
+# PyTorch: Windows (local) uses CPU wheels, Linux (vast.ai) uses CUDA 12.6 wheels.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform != 'linux'" },
+    { index = "pytorch-cu126", marker = "sys_platform == 'linux'" },
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.9",
+    "vastai>=1.8.2",
+]
+train = [
+    "numpy>=2.5.3",
+    "sentencepiece>=0.2.2",
+    "torch>=2.14.0",
+]

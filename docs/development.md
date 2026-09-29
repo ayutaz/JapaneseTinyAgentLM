@@ -19,10 +19,22 @@
 - Python の環境と依存関係は **uv** で管理する。
 - 依存の追加は **`uv add` だけ**を使う。`uv pip` の subcommand は一切使わない。
 - 依存関係は `pyproject.toml` と `uv.lock` だけで管理する。環境構築は `uv sync --locked`、実行は `uv run` で行う。ローカルでも vast.ai 上でも同じ手順にする。
-- Python のバージョンは M1 で固定する。PyTorch 2.14 系と SentencePiece などの wheel がそろう版を選ぶ（第一候補は 3.13）。
-- PyTorch の CUDA 版は `pyproject.toml` の `[[tool.uv.index]]` と `[tool.uv.sources]` で指定する。Linux（vast.ai）では CUDA 版、Windows（ローカル）では CPU 版を使う。場当たり的な install はしない。
-- 学習・実行基盤のスクリプトが使う CLI（`vastai`）は、`uv add --dev` で開発用の依存として lock する。
+- Python は **3.13** に固定した（`.python-version`、`requires-python = ">=3.13,<3.14"`）。PyTorch 2.14 と SentencePiece の wheel が、Windows と Linux の両方でそろっている。
+- PyTorch の取得元は `pyproject.toml` の `[[tool.uv.index]]` と `[tool.uv.sources]` で指定している。Linux（vast.ai）は **cu126** 版、Windows（ローカル）は CPU 版。cu126 にしたのは、vast.ai の host の driver が古くても動くようにするため（cu130 以降は新しい driver が必要）。場当たり的な install はしない。
+- 学習・実行基盤のスクリプトが使う CLI（`vastai`）は、`uv add --dev` で開発用の依存として lock している。
 - 実機の読み書きに使う `esptool` のような単発のツールは、`uvx --from <package> <command>` で実行する。
+
+### 依存グループ
+
+| グループ | 内容 | 入れ方 |
+|---|---|---|
+| 本体 | jsonschema、huggingface-hub、openai（vLLM の OpenAI 互換 API の client） | `uv sync --locked` |
+| `dev` | pytest、ruff、vastai | 既定で入る |
+| `train` | torch、sentencepiece、numpy | `uv sync --locked --group train`。データ生成用の instance では入れない（torch が数 GB あるため） |
+
+- ローカルで全部入れるときは `uv sync --locked --all-groups`。
+- `uv sync` は、指定していないグループのパッケージを削除する。学習のコードを動かす前は `--group train` か `--all-groups` を付ける。
+- 確認のコマンド: `uv run ruff check .`、`uv run ruff format --check .`、`uv run pytest`。
 
 ### Windows で日本語を扱うときの注意
 
@@ -34,16 +46,16 @@
 
 | ツール | 最新版 | 開発 PC の版 | 方針 |
 |---|---|---|---|
-| uv | 0.12.19 | 0.11.8 | 0.12 系に更新してから M1 に着手する |
-| PyTorch | 2.14.0（2026-09-02。Python 3.15 まで wheel あり） | — | 2.14 系を lock する |
-| vastai CLI | 1.8.2 | 1.5.6 | `uv add --dev vastai` で 1.8 系を lock する |
+| uv | 0.12.20 | 0.12.20（M1 で更新） | `uv_build` も 0.12 系 |
+| PyTorch | 2.14.0（2026-09-02。Python 3.15 まで wheel あり） | 2.14.0+cpu（lock 済み） | Linux は 2.14.0+cu126 |
+| vastai CLI | 1.8.2 | 1.8.2（`uv run vastai`） | 端末に別途入っている 1.5.6 は使わない |
 | esptool | 5.4.0 | `uvx` で都度取得 | 5 系 |
 | ESP-IDF | 6.1（2026-08-27） | 未導入 | **v5.5.5 に固定**（§7） |
 
 ## 3. 認証情報
 
 - API key などの秘密情報は、リポジトリ直下の `.env` に置く。`.env` は `.gitignore` で除外済み。
-- 必要な変数名は下表に記載する。雛形の `.env.example` は M1 で追加し、こちらは commit する。
+- 必要な変数名は下表に記載する。雛形の `.env.example` は、権限の設定で Claude Code から作成できなかったため、この表を雛形の代わりとする。
 
 | 変数 | 用途 |
 |---|---|
