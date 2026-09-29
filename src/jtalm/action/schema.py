@@ -89,7 +89,10 @@ def canonicalize(calls: list[Call]) -> list[Call]:
 
 
 def to_json(calls: list[Call]) -> str:
-    """Serialize calls in the compact canonical form used for training targets and comparison."""
+    """Serialize calls in the compact canonical form (sorted keys) used for comparison and records.
+
+    Training targets use ``jtalm.model.format.target_json`` (name first), which parses the same.
+    """
     return json.dumps(
         canonicalize(calls), ensure_ascii=False, separators=(",", ":"), sort_keys=True
     )

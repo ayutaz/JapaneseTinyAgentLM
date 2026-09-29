@@ -113,10 +113,11 @@ TinyLM-Bench の16件は、開発中の smoke test として使います。モ�
 | Action の完全一致率 | 90%以上 |
 | multi-action の正解率 | 90%以上 |
 | 否定の正解率 | 90%以上 |
-| No-action の正解率 | 95%以上（最優先） |
+| No-action の正解率（recall） | 95%以上（最優先） |
+| No-action の precision（動作の依頼を誤って `[]` にしない） | 0.90 以上（M4 の後に追加） |
 | Host INT4 と FP reference の差 | 許容範囲内 |
 
-- 上の目標値は、TinyLM-Bench の検証メモ（94）の提案を**暫定値**として採用したものです。M3 でルールベースの baseline が取れた（no_action の recall は 0.94、precision は 0.80）ので、M4 の最初の評価の後に見直し、no-action には precision の目標も加えるかを決めます。Baseline とデータセットの難易度を見てから見直します。
+- 上の目標値は、TinyLM-Bench の検証メモ（94）の提案を**暫定値**として採用したものです。M4 の最初の評価（2026-09-29、§12「M4 の結果」）の後に見直し、値は据え置きました。no-action には **precision 0.90 以上**の目標を加えます（ルールベースは 0.80、M4 の 3M は 0.86）。英語の命令は学習データに入れていないので、参考値として扱います。
 - Critical slot（方向、否定、量）の error budget は別に設定する。
 - OOD / 無関係な入力で誤って動作してしまう率を、許容値以下にする。
 - **既存モデルに勝つこと:** TinyLM-Bench の共通評価（16件）で、Needle 2、FunctionGemma 270M、MimiModel の厳格一致率を上回る。既存モデルは 16件分の出力しか手元にないため、1,189件の評価セットでの比較は、M5 で TinyLM-Bench の host 環境で流せるかを判断する。
@@ -371,8 +372,10 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | M2 Action schema v0 と評価の土台 | **完了**（2026-09-29） |
 | M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |
 | M3 合成データセット | **完了**（2026-09-29）。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
-| M4 以降 | 未着手。次は M4（下の「M4 の計画」）。並行して Track B（B1、B2）。**M4 の GPU 費用は、新たな承認が必要**（M2.5〜M3 の承認は使い切らずに終了） |
-| vast.ai の費用（M2.5〜M3 の累計） | 約 $1.03（承認済みの上限 約 $4 の範囲内） |
+| M4 Tokenizer と 3M / 5M / 20M の学習 | **完了**（2026-09-29）。下の「M4 の結果」 |
+| Track B（B1、B3、B2.5、B2 の準備） | 実行中（2026-09-29 開始）。結果は [`hardware.md`](hardware.md) |
+| M5 以降 | 未着手。次は「M4 の後の計画」 |
+| vast.ai の費用（累計） | 約 $1.27（M2.5〜M3 が約 $1.03、M4 が約 $0.24） |
 
 ### M1〜M3 の目的と完了条件
 
@@ -404,28 +407,61 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 
 M4 で Action LM が超えるべき基準は、このルールベースの baseline（完全一致 76.4%）と、TinyLM-Bench の既存モデルの結果です。特に multi_action（46.9%）と single（60.9%）で、差をつける余地が大きくあります。
 
-### M4 の計画（次の作業）
+### M4 の結果（2026-09-29）
 
-- **目的:** 3M / 5M の Action LM を学習し、ルールベースの baseline（76.4%）と既存モデルを上回れるかを確かめる。実機に載せない 20M の上限参照と比べて、精度不足の原因（capacity か、data / tokenizer か）を切り分けられるようにする。
-- **完了条件:**
-  - Tokenizer を固定し、hash を記録している。
-  - 3M / 5M / 20M の学習が vast.ai で完走している。
-  - 評価セット 1,189件を greedy で生成し、`jtalm.eval` でカテゴリ別に採点して、ルールベースと比べた表がある。
-  - checkpoint、学習の記録、費用を残している。
+- **目的:** 3M / 5M の Action LM を学習し、ルールベースの baseline（76.4%）と既存モデルを上回れるかを確かめる。20M の上限参照と比べて、精度不足の原因（capacity か、data / tokenizer か）を切り分ける。
+- **完了条件:** Tokenizer を固定して hash を記録する。3M / 5M / 20M の学習を vast.ai で完走する。評価セット 1,189件を greedy で生成し、カテゴリ別にルールベースと比べた表を作る。checkpoint、学習の記録、費用を残す。→ **すべて満たした。**
 
-| 手順 | 内容 |
+| 手順 | 結果 |
 |---|---|
-| 1. 学習データの転送 | `datasets/action/` は Git の管理外なので、`git archive` では instance に届かない。Hugging Face の dataset も manual gate なので、`HF_TOKEN` を持ち込まない方針では取りに行けない。そこで job runner に、ローカルのファイルを scp で送る項目（例: `JobSpec.uploads`）を加え、送った `train.jsonl` / `val.jsonl` と tokenizer の sha256 を manifest と照合する |
-| 2. Tokenizer | SentencePiece の 2k / 4k / 8k を、train と validation の入力文と出力（`to_json` の正規形）で学習する。評価セットは使わない。数秒で終わる前処理なので、ローカルの CPU で行う（モデルの学習は vast.ai）。coverage、byte fallback 率、1件あたりの token 数、embedding の parameter 数で選んで固定する。出力先は `tokenizer/out/`（Git の管理外）にそろえる |
-| 3. モデル | decoder-only Transformer（RMSNorm、RoPE、GQA / MQA、weight tying）。3M / 5M / 20M の config は、embedding を含めた parameter 数で決める。入力は `<action>` と発話、出力は正規形の JSON で、loss は出力の部分だけにかける |
-| 4. 学習の job | ローカルの CPU で数 step の smoke test を通してから、vast.ai で学習する。この規模なら 24GB 級の GPU（RTX 3090 / 4090、約 $0.15〜0.4/h）で足りる。image は vLLM ではなく CUDA 12.6 以上の base image にし、torch は `uv sync --locked --group train` で入れる（cu126） |
-| 5. 評価 | 評価セット 1,189件を greedy で生成し、カテゴリ別の完全一致、no-action の precision / recall、致命的な誤り、対比ペアの正解率を、ルールベースと既存モデル（16件）と比べる。評価条件（prompt、greedy、評価セットの hash）を記録する |
-| 6. 費用の承認 | GPU の種類、時間単価の上限、想定時間、費用の上限を提示し、承認を得てから instance を作る。M3 の実績（A100 で 1回あたり 0.2〜0.5 h）から、M4 の GPU 費用は合計 $1〜3 程度と見込む |
+| 1. 学習データの転送 | `JobSpec.uploads` を追加した。Git の管理外のファイルを scp で送り、instance 上で sha256 を照合する（4 ファイルとも一致） |
+| 2. Tokenizer | SentencePiece（unigram、byte fallback）の 2k / 4k / 8k を比べ、**2k（`action_v0_sp2048.model`、sha256 `61482f90…`）に固定**した。出力の JSON の固定の断片と enum の値を1 token にまとめたので、出力の token 数はどの語彙でも平均 4.7 で同じになり、入力側の指標だけで選べた。2k は、未知の日本語（MASSIVE の dev）での byte fallback が最も少なく（1.3%）、embedding が最も小さい（3M で全体の12%）。1件あたりの入力は約 8〜11 token。記録は `datasets/manifests/tokenizer_action_v0.json` |
+| 3. モデル | decoder-only Transformer（RMSNorm、RoPE、GQA、SwiGLU、weight tying、bias なし）。3M = d192 × 7層（3.15M）、5M = d256 × 6層（5.05M）、20M = d384 × 12層（19.67M）。教師の出力は `name` を先に置いた compact な JSON（[`architecture.md`](architecture.md) §7）で、loss は出力と `</s>` だけにかける |
+| 4. 学習 | vast.ai の Tesla V100 32GB（$0.219/h）。40 epoch、batch 64、AdamW、cosine。validation の完全一致（greedy）が最も高い checkpoint を採用した。1モデル 8〜14分 |
+| 5. 評価 | 下の表。同じ checkpoint を手元の CPU で評価し直し、出力が1件残らず一致することを確認した |
+| 6. 費用 | 1.085 h、約 $0.24（job の記録は `results/m4_action_v0/run.json`） |
 
-**Track B を並行して進めるための前提:**
+評価セット（1,189件、完全一致 %。greedy、grammar なし、confidence gate なし）:
 
-- **B1:** ESP-IDF の Docker image を使うので、ユーザーに Docker Desktop を起動してもらう。
-- **B2:** `stackchan-idf` を書き込むと、受領時の firmware が上書きされる。B0 のバックアップ（[`hardware.md`](hardware.md) §6）から戻せる手順を確認しておく。servo の動作に立ち会ってもらう日を調整する。
+| model | 全体 | single | multi_action | negation | no_action | correction | 英語 | no-action P / R | 対比ペア |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| ルールベース | 76.4 | 60.9 | 46.9 | 88.1 | 99.1 | 76.4 | 77.1 | 79.8 / 94.2 | 83.8 |
+| 3M | **84.4** | 62.1 | **79.7** | 98.5 | 99.1 | 76.4 | 54.3 | 86.1 / 98.8 | 58.8 |
+| 5M（seed 0 / 1 / 2） | 79.6 / 82.0 / 81.3 | 54.9 / 59.1 / 55.8 | 68.2 / 73.4 / 74.5 | 98.1〜98.9 | 98.5〜99.7 | 60.0〜63.6 | 54.3 | 約 80 / 99 | 40.0〜51.2 |
+| 20M | 83.9 | 63.0 | 77.6 | 97.0 | 99.1 | 74.5 | 54.3 | 83.2 / 98.2 | 52.5 |
+
+TinyLM-Bench の16件（厳格一致）: 3M / 5M / 20M が 62.5〜68.8%。Needle 2（18.8%）、FunctionGemma 270M（37.5%）、MimiModel（6.2%）を上回った。ただし、ルールベースはこの16件で 100% になる。16件は、ルールを作るときに参照した例なので、参考値として扱う。
+
+分かったこと:
+
+1. **全体ではルールベースを上回った。** 特に multi_action（+33 point）と negation（+10 point）で差が大きい。validation（学習データと同じ Qwen3 が書いた文）では約 99% だが、別のモデル（llm-jp）が書いた評価セットでは 80〜84% になる。**生成元の違いによる差**が大きい。
+2. **まだ届いていない条件:** single と correction はルールベースと同程度、英語（学習データにない）と対比ペアはルールベースより低い。目標値（完全一致 90%以上）にも届いていない。
+3. **20M は 3M とほぼ同じ**（83.9% と 84.4%）。§12 の判断基準に照らすと、capacity ではなく **data の側の問題**である。5M の seed による差は ±1.2 point（79.6〜82.0%）。
+4. **誤りの内訳（3M）:**
+   - single の誤り 111件のうち **85件は、動作の依頼を `[]`（何もしない）と答えたもの**で、多くは確信度が高い（最小の token 確率が 0.99 以上）。学習データの正解の 48.8% が `[]`（no_action 24.5% と negation 24.3%）なので、見慣れない言い回しを `[]` に倒している。
+   - 25件は、同じ call を2回出したもの（重複は schema で禁止）。重複を取り除くだけで、全体は 85.7%、single は 66.6%、correction は 78.2% になる。M5 の grammar で防げる。
+   - correction では、「左は見なくていい」の否定された動作まで出す誤りや、方向を取り違える誤りがある。
+
+### M4 の後の計画
+
+M4 の結果から、精度を上げる手段は **学習データ（v0.3）** と **M5 の grammar** の2つです。
+
+| 順 | 作業 | 内容 | 場所と費用 |
+|---|---|---|---|
+| 1 | M5（前半）grammar と confidence gate | 重複の禁止と enum を含めた grammar-constrained decoding を Python で実装し、M4 の checkpoint で効果を測る。min_prob による gate の閾値を validation で決める | ローカル。GPU 不要 |
+| 2 | データ v0.3 | 学習データの**書き手を増やす**（Apache-2.0 の gpt-oss-20b などを追加し、Qwen3 にも言い回しの指示を増やす）。疑問形、依頼の婉曲表現、話し言葉、ひらがなの依頼を増やす。**動作ありの例を増やして**、`[]` の割合を下げる（否定と no-action は各20%以上を保つ）。評価セットは変えない | vast.ai。生成に約 $0.5〜1 |
+| 3 | 再学習と比較 | 3M / 5M を v0.3 で学習し、M4 と同じ条件で比べる | vast.ai。約 $0.3 |
+| 4 | M5（後半）量子化 | INT8 / INT4 の fake quant をカテゴリ別に評価する | ローカル |
+
+- 英語は学習データに入れていないので、完了条件の判定では参考値として扱う（完全一致の全体の値には含まれる）。
+- no-action には recall に加えて precision の目標（0.90 以上）を置く（§4）。M4 の 3M は 0.86。
+- 実機に載せる候補は、精度が同程度なら速い 3M を優先する。最終的な判断は、B2.5 の実機速度と M5 の結果を見て行う。
+
+**Track B の状況（2026-09-29）:**
+
+- M4 と並行して、B1 → B3 → B2.5 → B2 の準備の順に進めている。Docker Desktop は起動済み。
+- 第三者のコード（`stackchan-idf`、`esp32-llm`、それらが指定する依存物）の取得、build、実機への書き込みは、ユーザーの明示的な許可を得て行う（2026-09-29）。取得したコードは Git の管理外に置く。
+- **B2:** `stackchan-idf` を書き込むと、受領時の firmware が上書きされる。B0 のバックアップ（[`hardware.md`](hardware.md) §6）から戻せる。servo を実際に動かす確認は、ユーザーの立ち会いのもとで行う。
 
 ### Track A: PC 上の実装マイルストーン
 
@@ -435,7 +471,7 @@ M4 で Action LM が超えるべき基準は、このルールベースの basel
 | M2 | Action schema v0 と評価の土台 | `src/jtalm/action/action_schema_v0.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
 | M2.5 | vast.ai 実行基盤 | `src/jtalm/infra/`（`uv run python -m jtalm.infra.job <job> --approve-dph <上限>`。GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 各手順 → 回収 → 必ず削除 → 費用の記録）。CLI は `uv add --dev vastai`（1.8 系）で lock する。vLLM（`vllm/vllm-openai:v0.30.0`）を使う生成用の構成を含める | 小さな生成と、GPU 上での torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている（学習そのものの確認は M4 で行う） |
 | M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書き、同じモデルが温度 0 で検証する。v0.1 の llm-jp-3.1 による検証は機能しなかったため変更した。評価セットは llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証する）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
-| M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
+| M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する。**完了**（2026-09-29。§12「M4 の結果」） |
 | M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | §12 冒頭のリストの手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
 | M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |
 
@@ -492,7 +528,7 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 | B4 | 実機への移植と servo の制御 | 4〜8 h | — | **Servo の動作に立ち会う** |
 | 合計 | | **約 32〜57 h** | GPU で数時間 | |
 
-### M1〜M3 の実績（2026-09-29）
+### M1〜M4 の実績（2026-09-29）
 
 | # | Claude Code の作業時間 | GPU と費用 | 見積もりとの差 |
 |---|---|---|---|
@@ -500,9 +536,10 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 | M2 | 未記録 | — | — |
 | M2.5 | 未記録 | RTX 3090 で 0.208 h（ほかに失敗 1回、0.105 h）。計 約 $0.055 | SSH の失敗（vLLM の image の権限）の修正が加わった |
 | M3 | 未記録 | A100 80GB で 3回、計 約 1.04 h。$0.50 + $0.31 + $0.17 = 約 $0.98 | 見積もりの前提外だった反復（v0.1 の失敗、否定の追加生成）を含む |
-| 合計 | — | 約 $1.03 | GPU の時間は、見積もり（数時間）より短かった |
+| M4 | 約 1.3 h（05:33〜06:53 UTC。実装と CPU の smoke test が約 10 分、GPU の job の待ちが約 65 分、分析と記録が約 5 分） | Tesla V100 32GB で 1.085 h、約 $0.24（5モデルの学習と評価） | 見積もり（4〜6 h、GPU で数時間）より大幅に短かった |
+| 合計 | — | 約 $1.27 | GPU の時間は、見積もり（数時間）より短かった |
 
-Claude Code の作業時間は計測していないため、「未記録」としています。M4 以降は、主な手順の開始と終了の時刻を記録します。
+M1〜M3 の Claude Code の作業時間は計測していないため、「未記録」としています。M4 からは、主な手順の開始と終了の時刻を記録しています。
 
 ### 速く進めるための並行化
 

@@ -34,7 +34,7 @@
 
 - ローカルで全部入れるときは `uv sync --locked --all-groups`。
 - `uv sync` は、指定していないグループのパッケージを削除する。学習のコードを動かす前は `--group train` か `--all-groups` を付ける。
-- 確認のコマンド: `uv run ruff check .`、`uv run ruff format --check .`、`uv run pytest`。
+- 確認のコマンド: `uv run ruff check .`、`uv run ruff format --check .`、`uv run --group train pytest`（model の test は torch と sentencepiece が必要で、ないときは skip される）。
 
 ### Windows で日本語を扱うときの注意
 
@@ -79,6 +79,7 @@
 # job の一覧は src/jtalm/infra/jobs.py。--approve-dph は承認した時間単価の上限（これを超える GPU は選ばない）
 uv run python -m jtalm.infra.job smoke --approve-dph 0.35
 uv run python -m jtalm.infra.job gen_action_v0 --approve-dph 1.10
+uv run python -m jtalm.infra.job train_action_v0 --approve-dph 0.40   # M4 の学習と評価
 ```
 
 - **動き:** 条件に合う最安の offer を選ぶ → instance を作る → 起動を待つ → `HEAD` を `git archive` で転送 → 各手順を実行 → `artifacts/` を回収する。最後に、成功しても失敗しても必ず削除し、削除を確認する。
@@ -87,6 +88,8 @@ uv run python -m jtalm.infra.job gen_action_v0 --approve-dph 1.10
 - **API key:** `vastai` には、コマンドの引数ではなく環境変数で渡す。process の一覧に key が出ないようにするため。
 - **既存の instance:** 同じアカウントに、別のプロジェクトの instance がある。本プロジェクトの実行基盤は、自分で作った instance の ID だけを削除・確認する。
 - **依存:** instance 上では `uv sync --locked --no-dev` を使う（学習のときは `--group train` を足す）。
+- **Git の管理外のファイル:** 学習データや tokenizer のように `git archive` に入らないファイルは、`JobSpec.uploads` に書く。job runner が instance を作る前に手元の sha256 を計算し、scp で送ってから instance 上で `sha256sum -c` で照合する。記録は `run.json` の `uploads`。`.env` や project の外のパスは受け付けない。
+- **GPU の選び方:** 学習の job は `gpu_ram>=24` の最安の offer を使う。M4 では Tesla V100 が選ばれ、bf16 の autocast は動いたが、V100 は bf16 の演算に対応していない。速度が必要になったら、query に `compute_cap>=800`（Ampere 以降）を加える。
 
 1. **実行前の確認:** 学習ならローカルの CPU で数 step の smoke test、データの生成なら少数の生成と検査を通してから instance を借りる。バグで課金されるのを防ぐため。
 2. **作成前の承認:** Instance を作る前に、GPU の種類、時間単価、想定時間、上限費用を提示して承認を得る。

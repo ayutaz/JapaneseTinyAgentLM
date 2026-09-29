@@ -46,12 +46,12 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 
 ### Action LM の完了条件（暫定）
 
-- 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
+- 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action の recall 95%以上と precision 0.90以上、schema 妥当 100%
 - 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
 - M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別の両方で上回る
 - 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たし、servo を実際に動かす
 
-目標値は、baseline を取ってから見直します。詳しくは [`docs/README.md`](docs/README.md) §1 と [`docs/roadmap.md`](docs/roadmap.md) を参照してください。
+目標値は M4 の最初の評価の後に見直し、据え置きました（no-action の precision を追加）。詳しくは [`docs/README.md`](docs/README.md) §1 と [`docs/roadmap.md`](docs/roadmap.md) を参照してください。
 
 ## 学習データの方針
 
@@ -76,7 +76,8 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | M2 Action schema v0 と評価の土台（validator、角度への変換、評価指標。TinyLM-Bench の結果を再現） | 完了 |
 | M2.5 vast.ai の実行基盤（GPU での torch と vLLM の動作確認、自動削除、費用の記録） | 完了 |
 | M3 合成データセット（学習 9,544 件、評価 1,189 件、ルールベースの baseline 76.4%） | 完了。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
-| M4 以降（学習） | 未着手 |
+| M4 Tokenizer（SentencePiece 2k）と 3M / 5M / 20M の学習 | 完了。評価セットの完全一致は 3M が 84.4%、20M が 83.9%（ルールベースは 76.4%）。single、correction、英語はまだ届かない |
+| Track B（ESP-IDF の環境、評価用 firmware、既存 runtime の実機速度、servo の確認の準備） | 実行中 |
 
 次の作業は、次の順序で進めます。各マイルストーンの目的と完了条件は [`docs/roadmap.md`](docs/roadmap.md) §12 にあります。
 
@@ -84,10 +85,13 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 2. ~~**M2:** Action schema v0 と評価の土台~~（完了）
 3. ~~**M2.5:** vast.ai の実行基盤~~（完了）
 4. ~~**M3:** 合成データセットの作成と Hugging Face への公開~~（完了）
-5. **M4:** Tokenizer と 3M / 5M / 20M の学習（vast.ai）。並行して Track B（ESP-IDF の環境、servo の座標の確認）
+5. ~~**M4:** Tokenizer と 3M / 5M / 20M の学習~~（完了。結果は [`docs/roadmap.md`](docs/roadmap.md) §12「M4 の結果」）
+6. **M5（前半）:** grammar-constrained decoding と confidence gate（ローカル）
+7. **データ v0.3:** 学習データの書き手と言い回しを増やし、`[]` の割合を下げて再学習する（vast.ai）
+8. 並行して Track B（評価用 firmware、既存 runtime の実機速度、servo の座標の確認）
 
 > [!IMPORTANT]
-> 2026-09-29 時点では、LM の性能、LM を含めた Flash / PSRAM の使用量、速度、電力はまだ検証していません。文書中の「目標値」「実測値」「確認済み事実」を区別してください。
+> 2026-09-29 時点で、LM の精度は PC 上（FP32、grammar なし）でだけ測っています。量子化後の精度、LM を含めた Flash / PSRAM の使用量、速度、電力はまだ検証していません。文書中の「目標値」「実測値」「確認済み事実」を区別してください。
 
 ## 構成
 
@@ -122,7 +126,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 ```sh
 uv sync --locked --all-groups   # 環境を作る（学習用の torch も入れる場合）
 uv run ruff check .             # lint
-uv run pytest                   # test
+uv run --group train pytest     # test（model の test には torch が必要）
 ```
 
 | 変数 | 用途 |

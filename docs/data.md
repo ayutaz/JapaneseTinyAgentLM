@@ -117,6 +117,16 @@ uv run python -m jtalm.data.publish publish --confirm                        # �
 
 件数と baseline は [`roadmap.md`](roadmap.md) §12 の「M3 の結果」にあります。
 
+### Tokenizer の学習に使うデータ（M4）
+
+Action LM v0 の tokenizer は、学習データと validation の入力文と出力に加えて、MASSIVE ja-JP の train の発話（CC BY 4.0）で学習しました。語彙の選定の指標には、ほかのどの工程にも使っていない MASSIVE の dev を使いました。評価セットは使っていません。記録は `datasets/manifests/tokenizer_action_v0.json` です（[`architecture.md`](architecture.md) §4）。
+
+### M4 の結果から分かったデータの課題（次の v0.3 へ）
+
+- 学習データの正解の 48.8% が `[]`（no_action と negation）で、別の書き手の言い回しの依頼を `[]` と答える誤りが多い（[`roadmap.md`](roadmap.md) §12「M4 の結果」）。
+- validation（学習データと同じ Qwen3 が書いた文）では約 99% だが、評価セット（llm-jp が書いた文）では 80〜84% になる。書き手が1つしかないことが原因と考えられる。
+- v0.3 では、学習データの書き手に Apache-2.0 の別のモデル（gpt-oss-20b など）を加え、疑問形、婉曲な依頼、話し言葉、ひらがなの依頼を増やす。動作ありの例を増やして `[]` の割合を下げる（否定と no-action は各20%以上を保つ）。評価セットは変えない。
+
 ## 6. Hugging Face への公開
 
 | 項目 | 内容 |

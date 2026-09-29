@@ -1,0 +1,64 @@
+{
+  "n": 1189,
+  "json_valid": 1184,
+  "schema_valid": 1172,
+  "exact": 967,
+  "exact_rate": 0.8132884777123633,
+  "by_category": {
+    "correction": {
+      "n": 55,
+      "exact": 35,
+      "exact_rate": 0.6363636363636364
+    },
+    "multi_action": {
+      "n": 192,
+      "exact": 143,
+      "exact_rate": 0.7447916666666666
+    },
+    "negation": {
+      "n": 270,
+      "exact": 267,
+      "exact_rate": 0.9888888888888889
+    },
+    "no_action": {
+      "n": 337,
+      "exact": 335,
+      "exact_rate": 0.9940652818991098
+    },
+    "single": {
+      "n": 335,
+      "exact": 187,
+      "exact_rate": 0.5582089552238806
+    }
+  },
+  "by_language": {
+    "en": {
+      "n": 35,
+      "exact": 19,
+      "exact_rate": 0.5428571428571428
+    },
+    "ja": {
+      "n": 1154,
+      "exact": 948,
+      "exact_rate": 0.8214904679376083
+    }
+  },
+  "name_accuracy": 0.8469301934398654,
+  "slot_accuracy": 0.7246031746031746,
+  "no_action": {
+    "tp": 602,
+    "fp": 138,
+    "fn": 5,
+    "precision": 0.8135135135135135,
+    "recall": 0.9917627677100495
+  },
+  "critical_error_rate": 0.020185029436501262,
+  "critical_counts": {
+    "duplicate_call": 12,
+    "false_action": 5,
+    "invalid_output": 17,
+    "reverse_direction": 2
+  },
+  "contrastive_pairs": 80,
+  "contrastive_pair_accuracy": 0.4375
+}

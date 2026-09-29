@@ -37,7 +37,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 
 **Action LM の完了条件（暫定。[`roadmap.md`](roadmap.md) §4）**
 
-- 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
+- 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action の recall 95%以上と precision 0.90以上、schema 妥当 100%
 - 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
 - M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別の両方で上回る
 - 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たし、servo を実際に動かす
@@ -213,3 +213,6 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | 開発環境を固定する。Python 3.13、torch 2.14.0（Linux は cu126、Windows は CPU 版）、vLLM の image は `vllm/vllm-openai:v0.30.0`、依存は `uv.lock` で固定し、instance では `--no-dev` を使う | [`development.md`](development.md) §2、§4 |
 | 2026-09-29 | 学習データと評価セットは、テンプレート単位ではなく生成元（モデルと prompt）で分ける。キーワードの規則で正解を確かめる検査は入れない（入れると、ルールベースの baseline が不当に高くなるため） | [`data.md`](data.md) §5 |
 | 2026-09-29 | Action LM の完了条件に、ルールベースの baseline（評価セットで完全一致 76.4%）を全体とカテゴリ別で上回ることを加える。M4 の GPU 費用は、あらためて承認を得る | [`roadmap.md`](roadmap.md) §4、§12 |
+| 2026-09-29 | M4 の決定。Tokenizer は SentencePiece の 2k（unigram、byte fallback）に固定し、出力の JSON の固定の断片と enum の値を1 token にまとめる。教師の出力は `name` を先に置いた compact な JSON にする。学習データなど Git の管理外のファイルは、job runner が scp で送り、sha256 で照合する | [`roadmap.md`](roadmap.md) §12、[`architecture.md`](architecture.md) §7 |
+| 2026-09-29 | M4 の結果（3M 84.4%、20M 83.9%）から、精度不足の原因は capacity ではなく data の側と判断する。次は M5 の grammar と、学習データ v0.3（書き手と言い回しを増やし、`[]` の割合を下げる）。目標値は据え置き、no-action の precision 0.90 以上を加える。英語は参考値とする | [`roadmap.md`](roadmap.md) §4、§12 |
+| 2026-09-29 | Track B で、第三者のコード（`stackchan-idf`、`esp32-llm` と、それらが指定する依存物）を取得して build し、実機に書き込むことを、ユーザーが明示的に許可した | [`hardware.md`](hardware.md) |

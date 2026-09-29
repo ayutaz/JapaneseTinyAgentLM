@@ -1,0 +1,10 @@
+{
+  "best_pt_sha256": {
+    "20m": "50d3b833a074b5918ee1eccb59af6628869a1d73ca9bfc6748118f8ab9bea409",
+    "3m": "d48b2c2c26fb5ac6021a7af32e112a2ada147569546890e865a40ce3d67af0ad",
+    "5m": "91600fc94750ec697aa841b738dac3d29f9c7983ef61c173ed796fba11c6fe64",
+    "5m-s1": "cb1c1fcd885fa39e518e929152b3ec46608245db872f0d0e86ea378ba9b035eb",
+    "5m-s2": "4eeb80bb52627cbf06406b811c7bfff02cb2ae4aebb4511fe725da408d3d59d1"
+  },
+  "location": "runs/vast/train_action_v0-20260929T054319Z/artifacts/m4/<run>/best.pt (gitignored; weights are published only after the Action LM meets its targets)"
+}

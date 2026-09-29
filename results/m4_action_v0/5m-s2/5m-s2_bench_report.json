@@ -1,0 +1,54 @@
+{
+  "n": 16,
+  "json_valid": 16,
+  "schema_valid": 16,
+  "exact": 11,
+  "exact_rate": 0.6875,
+  "by_category": {
+    "multi_action": {
+      "n": 4,
+      "exact": 2,
+      "exact_rate": 0.5
+    },
+    "negation": {
+      "n": 2,
+      "exact": 2,
+      "exact_rate": 1.0
+    },
+    "no_action": {
+      "n": 4,
+      "exact": 4,
+      "exact_rate": 1.0
+    },
+    "single": {
+      "n": 6,
+      "exact": 3,
+      "exact_rate": 0.5
+    }
+  },
+  "by_language": {
+    "en": {
+      "n": 8,
+      "exact": 3,
+      "exact_rate": 0.375
+    },
+    "ja": {
+      "n": 8,
+      "exact": 8,
+      "exact_rate": 1.0
+    }
+  },
+  "name_accuracy": 0.6875,
+  "slot_accuracy": 0.5,
+  "no_action": {
+    "tp": 6,
+    "fp": 5,
+    "fn": 0,
+    "precision": 0.5454545454545454,
+    "recall": 1.0
+  },
+  "critical_error_rate": 0.0,
+  "critical_counts": {},
+  "contrastive_pairs": 0,
+  "contrastive_pair_accuracy": null
+}

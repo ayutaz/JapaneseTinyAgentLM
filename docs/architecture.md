@@ -91,6 +91,14 @@ INT4 の理論的な重み本体は、1 parameter あたり約0.5 byteです。�
 | 10M | 約5MB | Action 高精度、Chat 主候補 | LM 予算（§9）の上限 |
 | 20M | 約10MB | Action の上限参照、Chat の品質比較 | **PC のみ。実機には載せない**（INT4 では LM 予算を超える） |
 
+M4 で学習した構成（語彙 2,048、`jtalm.model.transformer.SIZES`）:
+
+| 名前 | d_model | 層 | head（KV） | FFN | parameter 数 |
+|---|---:|---:|---:|---:|---:|
+| 3M | 192 | 7 | 6（2） | 512 | 3.15M |
+| 5M | 256 | 6 | 8（2） | 768 | 5.05M |
+| 20M | 384 | 12 | 6（2） | 1,024 | 19.67M |
+
 設計上は 3M / 5M / 10M / 20M を同じ training code で比較可能にします。最初から全サイズを完走させず、最初の1周は 3M / 5M の Action と、PC だけの 20M 上限参照に限ります。10M Chat は、Action LM の完成後に取り組みます。
 
 TinyLM-Bench の検証メモ（`94_model_validation_and_advantage_ja.md`）では、量子化後の容量を 4〜8MB とする案が出ていました。本計画では、LM 予算（§9）の 1.5〜5MB を優先します。8MB は INT4 で約 16M parameter に相当し、Action 専用のモデルとしては大きすぎるためです。
@@ -127,6 +135,20 @@ TinyLM-Bench の検証メモは 8k〜16k から始めることを提案してい
 語彙の embedding が parameter 数を左右することは、既存モデルでも確認できます。TinyTalk 2 は「8M」と表記されていますが、実際は 19.7M parameter あり、その多くが 50,257 語の embedding です（[`research_notes.md`](research_notes.md) §3.7）。
 
 **Tokenizer はモデルの本学習より先に固定します**（[`roadmap.md`](roadmap.md) §12 の M4）。Tokenizer を後から変えると、学習済みのモデルがすべて無駄になるためです。
+
+### Action LM v0 で固定した tokenizer（M4、2026-09-29）
+
+| 項目 | 内容 |
+|---|---|
+| 形式 | SentencePiece unigram、語彙 **2,048**、byte fallback あり、`nmt_nfkc` 正規化、数字は1文字ずつ、先頭の `▁` は付けない |
+| 特殊 token | `<unk>` 0、`<s>` 1、`</s>` 2、`<pad>` 3、制御用の `<act>` と `<out>` |
+| 1 token にまとめる断片 | 出力の JSON の固定の断片（`[]`、`{"name":"look","arguments":{"direction":"`、`","amount":"`、`"}}` など）と、enum の値（`left`、`slight`、`happy` など） |
+| 学習に使った文 | 学習データと validation の入力文と出力、MASSIVE ja-JP の train の発話（CC BY 4.0）。評価セットは使わない |
+| 系列の形 | `<s> <act> 入力文 <out> 出力 </s>`。入力は平均 約 8〜11 token、出力は平均 4.7 token（`look` 1個で 7 token、`[]` は 1 token）。系列の最大は 52 token なので、context は 128 で足りる |
+| 選んだ理由 | 出力の token 数は語彙によらず同じなので、入力側で比べた。2k は、未知の日本語（MASSIVE の dev）での byte fallback が 4k / 8k より少なく（1.3%、4k は 2.0%、8k は 2.2%）、embedding が最も小さい（d192 で 0.39M） |
+| 記録 | `datasets/manifests/tokenizer_action_v0.json`（3案の指標と sha256）。model ファイルは `tokenizer/out/`（Git の管理外） |
+
+Chat LM や Unified では、一般的な日本語の corpus で tokenizer を作り直すので、この tokenizer は Action LM v0 専用です。
 
 Tokenizer 評価では vocabulary 数だけでなく、次も測ります。
 
@@ -270,7 +292,8 @@ v0 の action は `look`、`set_expression`、`nod` の3種類です。
 
 - `center` のとき、`amount` は無視する。正規化では `normal` にそろえる。
 - TinyLM-Bench で既存モデルと比べるときは、ベンチの enum の範囲（`up` / `down` を含まないケース）で評価する。
-- 実装は `src/jtalm/action/`（M2 で実装済み）。schema の本体は `action_schema_v0.json` で、`jtalm.action.validate()` が schema の検査に加えて重複の禁止を確認する。学習の教師データには、`jtalm.action.to_json()` の compact な正規形（key を並べ替え、空白なし）を使う。
+- 実装は `src/jtalm/action/`（M2 で実装済み）。schema の本体は `action_schema_v0.json` で、`jtalm.action.validate()` が schema の検査に加えて重複の禁止を確認する。比較と記録には `jtalm.action.to_json()` の compact な正規形（key を並べ替え、空白なし）を使う。
+- 学習の教師データ（M4）には、`jtalm.model.format.target_json()` の形を使う。compact で、`name` を先に、引数を schema の順（`direction`、`amount`）に並べる。モデルが tool を決めてから引数を出せるようにするためで、parse すると正規形と同じ call になる。JSON の固定の断片（`{"name":"look","arguments":{"direction":"` など）と enum の値は tokenizer で1 token にまとめるので、`look` 1個は 7 token、no-action（`[]`）は 1 token になる。
 - 本プロジェクトの規則は TinyLM-Bench より厳しい（最大2個、重複の禁止）。そのため、同じ出力でも schema 妥当の数はベンチより少なくなる（例: FunctionGemma はベンチでは 11/16、本プロジェクトでは 10/16）。厳格一致の数は変わらない。
 
 初期 Runtime で `oneOf` や nested array の grammar 実装が重い場合は、固定長の 2 slot（各 slot は action または空）に縮退します。出力を 1 call に減らす縮退は、multi-action を扱えなくなるので採りません。Needle 2 の ESP32 実装にも schema 機能制限があるため、完全な JSON Schema 対応を前提にしません。
@@ -506,19 +529,17 @@ JapaneseTinyAgentLM/
 │   ├── eval/               # 評価指標、評価セットの読み込み、baseline（M2〜M3）
 │   ├── data/               # 合成データの生成・検査・分割・manifest（M3）
 │   ├── infra/              # vast.ai の job runner、vastai と SSH の wrapper、job の定義（M2.5）
-│   ├── tokenizer/          # Tokenizer の学習と評価（M4）
-│   ├── model/              # モデルの定義と config（M4）
-│   └── training/           # 学習 script（M4）
+│   └── model/              # 系列の形式、tokenizer、Transformer、学習、greedy decode、評価（M4）
 ├── datasets/
 │   ├── manifests/          # データの出典・ライセンス・hash（commit する）
 │   ├── action/             # 生成したデータ本体（Git 管理外。Hugging Face で公開）
 │   └── downloads/          # MASSIVE などの取得物（Git 管理外）
 ├── tokenizer/out/          # 学習した tokenizer の出力（Git 管理外。M4）
-├── runs/vast/              # vast.ai の実行記録と回収物（Git 管理外）
+├── runs/vast/              # vast.ai の実行記録と回収物、checkpoint（Git 管理外）
+├── results/                # 評価の比較表と学習の記録（commit する。例: m4_action_v0/）
 ├── configs/                # 生成と学習の設定
-├── runtime/
-│   ├── host/               # Host C reference runtime（M6）
-│   └── esp32/              # ESP32 の firmware と runtime（Track B）
+├── runtime/host/           # Host C reference runtime（M6。未作成）
+├── firmware/               # ESP32 の firmware（Track B）。third_party/ は Git 管理外
 ├── tests/                  # fixtures/tinylm_bench/ に TinyLM-Bench の16件と既存モデルの出力
 └── backups/                # 実機 Flash のバックアップ（Git 管理外）
 ```

@@ -1,0 +1,108 @@
+{
+  "job": {
+    "name": "train_action_v0",
+    "description": "M4: train 3M / 5M / 20M Action LMs from scratch and evaluate them",
+    "query": "gpu_ram>=24 num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=500 disk_space>=120 rentable=true direct_port_count>=1 verified=true",
+    "image": "vllm/vllm-openai:v0.30.0",
+    "disk_gb": 80,
+    "max_hours": 2.0,
+    "steps": [
+      "nvidia-smi > artifacts/nvidia_smi.txt",
+      "$HOME/.local/bin/uv sync --locked --no-dev --group train",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 3m --lr 1e-3 --out artifacts/m4/3m > artifacts/m4-3m.log 2>&1",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 5m --lr 1e-3 --out artifacts/m4/5m > artifacts/m4-5m.log 2>&1",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 20m --lr 6e-4 --out artifacts/m4/20m > artifacts/m4-20m.log 2>&1",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 5m --lr 1e-3 --seed 1 --out artifacts/m4/5m-s1 > artifacts/m4-5m-s1.log 2>&1",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 5m --lr 1e-3 --seed 2 --out artifacts/m4/5m-s2 > artifacts/m4-5m-s2.log 2>&1",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/m4/3m/best.pt artifacts/m4/5m/best.pt artifacts/m4/20m/best.pt artifacts/m4/5m-s1/best.pt artifacts/m4/5m-s2/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model --out artifacts/m4/eval"
+    ],
+    "fetch": [
+      "artifacts"
+    ],
+    "uploads": [
+      "datasets/action/v0/train.jsonl",
+      "datasets/action/v0/val.jsonl",
+      "datasets/action/v0/eval.jsonl",
+      "tokenizer/out/action_v0_sp2048.model"
+    ]
+  },
+  "offer": {
+    "id": 44696064,
+    "gpu_name": "Tesla V100",
+    "gpu_ram": 32768,
+    "dph_total": 0.2188888888888889,
+    "geolocation": "Bulgaria, BG"
+  },
+  "started_utc": "20260929T054319Z",
+  "uploads": {
+    "datasets/action/v0/train.jsonl": "f0e1ccfc8ab0236e5d45c54250d283e8722704c472d052104f5abb0bd8a2568e",
+    "datasets/action/v0/val.jsonl": "2605ea1e870f2ca8d25a15f8013a53677d2046df817d01190cd92532576b2cc9",
+    "datasets/action/v0/eval.jsonl": "24120eb2711b75a2f09c2a4df0c0d2b0a9f4673477372104b7cb071dcb991927",
+    "tokenizer/out/action_v0_sp2048.model": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4"
+  },
+  "commit": "f5edad375859fd88f58a6a3ed2a5a3eb8cc7e4c0",
+  "instance_id": 53311740,
+  "driver_version": "580.173.02",
+  "cuda_max_good": 13.0,
+  "steps": [
+    {
+      "cmd": "curl -LsSf https://astral.sh/uv/0.12.20/install.sh | sh",
+      "exit": 0,
+      "sec": 5
+    },
+    {
+      "cmd": "mkdir -p /root/work && tar -xf /root/code.tar -C /root/work",
+      "exit": 0,
+      "sec": 3
+    },
+    {
+      "cmd": "mkdir -p /root/work/artifacts",
+      "exit": 0,
+      "sec": 3
+    },
+    {
+      "cmd": "cd /root/work && nvidia-smi > artifacts/nvidia_smi.txt",
+      "exit": 0,
+      "sec": 3
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv sync --locked --no-dev --group train",
+      "exit": 0,
+      "sec": 57
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 3m --lr 1e-3 --out artifacts/m4/3m > artifacts/m4-3m.log 2>&1",
+      "exit": 0,
+      "sec": 583
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 5m --lr 1e-3 --out artifacts/m4/5m > artifacts/m4-5m.log 2>&1",
+      "exit": 0,
+      "sec": 508
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 20m --lr 6e-4 --out artifacts/m4/20m > artifacts/m4-20m.log 2>&1",
+      "exit": 0,
+      "sec": 853
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 5m --lr 1e-3 --seed 1 --out artifacts/m4/5m-s1 > artifacts/m4-5m-s1.log 2>&1",
+      "exit": 0,
+      "sec": 493
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --size 5m --lr 1e-3 --seed 2 --out artifacts/m4/5m-s2 > artifacts/m4-5m-s2.log 2>&1",
+      "exit": 0,
+      "sec": 523
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/m4/3m/best.pt artifacts/m4/5m/best.pt artifacts/m4/20m/best.pt artifacts/m4/5m-s1/best.pt artifacts/m4/5m-s2/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model --out artifacts/m4/eval",
+      "exit": 0,
+      "sec": 56
+    }
+  ],
+  "status": "succeeded",
+  "destroyed": true,
+  "hours": 1.085,
+  "cost_usd_estimate": 0.238
+}
