@@ -160,6 +160,8 @@ def main(argv: list[str] | None = None) -> None:
         if state["tokenizer_sha256"] != codec.sha256:
             raise SystemExit(f"{ckpt}: tokenizer sha256 does not match {args.tokenizer}")
         slug = ckpt.parent.name
+        if ckpt.stem != "best":  # e.g. best_q4_g64.pt -> "3m-q4_g64"
+            slug = f"{slug}-{ckpt.stem.removeprefix('best_')}"
         base_name = f"{slug} ({count_params(model) / 1e6:.2f}M)"
         info: dict[str, Any] = {"ckpt": str(ckpt), "epoch": state.get("epoch")}
         for mode in args.modes:

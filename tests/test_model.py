@@ -148,3 +148,19 @@ def test_greedy_with_grammar_always_returns_valid_json(codec: Codec) -> None:
     for pred in preds:
         calls = parse_output(pred.text).calls
         assert calls is not None and validate(calls) == []
+
+
+def test_quantization_error_is_bounded_and_int4_is_coarser_than_int8() -> None:
+    from jtalm.model.quantize import quantize_state, quantize_tensor
+
+    torch.manual_seed(0)
+    w = torch.randn(8, 128)
+    e8 = (quantize_tensor(w, 8, 64) - w).abs()
+    e4 = (quantize_tensor(w, 4, 64) - w).abs()
+    step8 = w.abs().reshape(8, 2, 64).amax(-1) / 127
+    assert (e8.reshape(8, 2, 64) <= step8[..., None] / 2 + 1e-6).all()  # half a step at most
+    assert e4.mean() > e8.mean()
+    state = {"a.weight": w, "norm.weight": torch.ones(128)}
+    q, info = quantize_state(state, 4, 64)
+    assert torch.equal(q["norm.weight"], state["norm.weight"])  # 1-D stays float
+    assert info["artifact_bytes_estimate"] == 8 * 128 // 2 + (8 * 128 // 64) * 2 + 128 * 4

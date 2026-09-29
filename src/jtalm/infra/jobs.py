@@ -271,6 +271,32 @@ TRAIN_ACTION_V03 = JobSpec(
     ],
 )
 
+# Retrain on v0.4 (v0.3 plus seven writers, about 49k examples). 15 epochs keep the step count
+# at about twice M4's; all runs share one GPU in parallel.
+ACTION_DATA_V04 = "datasets/action/v0.4"
+V04_RUNS = [
+    ("3m", "3m", "--lr 1e-3 --epochs 15"),
+    ("3m-s1", "3m", "--lr 1e-3 --epochs 15 --seed 1"),
+    ("5m", "5m", "--lr 1e-3 --epochs 15"),
+    ("5m-s1", "5m", "--lr 1e-3 --epochs 15 --seed 1"),
+    ("20m", "20m", "--lr 6e-4 --epochs 15"),
+]
+TRAIN_ACTION_V04 = JobSpec(
+    name="train_action_v04",
+    description="Train 3M / 5M / 20M on data v0.4 in parallel; evaluate on the v0 eval set",
+    query=f"gpu_ram>=24 compute_cap>=800 compute_cap<=900 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=4.0,
+    steps=train_action_steps(V04_RUNS, "v04", ACTION_DATA_V04, parallel=True),
+    uploads=[
+        f"{ACTION_DATA_V04}/train.jsonl",
+        f"{ACTION_DATA_V04}/val.jsonl",
+        f"{ACTION_DATA}/eval.jsonl",
+        TOKENIZER,
+    ],
+)
+
 # Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
 # number of optimizer steps as M4 (5,680), so only the amount of data changes.
 SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
@@ -303,5 +329,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V03,
         TRAIN_ACTION_V03,
         GEN_ACTION_V04,
+        TRAIN_ACTION_V04,
     )
 }
