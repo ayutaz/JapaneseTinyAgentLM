@@ -2,7 +2,9 @@
 
 Prompts are grouped by token length so a batch needs no padding (RoPE positions stay exact).
 Each prediction also carries the minimum probability of its generated tokens, which M5 uses as
-the confidence gate.
+the confidence gate. With ``grammar`` (``jtalm.model.grammar.ActionGrammar``) each step picks the
+most likely token among those the schema allows; ``min_prob`` still uses the unconstrained
+probability of the chosen token, so a forced token lowers the confidence.
 """
 
 from collections import defaultdict
@@ -11,6 +13,7 @@ from dataclasses import dataclass
 import torch
 
 from jtalm.model.data import MAX_TARGET_TOKENS, Codec
+from jtalm.model.grammar import ActionGrammar
 from jtalm.model.transformer import ActionLM
 
 
@@ -28,6 +31,7 @@ def greedy(
     prompts: list[str],
     batch_size: int = 256,
     max_new_tokens: int = MAX_TARGET_TOKENS,
+    grammar: ActionGrammar | None = None,
 ) -> list[Prediction]:
     was_training = model.training
     model.eval()
@@ -47,7 +51,16 @@ def greedy(
             min_prob = torch.ones(len(chunk), device=device)
             for _ in range(steps):
                 probs = model(x)[:, -1].float().softmax(-1)
-                p, nxt = probs.max(-1)
+                if grammar is None:
+                    p, nxt = probs.max(-1)
+                else:
+                    mask = torch.full_like(probs, -1.0)
+                    for row in range(len(chunk)):
+                        if not done[row]:
+                            ids = grammar.allowed(x[row, length:].tolist())
+                            mask[row, ids] = probs[row, ids]
+                    nxt = mask.argmax(-1)
+                    p = probs.gather(1, nxt[:, None]).squeeze(1)
                 min_prob = torch.where(done, min_prob, torch.minimum(min_prob, p))
                 nxt = torch.where(done, torch.full_like(nxt, codec.eos), nxt)
                 x = torch.cat([x, nxt[:, None]], dim=1)

@@ -73,44 +73,86 @@ def upload_files(ssh: Ssh, digests: dict[str, str], log: Path) -> None:
             raise VastError(f"sha256 mismatch after upload: {rel}")
 
 
+STARTUP_ATTEMPTS = 3
+STARTUP_TIMEOUT_S = 1800
+
+
+def _start(
+    client: VastClient, spec: JobSpec, offers: list[dict], tmp: Path, attempts: list[dict]
+) -> tuple[int, dict, float, dict, Ssh]:
+    """Create an instance and wait for SSH, moving to the next offer if a host is too slow.
+
+    Slow image pulls on some hosts kept instances in "loading" for over 20 minutes (2026-09-29),
+    so a failed start destroys that instance and tries the next cheapest offer.
+    """
+    for offer in offers[:STARTUP_ATTEMPTS]:
+        instance_id = client.create_instance(
+            offer["id"], spec.image, spec.disk_gb, f"jtalm-{spec.name}"
+        )
+        created = time.monotonic()
+        print(
+            f"created instance {instance_id} on {offer['gpu_name']} at ${offer['dph_total']:.3f}/h"
+        )
+        try:
+            target, info = client.wait_running(instance_id, timeout_s=STARTUP_TIMEOUT_S)
+            ssh = Ssh(target, known_hosts=tmp / "known_hosts")
+            ssh.wait_ssh()
+            return instance_id, offer, created, info, ssh
+        except VastError as e:
+            destroyed = _destroy(client, instance_id)
+            hours = (time.monotonic() - created) / 3600
+            attempts.append(
+                {
+                    "instance_id": instance_id,
+                    "offer_id": offer["id"],
+                    "gpu_name": offer["gpu_name"],
+                    "error": str(e)[:200],
+                    "destroyed": destroyed,
+                    "hours": round(hours, 3),
+                    "cost_usd_estimate": round(hours * offer["dph_total"], 3),
+                }
+            )
+            print(f"start failed on {instance_id} ({e}); destroyed={destroyed}")
+    raise VastError(f"no instance started after {len(attempts)} attempts")
+
+
 def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
     digests = local_uploads(spec)
     client = VastClient()
     offers = [o for o in client.search_offers(spec.query) if o["dph_total"] <= approve_dph]
     if not offers:
         raise VastError(f"no offer under ${approve_dph}/h for: {spec.query}")
-    offer = offers[pick]
+    offers = offers[pick:]
 
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     out_dir = PROJECT_ROOT / "runs" / "vast" / f"{spec.name}-{stamp}"
     out_dir.mkdir(parents=True, exist_ok=True)
     log = out_dir / "remote.log"
-    record: dict = {
-        "job": asdict(spec),
-        "offer": {
-            k: offer.get(k) for k in ("id", "gpu_name", "gpu_ram", "dph_total", "geolocation")
-        },
-        "started_utc": stamp,
-        "uploads": digests,
-    }
+    record: dict = {"job": asdict(spec), "started_utc": stamp, "uploads": digests}
+    attempts: list[dict] = []
+
+    def failed_starts_cost() -> float:
+        return sum(a["cost_usd_estimate"] for a in attempts)
 
     with tempfile.TemporaryDirectory() as tmp:
         tar = Path(tmp) / "code.tar"
         record["commit"] = _git_archive(tar)
-        instance_id = client.create_instance(
-            offer["id"], spec.image, spec.disk_gb, f"jtalm-{spec.name}"
-        )
-        record["instance_id"] = instance_id
-        created = time.monotonic()
-        print(
-            f"created instance {instance_id} on {offer['gpu_name']} at ${offer['dph_total']:.3f}/h"
-        )
         try:
-            target, info = client.wait_running(instance_id)
-            record["driver_version"] = info.get("driver_version")
-            record["cuda_max_good"] = info.get("cuda_max_good")
-            ssh = Ssh(target, known_hosts=Path(tmp) / "known_hosts")
-            ssh.wait_ssh()
+            instance_id, offer, created, info, ssh = _start(
+                client, spec, offers, Path(tmp), attempts
+            )
+        except VastError as e:
+            record.update(status=f"failed: {e}", failed_starts=attempts)
+            record["cost_usd_estimate"] = round(failed_starts_cost(), 3)
+            (out_dir / "run.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+            raise
+        record["offer"] = {
+            k: offer.get(k) for k in ("id", "gpu_name", "gpu_ram", "dph_total", "geolocation")
+        }
+        record["instance_id"] = instance_id
+        record["driver_version"] = info.get("driver_version")
+        record["cuda_max_good"] = info.get("cuda_max_good")
+        try:
             ssh.upload(tar, "/root/code.tar")
             deadline = created + spec.max_hours * 3600
             boot = remote_bootstrap()
@@ -141,7 +183,10 @@ def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
             record["destroyed"] = _destroy(client, instance_id)
             hours = (time.monotonic() - created) / 3600
             record["hours"] = round(hours, 3)
-            record["cost_usd_estimate"] = round(hours * offer["dph_total"], 3)
+            record["failed_starts"] = attempts
+            record["cost_usd_estimate"] = round(
+                hours * offer["dph_total"] + failed_starts_cost(), 3
+            )
             (out_dir / "run.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
             print(
                 f"destroyed={record['destroyed']} hours={record['hours']} "

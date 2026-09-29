@@ -5,7 +5,10 @@
         --tokenizer tokenizer/out/action_v0_sp2048.model \
         --out runs/m4/eval
 
-Decoding is greedy with the fixed prompt format of ``jtalm.model.format`` (no grammar, no gate).
+Decoding is greedy with the fixed prompt format of ``jtalm.model.format``. ``--modes`` selects
+``plain`` (no constraint), ``grammar`` (``jtalm.model.grammar``), and ``gate`` (grammar plus the
+confidence gate: outputs whose min token probability is below a threshold become ``[]``). The
+gate threshold is chosen on the validation set, never on the evaluation set.
 Existing models are compared on the 16 TinyLM-Bench cases, whose outputs are in the fixtures.
 """
 
@@ -24,6 +27,7 @@ from jtalm.eval.rule_baseline import predict_json
 from jtalm.infra.env import PROJECT_ROOT
 from jtalm.model.data import Codec
 from jtalm.model.decode import greedy
+from jtalm.model.grammar import ActionGrammar
 from jtalm.model.train import pick_device
 from jtalm.model.transformer import ActionLM, ModelConfig, count_params
 
@@ -38,10 +42,21 @@ def load_model(ckpt: Path, device: torch.device) -> tuple[ActionLM, dict[str, An
     return model.to(device).eval(), state
 
 
-def predict(model: ActionLM, codec: Codec, cases: list[EvalCase]) -> list[dict[str, Any]]:
-    preds = greedy(model, codec, [c.prompt for c in cases])
+MODES = ("plain", "grammar", "gate")
+GATE_TOLERANCE = 0.005  # the gate may cost at most 0.5 point of validation exact match
+
+
+def predict(
+    model: ActionLM,
+    codec: Codec,
+    cases: list[EvalCase],
+    grammar: ActionGrammar | None = None,
+    gate: float | None = None,
+) -> list[dict[str, Any]]:
+    preds = greedy(model, codec, [c.prompt for c in cases], grammar=grammar)
     rows = []
     for c, p in zip(cases, preds, strict=True):
+        text = "[]" if gate is not None and p.min_prob < gate else p.text
         rows.append(
             {
                 "id": c.id,
@@ -49,12 +64,32 @@ def predict(model: ActionLM, codec: Codec, cases: list[EvalCase]) -> list[dict[s
                 "language": c.language,
                 "prompt": c.prompt,
                 "expected": c.expected,
-                "output": p.text,
+                "output": text,
+                "raw_output": p.text,
                 "min_prob": round(p.min_prob, 5),
-                "exact": score_case(c, p.text).exact,
+                "exact": score_case(c, text).exact,
             }
         )
     return rows
+
+
+def select_gate(rows: list[dict[str, Any]], cases: list[EvalCase]) -> dict[str, Any]:
+    """Largest threshold whose validation exact match stays within GATE_TOLERANCE of no gate."""
+    by_id = {c.id: c for c in cases}
+
+    def exact_at(t: float) -> float:
+        hits = [
+            score_case(by_id[r["id"]], "[]" if r["min_prob"] < t else r["raw_output"]).exact
+            for r in rows
+        ]
+        return sum(hits) / len(hits)
+
+    base = exact_at(0.0)
+    best = 0.0
+    for t in sorted({r["min_prob"] for r in rows}):
+        if exact_at(t) >= base - GATE_TOLERANCE:
+            best = t
+    return {"threshold": best, "val_exact_no_gate": base, "val_exact_gated": exact_at(best)}
 
 
 def summarize(report: dict[str, Any]) -> dict[str, Any]:
@@ -92,6 +127,8 @@ def main(argv: list[str] | None = None) -> None:
     )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--modes", nargs="+", choices=MODES, default=["plain"])
+    parser.add_argument("--val", type=Path, default=PROJECT_ROOT / "datasets/action/v0/val.jsonl")
     args = parser.parse_args(argv)
 
     device = pick_device(args.device)
@@ -115,30 +152,43 @@ def main(argv: list[str] | None = None) -> None:
     for name, preds in by_model.items():
         bench_rows[name] = summarize(evaluate(bench, preds))
 
+    grammar = ActionGrammar(codec) if {"grammar", "gate"} & set(args.modes) else None
+    val_cases = load_cases(args.val) if "gate" in args.modes else []
     models: dict[str, Any] = {}
     for ckpt in args.ckpt:
         model, state = load_model(ckpt, device)
         if state["tokenizer_sha256"] != codec.sha256:
             raise SystemExit(f"{ckpt}: tokenizer sha256 does not match {args.tokenizer}")
         slug = ckpt.parent.name
-        name = f"{slug} ({count_params(model) / 1e6:.2f}M)"
-        for label, cs, table in (("eval", cases, eval_rows), ("bench", bench, bench_rows)):
-            rows = predict(model, codec, cs)
-            report = evaluate(cs, {r["id"]: r["output"] for r in rows})
-            with (args.out / f"{slug}_{label}_predictions.jsonl").open("w", encoding="utf-8") as f:
-                for r in rows:
-                    f.write(json.dumps(r, ensure_ascii=False) + "\n")
-            (args.out / f"{slug}_{label}_report.json").write_text(
-                json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            table[name] = summarize(report)
-        models[name] = {"ckpt": str(ckpt), "epoch": state.get("epoch"), "step": state.get("step")}
+        base_name = f"{slug} ({count_params(model) / 1e6:.2f}M)"
+        info: dict[str, Any] = {"ckpt": str(ckpt), "epoch": state.get("epoch")}
+        for mode in args.modes:
+            gate = None
+            if mode == "gate":
+                info["gate"] = select_gate(predict(model, codec, val_cases, grammar), val_cases)
+                gate = info["gate"]["threshold"]
+            name = base_name if mode == "plain" else f"{base_name} +{mode}"
+            tag = slug if mode == "plain" else f"{slug}_{mode}"
+            g = grammar if mode != "plain" else None
+            for label, cs, table in (("eval", cases, eval_rows), ("bench", bench, bench_rows)):
+                rows = predict(model, codec, cs, g, gate)
+                report = evaluate(cs, {r["id"]: r["output"] for r in rows})
+                pred_path = args.out / f"{tag}_{label}_predictions.jsonl"
+                with pred_path.open("w", encoding="utf-8") as f:
+                    for r in rows:
+                        f.write(json.dumps(r, ensure_ascii=False) + "\n")
+                (args.out / f"{tag}_{label}_report.json").write_text(
+                    json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+                )
+                table[name] = summarize(report)
+        models[base_name] = info
 
     keys = ["exact_rate", *CATEGORIES, "en", "no_action_precision", "no_action_recall",
             "critical_error_rate", "pair_accuracy"]  # fmt: skip
     result = {
         "conditions": {
-            "decoding": "greedy, no grammar, no confidence gate",
+            "decoding": "greedy; modes: " + ", ".join(args.modes),
+            "gate_rule": f"largest threshold within {GATE_TOLERANCE} of val exact (no gate)",
             "prompt_format": "<s> <act> prompt <out>",
             "eval_cases": str(args.cases.name),
             "eval_sha256": hashlib.sha256(args.cases.read_bytes()).hexdigest(),

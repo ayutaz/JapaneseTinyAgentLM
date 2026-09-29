@@ -5,7 +5,7 @@ from jtalm.infra.spec import JobSpec
 VLLM_IMAGE = "vllm/vllm-openai:v0.30.0"  # CUDA 13.0, so hosts need cuda_vers >= 13.0
 UV = "$HOME/.local/bin/uv"
 BASE_QUERY = (
-    "num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=500 disk_space>=120 "
+    "num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=120 "
     "rentable=true direct_port_count>=1 verified=true"
 )
 

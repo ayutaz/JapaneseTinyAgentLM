@@ -104,3 +104,47 @@ def test_uploads_are_checked_before_renting(tmp_path: Path) -> None:
     ok = JobSpec("t", "d", "q", "img", 10, 0.1, [], uploads=["pyproject.toml"])
     digest = local_uploads(ok)["pyproject.toml"]
     assert len(digest) == 64 and json.dumps(digest)
+
+
+def _enumerate(grammar, codec: Codec) -> list[list[int]]:
+    """All complete target token sequences the grammar allows (depth-first)."""
+    done, stack = [], [[]]
+    while stack:
+        seq = stack.pop()
+        for token in grammar.allowed(seq):
+            if token == codec.eos:
+                done.append(seq)
+            else:
+                stack.append(seq + [token])
+    return done
+
+
+def test_grammar_allows_exactly_the_valid_canonical_outputs(codec: Codec) -> None:
+    from jtalm.action.schema import validate
+    from jtalm.data.specs import all_specs
+    from jtalm.model.grammar import ActionGrammar
+
+    grammar = ActionGrammar(codec)
+    outputs = [codec.sp.decode(seq) for seq in _enumerate(grammar, codec)]
+    parsed = [json.loads(o) for o in outputs]
+    assert all(validate(calls) == [] for calls in parsed)  # schema + no duplicates
+    assert all(calls == canonicalize(calls) for calls in parsed)  # center -> normal
+    singles = 5 * 3 - 2 + 4 + 3  # look (center only normal) + expressions + nod counts
+    assert len(outputs) == 1 + singles + singles * (singles - 1)
+    texts = set(outputs)
+    for spec in all_specs():  # every label the dataset uses is reachable
+        assert target_json(list(spec.label)) in texts
+
+
+def test_greedy_with_grammar_always_returns_valid_json(codec: Codec) -> None:
+    from jtalm.action.schema import validate
+    from jtalm.model.grammar import ActionGrammar
+
+    torch.manual_seed(0)
+    cfg = ModelConfig(vocab_size=codec.vocab_size, d_model=32, n_layers=1, n_heads=2,
+                      n_kv_heads=1, d_ff=64)  # fmt: skip
+    model = ActionLM(cfg)  # untrained: without grammar it produces garbage
+    preds = greedy(model, codec, [p for p, _ in EXAMPLES], grammar=ActionGrammar(codec))
+    for pred in preds:
+        calls = parse_output(pred.text).calls
+        assert calls is not None and validate(calls) == []
