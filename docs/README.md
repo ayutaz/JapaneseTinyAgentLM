@@ -192,7 +192,7 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | 学習は vast.ai で行う。API key は `.env` の `VAST_API_KEY` から読む | [`development.md`](development.md) §3–4 |
 | 2026-09-29 | Python は uv で管理し、依存の追加は `uv add` だけを使う（`uv pip` は使わない） | [`development.md`](development.md) §2 |
 | 2026-09-29 | 対象の実機を M5 スタックチャン K151 とする | [`hardware.md`](hardware.md) |
-| 2026-09-29 | Action の yaw は正の値を右とする（公式 firmware の規約。実機での確認は未実施） | [`hardware.md`](hardware.md) §3 |
+| 2026-09-29 | Action の yaw は正の値を右とする（公式 firmware の規約）。実機では右へ回すと raw が減るので、dispatcher で符号を反転する（2026-09-29 に実機で確認） | [`hardware.md`](hardware.md) §3、§10 |
 | 2026-09-29 | PC 上の実験（Track A）と実機での計測（Track B）を並行して進める。最初の1周は Action 専用のスクラッチ学習とし、Base の事前学習は corpus のライセンスが決まってから行う | [`roadmap.md`](roadmap.md) §12 |
 | 2026-09-29 | 本計画の範囲は **LLM を作ること**に限る。TTS / ASR の調査と同居の検証は行わない。LM は LM 用の Flash / PSRAM 予算だけを前提に開発する | [`roadmap.md`](roadmap.md) §1、[`architecture.md`](architecture.md) §9–10 |
 | 2026-09-29 | 実機の build は ESP-IDF v5.5.5（Docker image `espressif/idf:v5.5.5`）に固定する。LM の評価には自前の最小 firmware を使う | [`development.md`](development.md) §7 |

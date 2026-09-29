@@ -305,7 +305,7 @@ v0 の action は `look`、`set_expression`、`nod` の3種類です。
 Action LM はカテゴリだけを出力し、firmware の dispatcher が K151 の servo の角度に変換します。規約は公式 firmware（[`hardware.md`](hardware.md) §3）に合わせます。
 
 - **yaw:** 0 が正面で、**正の値が右**。公式 firmware には 0.1° 単位で渡す（制限は ±128°）。
-- **pitch:** 中立位置からの相対値で、**正の値が上**。公式 firmware の pitch は 3°〜87° の絶対角で、値が大きいほど上を向く。中立角度は実機で確認してから決める。
+- **pitch:** 中立位置からの相対値で、**正の値が上**。公式 firmware の pitch は 3°〜87° の絶対角で、値が大きいほど上を向く。K151 の実機では、中立（正面・水平）は yaw raw 460 / pitch raw 620 で、首をロボット自身の右へ回すと yaw の raw が減り、上を向くと pitch の raw が増える（[`hardware.md`](hardware.md) §10、2026-09-29 に確認）。dispatcher は yaw の符号を反転して raw に変換する。
 
 | `amount` | `left` / `right` の yaw | `up` / `down` の pitch |
 |---|---:|---:|

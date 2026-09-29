@@ -325,7 +325,7 @@ Python の実装と C runtime は、同じ評価セットと同じ条件で比�
 優先度順:
 
 1. K151 上で、自前の最小 firmware（LM runtime と servo 制御）の Flash / PSRAM map を測り、LM の予算を確定する。
-   - 1a. Yaw の符号と pitch の中立角度を実機で確認する。
+   - 1a. Yaw の符号と pitch の中立角度を実機で確認する（**完了**、2026-09-29。[`hardware.md`](hardware.md) §10）。
 2. Needle 2 の artifact format、kernel、grammar の再利用可能性と license。
 3. ESP32-S3 SIMD / ESP-DSP / ESP-NN / ESP-DL を使う quantized GEMV の比較。既存の runtime（esp32-llm の Xtensa PIE INT8 kernel、esp32-mind / esp32-ai の int4 PLE runtime）を流用できるかと、その license も調べる。
 4. MQA/GQA、KV INT8、sliding window、recompute の速度・メモリ trade-off。
@@ -532,7 +532,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | 2 | v0.4 で 3M / 5M / 20M を再学習し、v0 / v0.3 / v0.4 の曲線から、**データ量とモデルサイズの候補**を決める | **完了**（データは v0.4、サイズは 3M が第一候補） |
 | 3 | 採用するモデルを INT8 / INT4 で確認する | **完了**（3M INT4 + grammar で 94.3 / 94.4%） |
 | 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | **完了**。実機の出力は host と 200/200 一致。3M INT4 は1回の依頼の中央値 1.15 秒（p90 1.53 秒）、5M INT4 は 1.79 秒。**3M INT4 に決定**（[`hardware.md`](hardware.md) §11） |
-| 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | 手順は [`hardware.md`](hardware.md) §10 |
+| 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | **完了**（2026-09-29）。次は、Action を servo の命令に変換して実機で首を動かす（立ち会いが必要） |
 
 - 英語は学習データに入れていないので、完了条件の判定では参考値として扱う（完全一致の全体の値には含まれる）。
 
@@ -562,7 +562,7 @@ M3 の評価セットを学習データとは別のモデルと別の prompt で
 |---|---|---|
 | B0 | 実機の初回調査 | **完了**（2026-09-29）。対象機の特定、SoC / Flash / PSRAM、Flash 全体のバックアップ（[`hardware.md`](hardware.md)） |
 | B1 | ESP-IDF の build 環境 | ESP-IDF **v5.5.5** の公式 Docker image（`espressif/idf:v5.5.5`）で build する。ローカルへの導入は不要。書き込みは Windows から `esptool` で行う。**完了**（2026-09-29） |
-| B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する。**build まで完了**。起動直後から首が動くので、書き込みと確認はユーザーの立ち会いのもとで行う（手順は [`hardware.md`](hardware.md) §10、5〜10分） |
+| B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する。**完了**（2026-09-29、ユーザーの立ち会いのもとで実施）。中立は yaw 460 / pitch 620、ロボット自身の右へ回すと yaw の raw は減り、上を向くと pitch の raw は増える（[`hardware.md`](hardware.md) §10） |
 | B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う。**完了**（2026-09-29）: stories3M INT8 は forward だけで 6.5〜7.1 tok/s（上流の約半分。CoreS3 は Quad PSRAM のため） |
 | B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate）。**計測の部分は完了**（2026-09-29、`firmware/jtalm_eval/`）: 起動直後の内部 SRAM 空き 335,663 B、PSRAM 空き 8.39MB、14MB の `model` partition を1回で mmap、読み出しは PSRAM 32.8 MB/s、Flash の mmap 31.2 MB/s。servo と画面を載せた状態の計測は B4 で行う |
 | B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、5M INT4 の tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす。**runtime の移植と計測は完了**（2026-09-29、`firmware/jtalm_action/`、[`hardware.md`](hardware.md) §11）。servo を動かす部分は、ユーザーの立ち会いのもとで B2 と合わせて行う |

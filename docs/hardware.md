@@ -51,7 +51,7 @@
 - Raw position は 0〜1000。1 step = 0.3125°。
 - Servo の zero position は firmware が NVS に保存して較正する。
 - Servo 電源は IO expander（PY32L020）の `VM_EN` で制御する。
-- **符号規約:** 公式コードのコメントでは、yaw は -1.0 が左端、+1.0 が右端である。つまり **yaw の正の値は右**。ただし実機を動かしての確認はまだ行っていない。
+- **符号規約:** 公式コードのコメントでは、yaw は -1.0 が左端、+1.0 が右端である。本プロジェクトの Action schema でも **yaw の正の値は右**とする。実機で確かめたところ（2026-09-29、§10）、**首をロボット自身の右へ回すと yaw の raw は減り**、上を向くと pitch の raw は増えた。中立（正面・水平）は yaw 460 / pitch 620（stackchan-idf の既定値）。
 
 ### その他の周辺機器
 
@@ -409,6 +409,19 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
   0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin 0x10000 jtalm_eval.bin
 ```
 
+### 結果（2026-09-29、ユーザーの立ち会いのもとで実施）
+
+| 項目 | 結果 | 確度 |
+|---|---|---|
+| Servo の応答 | `yaw (id=1) ping OK`、`pitch (id=2) ping OK`（log は `runs/device/b2_servo_check.log`） | 実測 |
+| 起動直後の姿勢（raw 460 / 620） | 正面で水平 | 実測（目視） |
+| 首をロボット自身の右へ回したとき | yaw の raw が**減る** | 実測（目視） |
+| 顔を上に向けたとき | pitch の raw が**増える** | 実測（目視） |
+| 中立（正面・水平）の raw | yaw 460、pitch 620（既定値のまま） | 実測（目視） |
+
+- **dispatcher での変換:** Action の「右」は yaw の raw を減らす向き、「上」は pitch の raw を増やす向きになる。1 step は 0.3125° なので、yaw は `raw = 460 − deg × 16 / 5`（deg は右が正）、pitch は `raw = 620 + deg × 16 / 5`（deg は上が正）で求める。
+- 確認の後、Flash 全体を消して `jtalm_action`（v0.4 の 3M INT4、confidence gate 0.970）に書き戻した。3つの依頼文で正しく応答することを確認した。NVS は消したので、stackchan-idf の設定は残っていない。
+
 ### 結果の使い方
 
 - 右へ回したときに raw が**増える**なら、「yaw の正 = 右」（[`architecture.md`](architecture.md) §7）は stackchan-idf の deg の符号とそのまま一致する。**減る**なら、dispatcher で符号を反転する。
@@ -540,7 +553,7 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 
 ## 12. 未確認事項
 
-- Yaw の符号と、pitch の中立角度を、実機を動かして確認する（[`roadmap.md`](roadmap.md) §12 の B2。手順は §10）。
+- Action を servo の命令に変換して、実機で実際に首を動かす（§10 の変換式を使う。ユーザーの立ち会いが必要）。
 - 画面、servo、M5Unified を載せた状態での SRAM / PSRAM（B4 の servo の部分で測る。LM だけの値は §11）。
 - `-DJTLM_BATCH=8` にしたときの速度と、音声認識・TTS と同時に動かしたときの LM の速度。
 - FCC ID `2AN3WM5STACKCHAN` の個別登録内容。
