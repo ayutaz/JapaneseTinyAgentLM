@@ -40,8 +40,9 @@ target-version = "py313"
 select = ["E", "F", "I", "B", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
-# Long Japanese prompt strings: wrapping would change the prompt text.
+# Long Japanese prompt / dataset-card strings: wrapping would change the text.
 "src/jtalm/data/prompts.py" = ["E501"]
+"src/jtalm/data/publish.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

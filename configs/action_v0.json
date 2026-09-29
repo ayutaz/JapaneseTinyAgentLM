@@ -5,7 +5,7 @@
   "temperature": 0.9,
   "top_p": 0.95,
   "max_tokens": 900,
-  "train_generator": {"served_name": "qwen", "hf_id": "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8", "license": "Apache-2.0"},
+  "train_generator": {"served_name": "qwen", "hf_id": "Qwen/Qwen3-30B-A3B-Instruct-2507", "license": "Apache-2.0"},
   "eval_generator": {"served_name": "llmjp", "hf_id": "llm-jp/llm-jp-3.1-13b-instruct4", "license": "Apache-2.0"},
   "train_quota": {"single": 2400, "multi_action": 2400, "negation": 2400, "correction": 1200, "no_action": 1400},
   "eval_quota": {"single": 300, "multi_action": 240, "negation": 180, "correction": 150, "no_action": 180},

@@ -1,9 +1,13 @@
-"""Generate and cross-verify synthetic Action sentences against two vLLM servers (runs on vast.ai).
+"""Generate and cross-verify synthetic Action sentences with vLLM servers (runs on vast.ai).
 
-- Train sentences: written by the train generator (Qwen3), verified by the eval generator (llm-jp).
-- Eval sentences, contrastive pairs, and English cases: written by the eval generator (llm-jp),
-  verified by the train generator (Qwen3).
-A sentence is kept later (jtalm.data.build) only if the verifier's parse equals the spec label.
+Runs in phases so only one model needs to be on the GPU at a time:
+
+1. ``eval-gen``      eval generator (llm-jp) writes eval sentences, contrastive pairs, English
+2. ``train-gen``     train generator (Qwen3) writes train sentences
+3. ``eval-verify``   train generator (Qwen3) parses the eval sentences
+4. ``train-verify``  eval generator (llm-jp) parses the train sentences
+
+``jtalm.data.build`` later keeps a sentence only if the parse equals the spec label.
 """
 
 import argparse
@@ -19,6 +23,10 @@ from openai import OpenAI
 
 from jtalm.data import prompts
 from jtalm.data.specs import Spec, all_specs, sample_requests
+
+PHASES = ("eval-gen", "train-gen", "eval-verify", "train-verify")
+PAIR_N = 4
+EN_N = 4
 
 
 class Generator:
@@ -48,25 +56,21 @@ class Generator:
 
 
 def _parallel(fn: Callable[[Any], list[dict]], items: list, workers: int) -> tuple[list[dict], int]:
-    rows: list[dict] = []
-    failures = 0
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        for result in pool.map(_safe(fn), items):
-            if result is None:
-                failures += 1
-            else:
-                rows.extend(result)
-    return rows, failures
-
-
-def _safe(fn: Callable[[Any], list[dict]]) -> Callable[[Any], list[dict] | None]:
-    def wrapper(item: Any) -> list[dict] | None:
+    def safe(item: Any) -> list[dict] | None:
         try:
             return fn(item)
         except Exception:
             return None
 
-    return wrapper
+    rows: list[dict] = []
+    failures = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for result in pool.map(safe, items):
+            if result is None:
+                failures += 1
+            else:
+                rows.extend(result)
+    return rows, failures
 
 
 def _row(spec: Spec, text: str, split: str, generator: str, **extra: Any) -> dict:
@@ -83,120 +87,148 @@ def _row(spec: Spec, text: str, split: str, generator: str, **extra: Any) -> dic
     }
 
 
-def run(args: argparse.Namespace) -> dict:
-    cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
-    rng = random.Random(cfg["seed"])
+def _write(path: Path, rows: list[dict]) -> None:
+    path.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), "utf-8")
+
+
+def _read(path: Path) -> list[dict]:
+    return [json.loads(line) for line in path.read_text("utf-8").splitlines() if line]
+
+
+def generate_sentences(gen: Generator, name: str, split: str, quota: dict, cfg: dict, seed0: int):
     n = cfg["per_request"]
-    train_gen = Generator(args.train_url, cfg["train_generator"]["served_name"], cfg)
-    eval_gen = Generator(args.eval_url, cfg["eval_generator"]["served_name"], cfg)
-    train_name, eval_name = cfg["train_generator"]["hf_id"], cfg["eval_generator"]["hf_id"]
-    specs = all_specs()
-    summary: dict[str, Any] = {"prompt_version": prompts.PROMPT_VERSION, "failures": {}}
+    rng = random.Random(seed0)
+    requests = list(enumerate(sample_requests(all_specs(), quota, n, rng)))
 
-    def gen_sentences(gen: Generator, split: str, name: str) -> Callable[[tuple], list[dict]]:
-        def fn(item: tuple[int, Spec]) -> list[dict]:
-            i, spec = item
-            data = gen.chat_json(
-                prompts.generation_messages(spec, n, split),
-                prompts.json_response_format("sentences", prompts.sentence_schema(n)),
-                seed=cfg["seed"] + i,
-                temperature=cfg["temperature"],
-            )
-            return [_row(spec, t, split, name, seed=cfg["seed"] + i) for t in data["sentences"]]
+    def fn(item: tuple[int, Spec]) -> list[dict]:
+        i, spec = item
+        data = gen.chat_json(
+            prompts.generation_messages(spec, n, split),
+            prompts.json_response_format("sentences", prompts.sentence_schema(n)),
+            seed=seed0 + i,
+            temperature=cfg["temperature"],
+        )
+        return [_row(spec, t, split, name, seed=seed0 + i) for t in data["sentences"]]
 
-        return fn
+    return fn, requests
 
-    t0 = time.time()
-    train_requests = list(enumerate(sample_requests(specs, cfg["train_quota"], n, rng)))
-    train_rows, summary["failures"]["train_gen"] = _parallel(
-        gen_sentences(train_gen, "train", train_name), train_requests, args.workers
-    )
-    eval_requests = list(enumerate(sample_requests(specs, cfg["eval_quota"], n, rng)))
-    eval_rows, summary["failures"]["eval_gen"] = _parallel(
-        gen_sentences(eval_gen, "eval", eval_name), eval_requests, args.workers
-    )
 
-    singles = [s for s in specs if s.category == "single"]
-    pair_n = 4
+def phase_eval_gen(gen: Generator, cfg: dict, workers: int) -> tuple[list[dict], dict]:
+    name = cfg["eval_generator"]["hf_id"]
+    seed0 = cfg["seed"] + 100_000
+    fn, requests = generate_sentences(gen, name, "eval", cfg["eval_quota"], cfg, seed0)
+    rows, failures = _parallel(fn, requests, workers)
+    stats = {"eval_gen_failures": failures}
+
+    singles = [s for s in all_specs() if s.category == "single"]
 
     def gen_pairs(item: tuple[int, Spec]) -> list[dict]:
         i, spec = item
-        data = eval_gen.chat_json(
-            prompts.pair_messages(spec, pair_n),
-            prompts.json_response_format("pairs", prompts.pair_schema(pair_n)),
-            seed=cfg["seed"] + 10_000 + i,
+        data = gen.chat_json(
+            prompts.pair_messages(spec, PAIR_N),
+            prompts.json_response_format("pairs", prompts.pair_schema(PAIR_N)),
+            seed=seed0 + 10_000 + i,
             temperature=cfg["temperature"],
         )
-        rows = []
+        out = []
         for j, pair in enumerate(data["pairs"]):
             pair_id = f"pair.{spec.id}.{i}.{j}"
-            rows.append(_row(spec, pair["positive"], "eval", eval_name, pair_id=pair_id))
+            out.append(_row(spec, pair["positive"], "eval", name, pair_id=pair_id))
             neg = Spec(f"negation.of.{spec.id}", "negation", (), spec.meaning)
-            rows.append(_row(neg, pair["negative"], "eval", eval_name, pair_id=pair_id))
-        return rows
+            out.append(_row(neg, pair["negative"], "eval", name, pair_id=pair_id))
+        return out
 
-    pair_specs = [singles[i % len(singles)] for i in range(-(-cfg["eval_pairs"] // pair_n))]
-    pair_rows, summary["failures"]["eval_pairs"] = _parallel(
-        gen_pairs, list(enumerate(pair_specs)), args.workers
+    n_pair_requests = -(-cfg["eval_pairs"] // PAIR_N)
+    pair_specs = [singles[i % len(singles)] for i in range(n_pair_requests)]
+    pair_rows, stats["eval_pair_failures"] = _parallel(
+        gen_pairs, list(enumerate(pair_specs)), workers
     )
 
-    en_pool = [s for s in specs if s.category in ("single", "negation", "no_action")]
+    en_pool = [s for s in all_specs() if s.category in ("single", "negation", "no_action")]
 
     def gen_english(item: tuple[int, Spec]) -> list[dict]:
         i, spec = item
-        data = eval_gen.chat_json(
-            prompts.english_messages(spec, 4),
-            prompts.json_response_format("sentences", prompts.sentence_schema(4)),
-            seed=cfg["seed"] + 20_000 + i,
+        data = gen.chat_json(
+            prompts.english_messages(spec, EN_N),
+            prompts.json_response_format("sentences", prompts.sentence_schema(EN_N)),
+            seed=seed0 + 20_000 + i,
             temperature=cfg["temperature"],
         )
-        return [_row(spec, t, "eval", eval_name, language="en") for t in data["sentences"]]
+        return [_row(spec, t, "eval", name, language="en") for t in data["sentences"]]
 
-    en_specs = rng.sample(en_pool, k=min(len(en_pool), -(-cfg["eval_english"] // 4)))
-    en_rows, summary["failures"]["eval_english"] = _parallel(
-        gen_english, list(enumerate(en_specs)), args.workers
+    rng = random.Random(seed0)
+    en_specs = rng.sample(en_pool, k=min(len(en_pool), -(-cfg["eval_english"] // EN_N)))
+    en_rows, stats["eval_english_failures"] = _parallel(
+        gen_english, list(enumerate(en_specs)), workers
     )
-    eval_rows += pair_rows + en_rows
-    summary["generation_sec"] = round(time.time() - t0)
+    return rows + pair_rows + en_rows, stats
 
-    def verifier(gen: Generator, name: str) -> Callable[[dict], list[dict]]:
-        def fn(row: dict) -> list[dict]:
-            parsed = gen.chat_json(
-                prompts.verify_messages(row["text"]),
-                prompts.action_response_format(),
-                seed=0,
-                temperature=0.0,
-            )
-            return [{**row, "verifier": name, "verified": parsed}]
 
-        return fn
+def phase_train_gen(gen: Generator, cfg: dict, workers: int) -> tuple[list[dict], dict]:
+    name = cfg["train_generator"]["hf_id"]
+    fn, requests = generate_sentences(gen, name, "train", cfg["train_quota"], cfg, cfg["seed"])
+    rows, failures = _parallel(fn, requests, workers)
+    return rows, {"train_gen_failures": failures}
 
-    t1 = time.time()
-    train_rows, summary["failures"]["train_verify"] = _parallel(
-        verifier(eval_gen, eval_name), train_rows, args.workers
-    )
-    eval_rows, summary["failures"]["eval_verify"] = _parallel(
-        verifier(train_gen, train_name), eval_rows, args.workers
-    )
-    summary["verify_sec"] = round(time.time() - t1)
 
+def phase_verify(gen: Generator, name: str, rows: list[dict], workers: int):
+    def fn(row: dict) -> list[dict]:
+        parsed = gen.chat_json(
+            prompts.verify_messages(row["text"]),
+            prompts.action_response_format(),
+            seed=0,
+            temperature=0.0,
+        )
+        return [{**row, "verifier": name, "verified": parsed}]
+
+    return _parallel(fn, rows, workers)
+
+
+def run(args: argparse.Namespace) -> dict:
+    cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    for name, rows in (("train_raw.jsonl", train_rows), ("eval_raw.jsonl", eval_rows)):
-        (out / name).write_text(
-            "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8"
+    train_cfg, eval_cfg = cfg["train_generator"], cfg["eval_generator"]
+    t0 = time.time()
+    if args.phase == "eval-gen":
+        gen = Generator(args.base_url, eval_cfg["served_name"], cfg)
+        rows, stats = phase_eval_gen(gen, cfg, args.workers)
+        _write(out / "eval_gen.jsonl", rows)
+    elif args.phase == "train-gen":
+        gen = Generator(args.base_url, train_cfg["served_name"], cfg)
+        rows, stats = phase_train_gen(gen, cfg, args.workers)
+        _write(out / "train_gen.jsonl", rows)
+    elif args.phase == "eval-verify":
+        gen = Generator(args.base_url, train_cfg["served_name"], cfg)
+        rows, failures = phase_verify(
+            gen, train_cfg["hf_id"], _read(out / "eval_gen.jsonl"), args.workers
         )
-    summary["counts"] = {"train_raw": len(train_rows), "eval_raw": len(eval_rows)}
-    (out / "generation_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        stats = {"eval_verify_failures": failures}
+        _write(out / "eval_raw.jsonl", rows)
+    else:
+        gen = Generator(args.base_url, eval_cfg["served_name"], cfg)
+        rows, failures = phase_verify(
+            gen, eval_cfg["hf_id"], _read(out / "train_gen.jsonl"), args.workers
+        )
+        stats = {"train_verify_failures": failures}
+        _write(out / "train_raw.jsonl", rows)
+    summary = {
+        "phase": args.phase,
+        "prompt_version": prompts.PROMPT_VERSION,
+        "rows": len(rows),
+        "sec": round(time.time() - t0),
+        **stats,
+    }
+    (out / f"summary_{args.phase}.json").write_text(json.dumps(summary, indent=2), "utf-8")
     return summary
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--phase", choices=PHASES, required=True)
     parser.add_argument("--config", default="configs/action_v0.json")
-    parser.add_argument("--train-url", default="http://localhost:8000/v1")
-    parser.add_argument("--eval-url", default="http://localhost:8001/v1")
-    parser.add_argument("--workers", type=int, default=48)
+    parser.add_argument("--base-url", default="http://localhost:8000/v1")
+    parser.add_argument("--workers", type=int, default=64)
     parser.add_argument("--out", default="artifacts/raw")
     print(json.dumps(run(parser.parse_args()), indent=2))
 
