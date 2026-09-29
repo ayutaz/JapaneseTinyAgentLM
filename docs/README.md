@@ -2,26 +2,62 @@
 
 最終更新: 2026-09-29
 
-## 1. 目的
+## 1. 目的とゴール
 
-本プロジェクトの目的は、ESP32-S3、特に M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン上で、ネットワークに依存せず日本語テキストを処理できる超小型モデルを研究・実装することです。
+### 目的
+
+M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン上で、ネットワークに依存せず日本語テキストを処理できる超小型モデルを、**実用のために**作ります。
 
 開発と評価に使う実機は、M5Stack 公式の **M5 スタックチャン（SKU K151）** です。本体は CoreS3 で、servo は Feetech SCS0009 を2個使います。詳細は [`hardware.md`](hardware.md) を参照してください。
 
-狙いは「大規模な汎用チャットモデルを無理に縮小すること」ではありません。対象タスクを次の2つに絞り、限られた計算資源に対して実用価値を最大化します。
+狙いは「大規模な汎用チャットモデルを無理に縮小すること」ではありません。TinyLM-Bench の検証で、既存の小型モデルには次の4つを同時に満たすものがないと分かりました（[`research_notes.md`](research_notes.md) §3.7）。本プロジェクトはこの空白を埋めます。
 
-| 派生モデル | 入力 | 出力 | 主用途 |
-|---|---|---|---|
-| Japanese Tiny Chat LM | 日本語 text | 短い日本語 text | 短い応答、簡単な会話、状態に応じた発話文生成 |
-| Japanese Action LM | 日本語 text | JSON / structured actions | サーボ（視線、うなずき）と表情の制御。対象外や曖昧な入力には no-action を返す |
+- 日本語を理解できる
+- ESP32 に載る大きさである
+- 厳密な Action を出力できる
+- 安全に no-action を返せる
 
-本プロジェクトの中心的な研究問いは次のとおりです。
+### ゴール（2026-09-29 確定）
 
-- 日本語の短い命令理解と Action 生成は何百万 parameter まで小型化できるか。
+| 項目 | 内容 |
+|---|---|
+| 位置づけ | **実用**のためのモデル。研究としての比較は、実用に必要な範囲で行う |
+| 利用者 | Stack-chan などに組み込んで使う**開発者**。組み込みやすさ、仕様の明確さ、再現性を重視する |
+| 入力 | **テキストのみ**。主な対象は漢字仮名交じりの日本語で、英語の命令は評価用に少量だけ扱う |
+| 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
+| 公開 | Hugging Face でオープンモデルとして公開する。重みは **CC BY-SA 4.0**（商用利用可） |
+| 期限 | 決まっていない。できるだけ早く作る |
+| 実行体制 | 実装、学習、評価、実機での計測は、すべて **Claude Code** が実行する。工数は Claude Code の作業時間で見積もる（[`roadmap.md`](roadmap.md) §13） |
+
+| 派生モデル | 入力 | 出力 | 主用途 | 順序 |
+|---|---|---|---|---|
+| Japanese Action LM | 日本語 text | Action の JSON（0〜2個、`[]` は no-action） | サーボ（視線、うなずき）と表情の制御。対象外や曖昧な入力には no-action を返す | 1 |
+| Japanese Tiny Chat LM | 日本語 text | 短い日本語 text | 短い応答、簡単な会話、状態に応じた発話文の生成 | 2 |
+
+**Action LM の完了条件（暫定。[`roadmap.md`](roadmap.md) §4）**
+
+- 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
+- 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
+- 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たす
+
+**公開物（Hugging Face と GitHub）**
+
+- Hugging Face: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果
+- GitHub: 学習と評価の code、ESP32 runtime
+
+開発者が使いやすいように、次の2つも候補にしています（未確定）。
+
+- ESP-IDF の component としての runtime
+- Tool を追加するための、データ生成と fine-tuning の手順（recipe）
+
+### 答えたい問い
+
+- 日本語の短い命令理解と Action 生成は、何百万 parameter まで小型化できるか。
 - 日本語の短い会話に最低限必要なモデル規模はどの程度か。
 - 共通 Base / Tokenizer / Runtime により、Chat と Action の重複をどこまで減らせるか。
-- Ralomi のモーラ・正規化ひらがな出力を直接受けることで、日本語の表記変換コストを削減できるか。
 - 16MB Flash / 8MB PSRAM の CoreS3 で、LM に割り当てた予算（[`architecture.md`](architecture.md) §9–10）の中で、どこまでの品質と速度を出せるか。
+
+入力をテキストのみとしたので、「ひらがなで直接入力すると小型化に有利か」という問いは中心から外しました（[`research_notes.md`](research_notes.md) §5）。
 
 ## 2. スコープ
 
@@ -160,3 +196,5 @@ JapaneseTinyAgentLM
 | 2026-09-29 | Grammar に加えて confidence gate を入れ、確信度の低い出力は no-action にする | [`architecture.md`](architecture.md) §8 |
 | 2026-09-29 | Action の目標値は、TinyLM-Bench の検証メモの値（完全一致 90%以上、no-action 95%以上など）を暫定で採用し、既存モデルを baseline に加える | [`roadmap.md`](roadmap.md) §4 |
 | 2026-09-29 | TinyLM-Bench の検証全体（00 / 02 / 90 / 91 / 92）を反映する。主な内容は次のとおり。Action の契約（入力は1〜2文、出力は0〜2個、tool は v1 で 8〜16 種類）。学習データは 2,000〜10,000件で、否定と no-action を各20%以上とし、対比ペアを入れる。Tokenizer を先に固定する。PC 上だけの上限参照（20M）を置く。評価条件（prompt、greedy、grammar の実装）を固定して記録する。量子化後はカテゴリ別に評価し直す。既存 runtime（esp32-llm stories3M INT8）で実機の基準値を取る（B2.5） | [`roadmap.md`](roadmap.md) §4、§10、§12、[`architecture.md`](architecture.md) §2–7 |
+| 2026-09-29 | **ゴールを確定する。** 実用のためのモデルとし、利用者は開発者とする。入力はテキストのみとする。Action LM を実機で完成させてから Chat LM に取り組む。期限は設けず、できるだけ早く作る。実装と学習はすべて Claude Code が実行する | 本文書 §1 |
+| 2026-09-29 | モデルの重みは Hugging Face で **CC BY-SA 4.0**（商用利用可）で公開する。学習データは CC BY-SA 4.0 と両立するものだけを使う | [`development.md`](development.md) §6 |

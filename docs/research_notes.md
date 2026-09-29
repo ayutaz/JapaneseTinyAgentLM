@@ -200,6 +200,9 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 漢字復元を挟まず、ひらがな / モーラ列から直接意味・action を学習すれば、Tokenizer vocabulary と表記ゆれを削減できる可能性があります。一方で同音異義語、分かち書き、長音、数字、固有名詞の曖昧性が増えるため、必ず mixed Japanese baseline と比較します。
 
+> [!NOTE]
+> 2026-09-29 に、入力はテキストのみと決まりました。主な入力は漢字仮名交じり文なので、この仮説は本計画の中心から外します。ひらがなだけの入力は、頑健性を確かめるためのデータとして一部だけ扱います。
+
 ### 仮説C: 共通 Base から Chat / Action を派生させると開発効率が高い
 
 日本語理解は共有しつつ、Chat の自由生成と Action の決定的出力を SFT で分けられます。最終的な Unified 化により Flash を節約できる可能性がありますが、mode leakage と capacity competition の危険があります。
@@ -249,6 +252,8 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 ### Hugging Face
 
 Base / Chat / Action / Unified と model size ごとに repository を分けます。各 repository で FP artifact、quantized artifact、ESP32 artifact を明確に区別し、互換性のない形式に同じ曖昧な名前を付けません。
+
+重みのライセンスは **CC BY-SA 4.0**（商用利用可）です（2026-09-29 決定）。学習データのライセンス条件は [`development.md`](development.md) §6 にまとめています。最初に公開するのは Action LM で、Chat LM は後から追加します。
 
 `ayutaz/Ralomi` は別 repository、別 release gate のまま維持します。現時点では private / experimental であり、本プロジェクトの README から公開済み依存関係として宣伝しません。
 

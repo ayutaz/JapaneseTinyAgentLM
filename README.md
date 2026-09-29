@@ -1,16 +1,39 @@
 # JapaneseTinyAgentLM
 
-ESP32-S3 / M5Stack CoreS3 上で動作する、日本語向けの超小型 Language Model 群を研究・実装するプロジェクトです。
+ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用のための**日本語の超小型言語モデルを作るプロジェクトです。完成したモデルは、Hugging Face でオープンモデルとして公開します。
 
-本プロジェクトは、共通の日本語 Base LM、Tokenizer、学習基盤、量子化形式、ESP32-S3 推論 Runtime を共有し、初期段階では次の2種類の checkpoint を個別に開発します。
+## ゴール
 
-- **Japanese Tiny Chat LM**: 日本語テキストから短い日本語テキストを生成する。
-- **Japanese Action LM**: 日本語テキストから Stack-chan 等が実行できる JSON / action 列を生成する。
+| 項目 | 内容 |
+|---|---|
+| 位置づけ | 研究のためではなく、**実用**のためのモデル |
+| 利用者 | Stack-chan などに組み込んで使う**開発者** |
+| 入力と出力 | 入力は**テキストのみ**（漢字仮名交じりの日本語）。出力は Action の JSON、または短い日本語の応答 |
+| 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
+| 対象の実機 | M5 スタックチャン K151（CoreS3、Flash 16MB、PSRAM 8MB） |
+| 公開 | モデルを Hugging Face で公開する（**CC BY-SA 4.0**、商用利用可） |
+| 期限 | 決まっていない。できるだけ早く作る |
+| 進め方 | 実装と学習は、すべて Claude Code が実行する |
 
-最初は評価原因を切り分けるため Chat と Action を分離し、十分な性能が得られた後に `<chat>` / `<action>` モードを持つ Unified Model を実験します。音声認識は別プロジェクトの `ayutaz/Ralomi`、音声合成は `sanoTTS-jp` 等が担当し、本プロジェクトの基本入出力はテキストです。
+**Action LM の完了条件（暫定）:**
+
+- 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
+- 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
+- 量子化後も精度を保ち、K151 の実機で容量、速度、安定性の基準を満たす
+
+詳しくは [`docs/README.md`](docs/README.md) §1 と [`docs/roadmap.md`](docs/roadmap.md) を参照してください。
+
+## 構成
+
+共通の日本語 Tokenizer、学習基盤、量子化形式、ESP32-S3 推論 Runtime を共有し、次の2種類の checkpoint を開発します。
+
+- **Japanese Action LM**: 日本語テキストから、Stack-chan が実行できる Action の JSON を生成する。
+- **Japanese Tiny Chat LM**: 日本語テキストから、短い日本語テキストを生成する。
+
+Chat と Action は、評価で原因を切り分けやすいように最初は分けます。十分な性能が得られた後に、`<chat>` / `<action>` モードを持つ Unified Model を実験します。音声認識と音声合成は本プロジェクトの範囲外です。
 
 > [!IMPORTANT]
-> 2026-09-29 時点では調査・設計段階です。実機（M5 スタックチャン K151）の初回調査だけ完了しています。LM の性能、LM を含めた Flash/PSRAM 使用量、速度、電力、Ralomi との同居可否、市場優位性は未検証です。文書中の「目標値」「実測値」「確認済み事実」を区別してください。
+> 2026-09-29 時点では調査・設計段階です。完了しているのは、実機（M5 スタックチャン K151）の初回調査と、既存モデルの検証（TinyLM-Bench）だけです。LM の性能、LM を含めた Flash/PSRAM 使用量、速度、電力はまだ検証していません。文書中の「目標値」「実測値」「確認済み事実」を区別してください。
 
 ## 文書
 
@@ -38,6 +61,12 @@ ESP32-S3 / M5Stack CoreS3 上で動作する、日本語向けの超小型 Langu
 - 学習は vast.ai で行い、API key は `.env` の `VAST_API_KEY` に置く。
 - 詳しくは [`docs/development.md`](docs/development.md) を参照。
 
-## 想定ライセンスと公開状態
+## ライセンスと公開
 
-本リポジトリのソースコードと文書は [Apache License 2.0](LICENSE) で提供します（Copyright 2026 ayutaz）。学習データ、モデル重み、モデルカード、第三者コードの採用可否とそれぞれのライセンスはまだ決定していません。GitHub/Hugging Face への公開は、データ provenance、ライセンス、再現性、実機評価、安全性の gate を通過した artifact だけを対象にします。`ayutaz/Ralomi` は別プロジェクトかつ非公開・実験段階として扱い、本リポジトリの公開と連動させません。
+| 対象 | ライセンス |
+|---|---|
+| ソースコードと文書（本リポジトリ） | [Apache License 2.0](LICENSE)（Copyright 2026 ayutaz） |
+| モデルの重み（Hugging Face で公開） | **CC BY-SA 4.0**（商用利用可。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある） |
+| 学習データ | CC BY-SA 4.0 と両立するものだけを使う（[`docs/development.md`](docs/development.md) §6） |
+
+公開するのは、データの出典、ライセンス、再現性、実機での評価、安全性の審査をすべて通過した artifact だけです。

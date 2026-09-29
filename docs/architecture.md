@@ -102,7 +102,7 @@ TinyLM-Bench の 91 は、Action 専用のモデルを 10M〜50M で学習する
 - SentencePiece Unigram または BPE
 - Byte fallback を有効化し OOV をなくす
 - NFC 正規化
-- Chat 用の漢字仮名交じり corpus と、Ralomi 接続用の正規化ひらがな corpus を明示的に分離
+- 入力はテキストのみ。漢字仮名交じり文を主な対象とし、ひらがなだけの入力は頑健性の確認用に一部だけ扱う
 - `<chat>`, `<action>`, `<eos>`, `<no_action>` 等の special token を予約
 
 ### 比較する vocabulary
@@ -127,7 +127,7 @@ Tokenizer 評価では vocabulary 数だけでなく、次も測ります。
 - Action command の P50 / P95 token 長
 - 固有名詞、英数字、記号、JSON key の分割
 - 漢字仮名交じりとひらがなの圧縮率差
-- Ralomi 誤認識を模した入力に対する安定性
+- 入力ミス、変換ミス、全角・半角の表記ゆれに対する安定性
 
 ## 5. Transformer と推論方式
 
@@ -454,9 +454,13 @@ Host と ESP32 の双方で同じ golden vector を読み、Tokenizer、1-layer�
 
 Windows の host runtime では、日本語の入力を UTF-8 のファイルか stdin から読みます。argv では渡しません。TinyLM-Bench では、needle-2-esp32 の C host に argv で日本語を渡すと制限がありました。
 
-## 12. Ralomi 接続 interface 案
+## 12. 入力の interface
 
-LM が ASR 内部実装へ依存しないよう、最低限次の契約を定義します。
+入力はテキストのみです（2026-09-29 決定）。LM への入力は、UTF-8 の日本語テキストとして受け取ります。実機では serial、PC では UTF-8 のファイルか stdin から渡します。
+
+### 参考: 将来の ASR 接続の案（本計画の対象外）
+
+将来 ASR（Ralomi など）と統合する場合に、LM が ASR の内部実装へ依存しないための最低限の契約です。
 
 ```json
 {

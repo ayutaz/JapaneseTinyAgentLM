@@ -72,8 +72,8 @@ Phase 0 の exit gate は、実機の予算に依存する判断（partition、�
 - 左右、上下、強度（`slight` / `normal` / `large`）、相対表現。
 - 否定、取消、訂正、「もう少し」「さっきと逆」等の context 依存。
 - 丁寧語、口語、方言候補、表記ゆれ（全角・半角、句読点、省略）。
-- ひらがな入力 / 漢字仮名交じり入力。
-- 音声認識の誤りを模した表記ゆれ。
+- 漢字仮名交じり入力を主とする（入力はテキストのみ）。ひらがなだけの入力は、頑健性の確認用に一部だけ入れる。
+- 入力ミスや変換ミスを模した表記ゆれ。
 - 無関係要求、曖昧要求、危険要求の no-action。「何もしないで」のような明示的な no-action も含む。
 - 未知 tool / 未知 slot を含む adversarial input。
 - 少量の英語の命令（評価用）。
@@ -242,24 +242,31 @@ Unified が失敗しても研究成果です。原因を capacity、data balance
 
 ## 9. Phase 7: OSS / Model 公開
 
+モデルは Hugging Face で、オープンモデルとして公開します。利用者として想定しているのは開発者です（[`README.md`](README.md) §1）。
+
+最初に公開するのは、Action LM が完了条件（§4）と実機の基準（Phase 4）を満たした時点です。Chat LM は、完成してから追加で公開します。
+
 ### 公開物
 
-- Source、build 手順、training config。
-- Dataset manifest と provenance。
-- Tokenizer、model、quantized ESP32 artifact。
-- SHA-256 checksum。
-- Host / device benchmark raw JSON。
-- Model card と limitation。
-- Demo は再現可能な commit / board / config を明記。
+| 公開先 | 内容 | ライセンス |
+|---|---|---|
+| Hugging Face | FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、SHA-256 checksum | CC BY-SA 4.0 |
+| Hugging Face | モデルカード（用途、Action schema、角度への変換規約、評価結果、既知の限界、禁止用途） | CC BY-SA 4.0 |
+| GitHub | 学習と評価の code、training config、ESP32 runtime、build の手順 | Apache-2.0 |
+| GitHub | Dataset manifest と provenance、host と実機の benchmark の生の JSON | Apache-2.0（データ本体は、それぞれのライセンスに従う） |
+
+- デモには、再現できる commit、board、config を明記する。
+- 開発者向けの候補（未確定）として、ESP-IDF の component としての runtime と、tool を追加するための fine-tuning の手順も検討する。
 
 ### Release gate
 
-- License と再配布権の確認。
+- 学習データがすべて CC BY-SA 4.0 と両立すること。出典とライセンスが manifest に記録されていること（[`development.md`](development.md) §6）。
+- Claude Code が作ったデータを含む場合、Anthropic の利用規約上の扱いを確認済みであること。
 - Private data、個人情報、credential の除外。
 - Git history と artifact の secret scan。
-- Hardware safety test。
+- Hardware safety test（servo の可動域、no-action、confidence gate）。
 - Third-party notices。
-- Ralomi は独立した公開判断。開発中の private project を依存物として自動公開しない。
+- モデルカードに、CC BY-SA 4.0 の表示方法と継承の条件を明記する。
 
 ## 10. 評価指標の定義
 
@@ -336,13 +343,13 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 最初の1サイクルは次に限定します。
 
 1. Action schema v0 を `look` / `set_expression` / `nod` / no-action に絞る。形式は TinyLM-Bench と同じにし、1回の出力は 0〜2個とする（[`architecture.md`](architecture.md) §7）。
-2. ひらがなと漢字仮名交じりを対にした dataset を作る。学習データは 2,000〜10,000件とし、否定と no-action をそれぞれ20%以上にする。multi-action、否定、no-action を独立したカテゴリにし、対比ペアを入れる。
+2. 漢字仮名交じり文を主とした dataset を作る（ひらがなだけの入力は一部）。学習データは 2,000〜10,000件とし、否定と no-action をそれぞれ20%以上にする。multi-action、否定、no-action を独立したカテゴリにし、対比ペアを入れる。データはすべて CC BY-SA 4.0 と両立させ、出典を manifest に記録する。
 3. Tokenizer を先に固定してから、3M と 5M を学習する（vast.ai 上）。PC 上だけの上限参照として 20M も学習する。
 4. Grammar なし/ありと confidence gate なし/ありで、カテゴリ別の exact match と no-action を比較する。
 5. INT8 → INT4 の精度差を、カテゴリ別に測る。
 6. TinyLM-Bench の共通評価で、既存モデル（Needle 2、FunctionGemma 270M、MimiModel）と比べる。
 7. 5M INT4 を ESP32-S3 に載せ、Flash、PSRAM、tok/s、latency を測る。
-8. 結果を見て 10M Action または 10M Chat のどちらへ進むか決める。
+8. 結果を見て、Action の改善を続けるか（10M Action、データの見直し）、完了条件を満たして Chat へ進むかを決める。
 
 これにより、最も重要な「日本語 Action LM は小型化しても成立するか」を、Full pipeline の複雑さから切り離して検証できます。
 
@@ -363,13 +370,13 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 |---|---|---|---|
 | M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
 | M2 | Action schema v0 と評価の土台 | `grammar/action.schema.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
-| M3 | Dataset v0 と baseline | 学習用の合成データ 2,000〜10,000件（ひらがな版と漢字仮名交じり版の対、言い換え、multi-action、否定と no-action を各20%以上、対比ペア、少量の英語）、**手書きの test set**、ルールベース parser、既存モデルの結果（TinyLM-Bench） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている |
+| M3 | Dataset v0 と baseline | 学習用の合成データ 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア、少量の英語）。テンプレートと規則で生成する。**テンプレートの外で作る test set**、ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている |
 | M3.5 | vast.ai 実行基盤 | `infra/vast/`（GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 学習 → 回収 → 削除）。CLI は `uv add --dev vastai`（1.8 系）で lock する | 小さな学習で、一連の流れと instance の削除を確認し、費用を記録している |
 | M4 | Tokenizer と 3M / 5M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
 | M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | 上の手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
 | M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |
 
-M3 の test set を手書きにするのは、テンプレートで生成したデータで評価すると、テンプレートを暗記しているだけで高得点になるためです。
+M3 の test set をテンプレートの外で作るのは、テンプレートで生成したデータで評価すると、テンプレートを暗記しているだけで高得点になるためです。Test set は評価だけに使い、学習には使いません。
 
 ### Track B: 実機上のマイルストーン
 
@@ -393,3 +400,51 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
   - 20M が大きく上回る場合は、capacity が足りないと判断し、10M Action を試す。
   - 20M も低い場合は、data か tokenizer の問題と判断し、そちらを見直す。
 - **速度:** B2.5 で測った stories3M INT8 の実機速度を基準にし、5M / 10M を実機に載せたときの latency を見積もって、規模の判断に使う。
+
+## 13. 工数の見積もり（Claude Code が実行する前提）
+
+実装、学習、評価、実機での計測は、すべて Claude Code が実行します（[`README.md`](README.md) §1）。見積もりは次の3つに分けています。
+
+- **Claude Code の作業時間:** 実装、test、debug を含む。
+- **学習と待ち時間:** GPU での学習や、image の取得などの待ち時間。
+- **ユーザーの確認:** Claude Code だけでは完了できない点。
+
+初回の見積もりなので、±50% 程度の幅があります。精度が目標に届かなかったときの反復（データや tokenizer の見直し）は、この表には含みません。
+
+### Action LM の1周目
+
+| # | 内容 | Claude Code の作業時間 | 学習と待ち時間 | ユーザーの確認 |
+|---|---|---:|---|---|
+| M1 | リポジトリ基盤 | 1〜2 h | — | uv の更新 |
+| M2 | Action schema v0 と評価の土台 | 2〜3 h | — | — |
+| M3 | Dataset v0 と baseline | 4〜8 h | — | データの作り方の承認（規約の確認を含む） |
+| M3.5 | vast.ai 実行基盤 | 2〜3 h | 小さな学習 10〜30 分 | `.env` への API key の設定、費用の承認 |
+| M4 | Tokenizer と 3M / 5M / 20M の学習 | 4〜6 h | GPU で数時間 | 費用の承認 |
+| M5 | Grammar、confidence gate、量子化 | 3〜5 h | — | — |
+| M6 | Host C reference runtime | 4〜8 h | — | — |
+| B1 | ESP-IDF の Docker 環境 | 0.5〜1 h | image の取得 | Docker Desktop の起動 |
+| B2 | Servo の座標の確認 | 1〜2 h | — | **servo の動きを目で確認し、安全のため立ち会う** |
+| B2.5 | 既存 runtime による実機の基準値 | 2〜4 h | — | — |
+| B3 | LM 評価用の最小 firmware | 3〜5 h | — | — |
+| B4 | 実機への移植と servo の制御 | 4〜8 h | — | **Servo の動作に立ち会う** |
+| 合計 | | **約 30〜55 h** | GPU で数時間 | |
+
+### 速く進めるための並行化
+
+最短の経路（critical path）は M1 → M2 → M3 → M3.5 → M4 → M5 → M6 → B4 です。
+
+- GPU で学習している間（M4）に、Track B の B1〜B3 と B2.5 を進める。
+- 実機の作業のうち、ユーザーの立ち会いが要るのは B2 と B4 の servo の確認だけ。まとめて行えば、待ちを減らせる。
+- 暦の上での日数は、セッションを開ける時間と、上の確認のタイミングで決まる。
+
+### Chat LM（Action の完了後）
+
+| 内容 | Claude Code の作業時間 | 学習と待ち時間 | ユーザーの確認 |
+|---|---:|---|---|
+| 事前学習の corpus の準備（例: 日本語版 Wikipedia、CC BY-SA 4.0） | 3〜6 h | download と前処理 | corpus の承認 |
+| Base の事前学習（10M） | 2〜4 h | GPU で数時間 | 費用の承認 |
+| Chat の SFT のデータと学習 | 4〜8 h | GPU で1時間程度 | データの作り方の承認 |
+| 評価（自動評価、LLM による判定） | 3〜5 h | — | 人による比較評価（human preference）の一部 |
+| 合計 | **約 12〜23 h** | GPU で数時間 | |
+
+公開（Phase 7）の準備（モデルカード、artifact、checksum、審査の項目）には、別に 2〜4 h を見込みます。公開してよいかの最終判断は、ユーザーが行います。
