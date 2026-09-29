@@ -4,6 +4,14 @@ from jtalm.infra.spec import JobSpec
 
 VLLM_IMAGE = "vllm/vllm-openai:v0.30.0"  # CUDA 13.0, so hosts need cuda_vers >= 13.0
 UV = "$HOME/.local/bin/uv"
+
+
+def sync(extra: str = "") -> str:
+    """``uv sync`` with retries: a host's connection dropped mid-download of torch once."""
+    cmd = f"{UV} sync --locked --no-dev {extra}".strip()
+    return f"for i in 1 2 3; do {cmd} && exit 0; sleep 15; done; exit 1"
+
+
 BASE_QUERY = (
     "num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=120 "
     "rentable=true direct_port_count>=1 verified=true"
@@ -31,7 +39,7 @@ SMOKE = JobSpec(
     max_hours=1.0,
     steps=[
         "nvidia-smi > artifacts/nvidia_smi.txt",
-        f"{UV} sync --locked --no-dev --group train",
+        sync("--group train"),
         f"{UV} run --no-dev --group train python -m jtalm.infra.gpu_check "
         "> artifacts/gpu_check.json",
         start_vllm("Qwen/Qwen3-0.6B", gpu_mem=0.5, max_len=4096),
@@ -66,7 +74,7 @@ GEN_ACTION_V0 = JobSpec(
     max_hours=3.0,
     steps=[
         "nvidia-smi > artifacts/nvidia_smi.txt",
-        f"{UV} sync --locked --no-dev",
+        sync(),
         start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
         generate("eval-gen"),
         STOP_VLLM,
@@ -86,7 +94,7 @@ GEN_ACTION_V0_NEGATION = JobSpec(
     disk_gb=160,
     max_hours=1.0,
     steps=[
-        f"{UV} sync --locked --no-dev",
+        sync(),
         start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
         generate("train-gen", TOPUP_CONFIG),
         generate("train-verify", TOPUP_CONFIG),
@@ -129,7 +137,7 @@ def train_action_steps(
         ]
     return [
         "nvidia-smi > artifacts/nvidia_smi.txt",
-        f"{UV} sync --locked --no-dev --group train",
+        sync("--group train"),
         *cmds,
         f"{UV} run --no-dev --group train python -m jtalm.model.evaluate --ckpt {ckpts} "
         f"--tokenizer {TOKENIZER} --cases {ACTION_DATA}/eval.jsonl --out artifacts/{tag}/eval",
@@ -166,7 +174,7 @@ V03_WRITERS = [
 
 
 def _v03_steps() -> list[str]:
-    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", f"{UV} sync --locked --no-dev"]
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", sync()]
     for name, hf_id, mem in V03_WRITERS:
         cfg = f"configs/action_v03_{name}.json"
         steps += [
@@ -224,7 +232,7 @@ def _drop_weights(hf_id: str) -> str:
 
 
 def _v04_steps() -> list[str]:
-    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", f"{UV} sync --locked --no-dev"]
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", sync()]
     for name, hf_id, mem in V04_WRITERS:
         cfg = f"configs/action_v04_{name}.json"
         start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
@@ -262,7 +270,7 @@ V04B_WRITERS = [w for w in V04_WRITERS if w[0] in ("elyza", "calm3")]
 
 
 def _v04b_steps() -> list[str]:
-    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", f"{UV} sync --locked --no-dev"]
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", sync()]
     for name, hf_id, mem in V04B_WRITERS:
         cfg = f"configs/action_v04_{name}.json"
         start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
