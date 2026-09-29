@@ -10,23 +10,33 @@ ESP32-S3 / M5Stack CoreS3 上で動作する、日本語向けの超小型 Langu
 最初は評価原因を切り分けるため Chat と Action を分離し、十分な性能が得られた後に `<chat>` / `<action>` モードを持つ Unified Model を実験します。音声認識は別プロジェクトの `ayutaz/Ralomi`、音声合成は `sanoTTS-jp` 等が担当し、本プロジェクトの基本入出力はテキストです。
 
 > [!IMPORTANT]
-> 2026-09-29 時点では調査・設計段階です。モデル性能、Flash/PSRAM 使用量、速度、電力、Ralomi との同居可否、市場優位性は未検証です。文書中の「目標値」と「確認済み事実」を区別してください。
+> 2026-09-29 時点では調査・設計段階です。実機（M5 スタックチャン K151）の初回調査だけ完了しています。LM の性能、LM を含めた Flash/PSRAM 使用量、速度、電力、Ralomi との同居可否、市場優位性は未検証です。文書中の「目標値」「実測値」「確認済み事実」を区別してください。
 
 ## 文書
 
-- [`docs/README.md`](docs/README.md): プロジェクト全体像、決定事項、用語、文書索引
+- [`docs/README.md`](docs/README.md): プロジェクト全体像、決定事項の記録、用語、文書索引
 - [`docs/architecture.md`](docs/architecture.md): モデル、Runtime、Action schema、メモリ設計、公開構成案
+- [`docs/hardware.md`](docs/hardware.md): 対象の実機（K151）の構成、実機調査の計測値、Flash のバックアップ
+- [`docs/development.md`](docs/development.md): uv、vast.ai での学習、認証情報、実機操作の運用ルール
 - [`docs/research_notes.md`](docs/research_notes.md): 先行例比較、差別化仮説、確認済み事項と未検証事項
-- [`docs/roadmap.md`](docs/roadmap.md): 開発フェーズ、評価指標、各フェーズの完了条件、追加調査
+- [`docs/roadmap.md`](docs/roadmap.md): 開発フェーズ、実装マイルストーン、評価指標、各フェーズの完了条件、追加調査
 
 ## 現時点の短い結論
 
 1. 対象は Vision を入力しないため VLA ではなく、**Tiny LM + Language-to-Action / Tool-Calling LM** である。
 2. Chat と Action は完全な別プロジェクトにせず、**共通 Base から分岐する別 checkpoint** とする。
 3. Action は 3M / 5M / 10M、Chat は 10M / 20M を主な比較点とする。
-4. CoreS3 の 16MB Flash / 8MB PSRAM ではモデル単体でなく、Firmware・ASR・TTS・画面・音声バッファを含む全体予算が支配的である。
-5. ASR → LM → TTS は原則として同時実行せず、PSRAM workspace を時分割で再利用する。
-6. Action 出力は grammar-constrained decoding と実行側 validation の両方で制約する。
+4. **本計画の範囲は LLM を作ること**に限る。LM は、Flash 1.5〜5MB と PSRAM workspace 4MB 以下という LM 用の予算だけを前提に開発する。ASR / TTS との同居と統合は、将来の別計画とする。
+5. 学習は vast.ai（GPU）で行い、実機では LM の runtime と、Action による servo 制御を評価する。
+6. Action 出力は、TinyLM-Bench と同じ形式の action call の配列（0〜2個、`[]` が no-action）にする。grammar-constrained decoding、confidence gate、実行側 validation の3段で制約する。既存の小型モデルがすべて失敗した **multi-action、否定、no-action** を重点的に学習し、既存モデルに厳格一致率で勝つことを最初の目標にする。
+7. 対象の実機は **M5 スタックチャン K151** で、servo は Feetech SCS0009 ×2 を使う。Action の yaw は正の値を右とする（公式 firmware の規約）。実機の build は ESP-IDF v5.5.5 に固定する。
+8. 最初の1周は、3M / 5M の **Action 専用のスクラッチ学習**で「日本語 Action LM は小型化しても成立するか」を検証する。次の作業は M1（uv によるリポジトリ基盤）と M2（Action schema v0）である（[`docs/roadmap.md`](docs/roadmap.md) §12）。
+
+## 開発環境
+
+- Python は uv で管理し、依存の追加は `uv add` だけを使う。
+- 学習は vast.ai で行い、API key は `.env` の `VAST_API_KEY` に置く。
+- 詳しくは [`docs/development.md`](docs/development.md) を参照。
 
 ## 想定ライセンスと公開状態
 

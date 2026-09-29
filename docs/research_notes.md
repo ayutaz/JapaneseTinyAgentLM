@@ -18,6 +18,14 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 これらの peripheral もメモリ・Flash・CPU・DMA を使うため、8MB PSRAM を丸ごと LM に割り当てることはできません。
 
+開発に使う実機は、M5Stack 公式の M5 スタックチャン（SKU K151）です。2026-09-29 に実機から次を読み取りました。
+
+- ESP32-S3（QFN56）rev v0.2
+- 16MB quad Flash
+- 外付け PSRAM 約 8MB
+
+胴体（servo は SCS0009 ×2、IO expander、NFC、タッチなど）の構成と、受領時の firmware の計測値は [`hardware.md`](hardware.md) にまとめています。
+
 ## 3. 先行例
 
 ### 3.1 Needle 2 ESP32
@@ -38,6 +46,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 - MCU 上の grammar-constrained tool calling は実現可能。
 - 13MB 級 model は CoreS3 の全機能同居には大きすぎる。
+- Needle 2 の対象 board は Octal PSRAM、CoreS3 は Quad PSRAM で、PSRAM の帯域が異なる。KV cache や重みを PSRAM に置く場合、tok/s を直接比較しない。
 - Schema token が context を消費するため、tool 数を増やすだけでは拡張しにくい。
 - Grammar は構文を保証するが、日本語理解や slot correctness は別評価が必要。
 
@@ -76,15 +85,65 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 ### 3.5 stackchan-idf
 
-一次ソースで、ESP-IDF based Stack-chan Firmware、CoreS3 用 default config、16MB 用 partition 設定、component 構成が存在することを確認しました。参照会話では ESP-IDF 5.5 / C++20、CoreS3、Servo、Face、Mic/Speaker、local Japanese TTS、sanoTTS-jp 連携等が整理されています。
+一次ソースで確認済み（2026-09-29 再確認）:
 
-ただし本プロジェクトへ統合する前に、対象 commit で次を実測します。
+- ESP-IDF 5.5 系、C++20 の Stack-chan firmware。README によると 5.5.5 で検証しており、CI も `espressif/idf:v5.5.5` に固定している。
+- License は BSL-1.0。最終更新は 2026-09-23。
+- **K151 の胴体に対応している。** README に、PY32 IO expander（`0x6F`）の Pin 0 で servo の VM 電源を入れ、200ms 待ってから bus を使う手順が記載されている。SCS0009 ×2 を UART1（TX `G6` / RX `G7`、1Mbps、8N1）で動かす。
+- `components/scs_servo/` に SCS0009 のドライバがあり、台形速度の path generator と host test が付いている。
 
-- Firmware binary / partition 使用量
-- sanoTTS-jp weight と arena の実サイズ
-- LCD / audio / Wi-Fi 有効時の internal SRAM / PSRAM peak
-- License と第三者 notice
-- 既存 component API と LLM task の scheduling
+本プロジェクトへの示唆:
+
+- Servo の座標の確認（[`roadmap.md`](roadmap.md) §12 の B2）に、そのまま使える。
+- LM 評価用の最小 firmware では、`scs_servo` component の流用を候補にする。License（BSL-1.0）と第三者 notice は、採用時に確認する。
+
+### 3.6 m5stack/StackChan（K151 の公式 firmware）
+
+一次ソースで確認済み:
+
+- M5Stack 公式の M5 スタックチャン（K151）用の firmware、app、server をまとめた repository。
+- `firmware/` は ESP-IDF v5.5.4 系で、MIT License（Copyright 2026 M5Stack Technology）。
+- Servo は Feetech 製 servo のドライバ（`FTServo_Arduino`）の `SCSCL` で動かす。UART1、1Mbps、TX=`G6` / RX=`G7`。
+- Yaw は ID 1、±128°。Pitch は ID 2、3°〜87°。
+- Zero position を NVS に保存して較正する。
+- Pitch には、引っかかりを検知して止める stall protection がある。
+- Motion API では、yaw の正の値が右、pitch の値が大きいほど上（コードのコメントによる）。
+
+本プロジェクトへの示唆:
+
+- K151 の servo、電源、センサーの driver を再実装しなくて済む。
+- Action LM の出力は、この Motion API（`move` / `moveWithSpeed`、0.1° 単位）に写像できる。
+
+### 3.7 TinyLM-Bench（既存モデルの Windows host 検証、2026-09-29）
+
+別 workspace の `TinyLM-Bench` で、既存の小型モデルを Windows host 上の共通評価にかけました。
+
+- 結論は `docs/94_model_validation_and_advantage_ja.md`、生データは `results/` にある。
+- 94 の数値は `results/*.csv` と一致することを確認した。
+- 評価セットは16件（英語 8件、日本語 8件）。内訳は single 6、multi_action 4、no_action 4、negation 2。
+- Tool は `look(direction, amount)`、`set_expression(expression)`、`nod(count)` の3種類。
+
+**Action モデルの結果**
+
+| モデル | 厳格一致 | 日本語の厳格一致 | JSON 妥当 | Schema 妥当 | multi-action | 否定 | No-action | Decode | Peak RSS |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| FunctionGemma 270M | 6/16 | 4/8 | 16/16 | 11/16 | 0/4 | 0/2 | 2/4 | 4.76 tok/s | 約 2,026 MiB |
+| Needle 2 | 3/16 | 1/8 | 16/16 | 16/16 | 0/4 | 0/2 | 1/4 | 146.61 tok/s | 約 84 MiB |
+| MimiModel | 1/16 | 0/8 | 16/16 | 14/16 | 0/4 | 0/2 | 1/4 | 54.15 tok/s | 約 23 MiB |
+
+- FunctionGemma は「Do nothing.」に `nod` を返し、`amount` に enum 外の `right` や `left` を入れていた。
+- Needle 2 は schema 妥当率が 16/16 でも、厳格一致は 3/16 だった。構造の制約と意味の理解は別の問題である。
+
+**Chat モデルの結果**
+
+- 英語の小型モデル（TinyTalk 2 / cardputer-ai、esp32-mind、esp32-ai、esp32-llm）は、日本語の入力に対して、何も返さないか英語の物語を続けるだけだった。
+- 日本語を生成できたのは LLM-jp-3-150M-instruct3 だけだったが、約 1.25GB の RSS を使い、指示への追従も不安定だった。
+
+**本プロジェクトへの示唆**
+
+- 既存の3モデルは、どれも multi-action、否定、no-action で全滅している。差をつけるならここで、評価でもこの3カテゴリを独立に集計する。
+- Action の出力形式をこのベンチと同じにすれば、既存モデルを外部の比較対象にできる（[`architecture.md`](architecture.md) §7）。
+- 16件は、傾向を見るには足りるが、統計的な結論には足りない。評価セットは1,000件以上、重要カテゴリは各100件以上に拡張する（[`roadmap.md`](roadmap.md) §12 の M3）。
 
 ## 4. 先行例比較
 
@@ -94,7 +153,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 | slvDev/esp32-ai | TinyStories text generation | 28.9M stored | 14.9MB、4-bit PLE | 9.88 tok/s | instruction/action 向けでない | 一次ソース確認済み |
 | esp32-mind | TinyStories text generation | 11.5M と会話で整理 | 4-bit PLE | 14.22 tok/s | 日本語・action ではない | 速度等は一次ソース、規模は再確認 |
 | doryiii/esp32-llm | Tiny Llama experiment | 3.3M と会話で整理 | 要再確認 | 約12 tok/s と会話で整理 | 改造容易性を要評価 | 再確認必要 |
-| JapaneseTinyAgentLM | 日本語 Chat + Action | 3M〜20M 候補 | INT8/INT4候補 | 未計測 | 日本語、共有Base、Ralomi/Stack-chan連携 | 設計目標 |
+| JapaneseTinyAgentLM | 日本語 Chat + Action | 3M〜20M 候補 | INT8/INT4候補、1.5〜5MB | 未計測 | 日本語、共有 Base、K151 向けの Action（multi-action、否定、no-action を重視） | 設計目標 |
 
 数値比較では prompt length、prefill、decode、CPU clock、PSRAM mode、出力長、temperature を固定した共通 benchmark が必要です。
 
@@ -107,7 +166,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 ### 仮説B: Ralomi の正規化ひらがなを直接使うと小型化に有利
 
 ```text
-音声 → でんきをけして → {"actions":[...]}
+音声 → みぎをむいて → [{"name":"look","arguments":{"direction":"right","amount":"normal"}}]
 ```
 
 漢字復元を挟まず、ひらがな / モーラ列から直接意味・action を学習すれば、Tokenizer vocabulary と表記ゆれを削減できる可能性があります。一方で同音異義語、分かち書き、長音、数字、固有名詞の曖昧性が増えるため、必ず mixed Japanese baseline と比較します。
@@ -130,7 +189,7 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 - 3M / 5M / 10M / 20M を同一条件で比較し、日本語 Action に必要な最小規模を示す。
 - ASR の正規化ひらがな / モーラ列を直接入力する end-to-end pipeline 設計。
 - Chat と Action を共通 Base から派生し、後から Unified 化する比較研究。
-- ASR / LM / TTS の PSRAM workspace 時分割による CoreS3 完全オフライン統合。
+- ASR / LM / TTS の PSRAM workspace 時分割による CoreS3 完全オフライン統合（将来の統合計画。本計画の対象外）。
 - Stack-chan の Servo / Face / Speech に特化した安全な no-op と grammar 制約。
 
 未検証事項:
@@ -173,5 +232,11 @@ Base / Chat / Action / Unified と model size ごとに repository を分けま�
 - esp32-mind: https://github.com/kortexa-ai/esp32-mind
 - doryiii/esp32-llm: https://github.com/doryiii/esp32-llm
 - Ralomi: `ayutaz/Ralomi`（private / experimental。アクセス権がある環境でのみ確認）
+- M5Stack StackChan（K151）公式資料: https://docs.m5stack.com/en/StackChan
+- m5stack/StackChan（公式 firmware）: https://github.com/m5stack/StackChan
+- M5 スタックチャン販売開始（スイッチサイエンス）: https://prtimes.jp/main/html/rd/p/000000244.000064534.html
+- M5Stack Technology の FCC grantee code（2AN3W）: https://fccid.io/2AN3W
+- ESP-IDF releases: https://github.com/espressif/esp-idf/releases
+- TinyLM-Bench: 別 workspace（`../TinyLM-Bench`。Git 管理外）。`docs/94_model_validation_and_advantage_ja.md`、`eval/action_cases.json`、`eval/action_tools.json`、`results/`
 
 参照日は 2026-09-29。公開前・実装採用前に、対象 commit と license を固定して再確認します。

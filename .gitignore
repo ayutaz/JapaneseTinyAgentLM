@@ -79,3 +79,6 @@ CMakeCache.txt
 *.obj
 *.a
 *.exe
+
+# ==== Device flash backups (never commit) ====
+backups/
