@@ -416,16 +416,16 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 
 ## 11. Action LM の実機での実行（B4、2026-09-29）
 
-M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（Apache-2.0）で CoreS3 に載せました。LM の source は copy せず、`runtime/host/` の `model.c`、`tokenizer.c`、`grammar.c` をそのまま build します（`-DJTLM_ACC=float -ffp-contract=off`）。Wi-Fi、画面、servo は使いません。GPIO も操作しません。作業は 09:55〜11:13 UTC。
+M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（Apache-2.0）で CoreS3 に載せました。LM の source は copy せず、`runtime/host/` の `model.c`、`tokenizer.c`、`grammar.c` をそのまま build します（`-DJTLM_ACC=float -ffp-contract=off`）。Wi-Fi、画面、servo は使いません。GPIO も操作しません。作業は 09:55〜11:53 UTC。
 
 ### 構成
 
 | 項目 | 内容 | 確度 |
 |---|---|---|
-| Firmware | `jtalm_action`（ELF SHA-256 の先頭 `12c755445`）。ESP-IDF v5.5.5、gcc 14.2（`esp-14.2.0_20260121`）、`-O2`。Cache と clock は §8 と同じ（240MHz、data cache 64KB / line 64B、Flash QIO 80MHz、PSRAM Quad 80MHz） | 確認済み |
+| Firmware | `jtalm_action`（ELF SHA-256 の先頭 `12c755445`。confidence gate を加えた版は `bf5d82461`）。ESP-IDF v5.5.5、gcc 14.2（`esp-14.2.0_20260121`）、`-O2`。Cache と clock は §8 と同じ（240MHz、data cache 64KB / line 64B、Flash QIO 80MHz、PSRAM Quad 80MHz） | 確認済み |
 | Flash map | §8 と同じ partition table。app は `0x10000`（246KB）、`.jtlm` は `model` partition（`0x200000`、14MB）に esptool で直接書く。起動時に partition 全体を1回で mmap（`0x3C830000`）し、image をそのまま `jtlm_model_init` に渡す。起動時に image の SHA-256 を計算して log に出す | 実測 |
 | 入出力 | USB-Serial/JTAG の console（driver 経由）。1行の UTF-8 が1件の発話。応答は `JTALM {"t":"gen",...}` の1行（出力、生成した id、prompt の id、tokenize / prefill / decode / 合計の時間）。`!` で始まる行は command（`firmware/README.md`） | 確認済み |
-| 生成 | Action schema v0 の grammar 付きの greedy（host の `--grammar` と同じ） | 確認済み |
+| 生成 | Action schema v0 の grammar 付きの greedy（host の `--grammar` と同じ）。その後に confidence gate（既定 0.970）をかける | 確認済み |
 | Task | LM の task を core 1、行列積を半分受け持つ worker を core 0 に置く | 確認済み |
 | 状態の置き場所 | KV cache（f32、`max_seq_len` 128 の分）は PSRAM、残り（16 token 分の activation、attention の score、logits）は内部 SRAM | 実測 |
 | 5M の FP32 | 20.5MB で `model` partition（14MB）に入らないので測っていない | 確認済み |
@@ -445,6 +445,23 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 - 実機の出力は host の C、Python（`jtalm.model.decode.greedy`）と1件残らず同じなので、完全一致の率も [`runtime/host/README.md`](../runtime/host/README.md) の表の値（3M INT4 で 84.78% など）がそのまま実機の値になる。
 - 200件のうち 21件は prompt が 16 token を超え、prefill を2回に分けて処理する経路も通った。
 - 使った model は M4 の checkpoint（`runs/vast/train_action_v0-20260929T054319Z/artifacts/m4/{3m,5m}/best.pt`）。Image の SHA-256 の先頭は、3M が FP32 `de127de6c45ccb4e`、INT8 `a082374abf978e43`、INT4 `692604ceab4edd88`、5M が INT8 `18b912ffe5a76846`、INT4 `9645841b3a3b1fe1`。
+
+### 採用モデル（v0.4 の 3M）と confidence gate（実測）
+
+採用した v0.4 の 3M（`runs/vast/train_action_v04-20260929T095441Z/artifacts/v04/3m/best.pt`。構成と tokenizer は M4 と同じ）を INT4 / INT8 で書き出し、confidence gate を入れた firmware で確かめました。
+
+- **Confidence gate:** 生成した token の確率の最小値（`min_prob`。grammar で制約する前の確率）が閾値より小さいと、出力を `[]` にする（`jtalm.model.evaluate` の `gate` と同じ比較）。閾値は既定 0.970 で、`CONFIG_JTALM_GATE_PERMILLE`（千分率）で変えられる。応答の行には、gate の後の `output` と、前の `raw` の両方を出す。
+
+| 対象 | 件数 | 生成した id | gate 前の出力 | gate 後の出力 | gate で `[]` にした件数 |
+|---|---:|---:|---:|---:|---:|
+| INT4（image `11e80a93ac791c60`） | 評価セット全体 1,189 | 1,189 一致 | 1,189 一致 | 1,189 一致 | 71 |
+| INT8（image `1237ab25a85fab54`） | 先頭 200 | 200 一致 | 200 一致 | 200 一致 | 12 |
+
+- 比較相手は host の C（`double` の累積）。host の C の出力は、Python（`best_q4_g64.pt` / `best_q8_g64.pt` の `grammar`）と 1,189件すべてで一致した（`-DJTLM_ACC=float` でも同じ）。
+- **実機の INT4 ＋ gate の出力を評価すると、完全一致 94.45%、critical error 0.59%。** Python（`jtalm.model.evaluate --modes gate`）の 94.4% / 0.6% と同じ値。Gate をかけない場合は 94.28% / 2.02%。
+- `min_prob` が 0.970 から 1e-4 以内の例は1件もなく、C と Python の確率のわずかな差（最大 1e-5 程度）で gate の判定が変わるおそれはない。Python が validation で選んだ閾値（INT4 で 0.97004）と 0.970 のどちらでも、評価セットの結果は同じ。
+- 速度は M4 の 3M INT4 と同じ（decode 105.4 ms/token、prefill 45.4 ms/token）。評価セット全体（prompt 平均 14.8 token、生成 平均 5.5 token）で、1件の latency は中央値 1,075ms、p90 1,859ms、最大 4,134ms。出力が `[]` の件は中央値 724ms。先頭 200件だけでは中央値 1,222ms、p90 1,434ms。
+- 作業の終わりに、実機はこの firmware（`bf5d82461`）と v0.4 の 3M INT4 の状態にしてある。
 
 ### 速度（実測）
 
@@ -514,7 +531,7 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 
 ### 本プロジェクトへの示唆
 
-- **3M（INT4 または INT8）なら、実機で1件あたり約 1.2 秒（p90 約 1.5〜1.8 秒）で応答できる。** 実用の目安としては使える範囲（推測。音声認識や TTS と合わせた体感は未確認）。
+- **3M（INT4 または INT8）なら、実機で1件あたり約 1.1〜1.3 秒（p90 約 1.5〜1.9 秒）で応答できる。** 採用した v0.4 の 3M INT4 と gate の組み合わせで、実機でも完全一致 94.45%、critical error 0.59%（Python と同じ）。 実用の目安としては使える範囲（推測。音声認識や TTS と合わせた体感は未確認）。
 - 3M の decode は、INT8 では flash の帯域、INT4 では演算が律速で、どちらも約 0.1 秒 / token。これ以上は、生成する token 数を減らす（Action の表現を短くする）か、層や語彙を小さくするのが効く（推測）。
 - 5M は 3M より約 0.6 秒遅く、内部 SRAM にも余裕がない。精度で 3M を上回らない限り、実機の本命は 3M（[`roadmap.md`](roadmap.md) §12 の結論と同じ）。
 - 最も効いたのは prefill のまとめ処理で、prefill は 166 → 88 ms/token、2 core と合わせて 49 ms/token（約 1/3.4）になった。発話が長いほど効果が大きい。

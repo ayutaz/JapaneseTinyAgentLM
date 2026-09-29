@@ -120,18 +120,31 @@ def summarize(results: list[dict], ref: list[dict] | None) -> dict:
         "n_gen_mean": statistics.mean(r["n_gen"] for r in results),
     }
     if ref is not None:
-        same_ids = same_out = 0
+        same_ids = same_out = same_gated = near_gate = 0
         mismatches = []
         for i, (d, h) in enumerate(zip(results, ref, strict=False)):
+            raw = d.get("raw", d["output"])  # firmware before the gate had only "output"
+            gate = d.get("gate", 0.0)
+            # The host prints the ungated output; gate it the same way (jtalm.model.evaluate).
+            host_gated = "[]" if h["min_prob"] < gate else h["output"]
             ok_ids = d["ids"] == h["ids"]
-            ok_out = d["output"] == h["output"]
+            ok_out = raw == h["output"]
             same_ids += ok_ids
             same_out += ok_out
-            if not (ok_ids and ok_out):
+            same_gated += d["output"] == host_gated
+            near_gate += abs(d["min_prob"] - gate) < 1e-4
+            if not (ok_ids and ok_out and d["output"] == host_gated):
                 mismatches.append(
                     {"i": i, "prompt": d["prompt"], "device": d["ids"], "host": h["ids"]}
                 )
-        out.update(same_ids=same_ids, same_output=same_out, mismatches=mismatches[:20])
+        out.update(
+            same_ids=same_ids,
+            same_output=same_out,
+            same_gated_output=same_gated,
+            gated=sum(d.get("gated", 0) for d in results),
+            near_gate=near_gate,
+            mismatches=mismatches[:20],
+        )
     return out
 
 

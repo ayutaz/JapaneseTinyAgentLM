@@ -8,9 +8,12 @@
 // Each UTF-8 line received on the USB-Serial/JTAG console is one utterance; the reply is
 // one telemetry line with the greedy (grammar-constrained) output and its timings:
 //
-//   JTALM {"t":"gen","output":"[...]","ids":[...],"prefill_ms":...,...}
+//   JTALM {"t":"gen","output":"[...]","raw":"[...]","gated":0,"ids":[...],...}
 //
-// Lines starting with '!' are commands: "!heap", "!info", "!grammar 0|1", "!par 0|1" (split
+// "raw" is the decoded output; "output" is it after the confidence gate (CONFIG_JTALM_GATE_
+// PERMILLE): "[]" when the minimum token probability is below the threshold.
+// Lines starting with '!' are commands: "!heap", "!info", "!grammar 0|1", "!gate <threshold>"
+// (0 turns it off), "!par 0|1" (split
 // matrix products across both cores), "!batch 0|1" (batched prefill; 0 runs the prompt one
 // token at a time through jtlm_forward, as a baseline).
 // No Wi-Fi, no display, no servo: the only I/O is the console.
@@ -18,6 +21,7 @@
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "driver/usb_serial_jtag.h"
@@ -57,6 +61,7 @@ typedef struct {
   float *logits0;
   char out[OUT_BYTES];
   int use_grammar, use_par, use_batch;
+  double gate;  // confidence gate threshold (0: off)
   long n_requests;
 } lm_t;
 
@@ -159,13 +164,13 @@ static void emit_info(const lm_t *lm) {
       ",\"vocab\":%d,\"d_model\":%d,\"n_layers\":%d,\"n_heads\":%d,\"n_kv_heads\":%d"
       ",\"d_ff\":%d,\"max_seq_len\":%d,\"bits\":%d,\"group\":%d"
       ",\"arena\":\"%s\",\"arena_bytes\":%u,\"kv_bytes\":%u,\"batch\":%d"
-      ",\"grammar\":%d,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
+      ",\"grammar\":%d,\"gate\":%.3f,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
       app->project_name, app->idf_ver, elf_sha, app->date, app->time,
       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, lm->sha, (unsigned)lm->image_bytes,
       c->vocab_size, c->d_model, c->n_layers, c->n_heads, c->n_kv_heads, c->d_ff,
       c->max_seq_len, c->bits, c->group, lm->arena_where, (unsigned)lm->arena_bytes,
-      (unsigned)lm->kv_bytes, JTLM_BATCH, lm->use_grammar, lm->use_par, lm->use_batch,
-      xPortGetCoreID()
+      (unsigned)lm->kv_bytes, JTLM_BATCH, lm->use_grammar, lm->gate, lm->use_par,
+      lm->use_batch, xPortGetCoreID()
   );
 }
 
@@ -224,6 +229,7 @@ static int lm_init(lm_t *lm) {
     return -1;
   }
   lm->use_grammar = 1;
+  lm->gate = CONFIG_JTALM_GATE_PERMILLE / 1000.0;
   lm->use_batch = 1;
   lm->use_par = 1;
   jtlm_set_parallel(run_parallel);
@@ -278,9 +284,17 @@ static void run_prompt(lm_t *lm, const char *text, size_t len) {
   int n_fwd = n + n_decode_fwd;
   double prefill_ms = (t3 - t2) / 1000.0, decode_ms = (t4 - t3) / 1000.0;
   double total_ms = (t5 - t0) / 1000.0;
+  // Same comparison as jtalm.model.evaluate (a float probability against a double threshold).
+  int gated = (double)r.min_prob < lm->gate;
+  if (olen >= OUT_BYTES) olen = OUT_BYTES - 1;
   fputs("JTALM {\"t\":\"gen\",\"output\":", stdout);
-  print_json_string(lm->out, olen < OUT_BYTES ? olen : OUT_BYTES - 1);
-  printf(",\"min_prob\":%.9g,\"ids\":", (double)r.min_prob);
+  print_json_string(gated ? "[]" : lm->out, gated ? 2 : olen);
+  fputs(",\"raw\":", stdout);
+  print_json_string(lm->out, olen);
+  printf(
+      ",\"gated\":%d,\"gate\":%.3f,\"min_prob\":%.9g,\"ids\":", gated, lm->gate,
+      (double)r.min_prob
+  );
   print_ids(r.ids, r.n);
   fputs(",\"prompt_ids\":", stdout);
   print_ids(lm->ids, n);
@@ -348,6 +362,9 @@ static void run_command(lm_t *lm, const char *line) {
   } else if (!strncmp(line, "!grammar ", 9)) {
     lm->use_grammar = line[9] == '1';
     printf("JTALM {\"t\":\"ok\",\"grammar\":%d}\n", lm->use_grammar);
+  } else if (!strncmp(line, "!gate ", 6)) {
+    lm->gate = atof(line + 6);
+    printf("JTALM {\"t\":\"ok\",\"gate\":%.3f}\n", lm->gate);
   } else if (!strncmp(line, "!par ", 5)) {
     lm->use_par = line[5] == '1';
     jtlm_set_parallel(lm->use_par ? run_parallel : NULL);
