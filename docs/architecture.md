@@ -38,7 +38,7 @@
 - 図中の Servo は Feetech SCS0009 ×2 で、UART1（`G6` / `G7`、1Mbps）の SCS protocol で動かす。
 - Servo の電源（`VM_EN`）は IO expander（PY32L020）が制御する。
 - 検証済みの JSON を servo の命令に変換するのは firmware 側の dispatcher であり、LM は servo の raw 値を直接出力しない。
-- **実装の状況（2026-09-29）:** 実機の firmware（`firmware/jtalm_action/`）は、LM、grammar、confidence gate までを持ちます。図の validator と dispatcher、表情の表示、servo の制御はまだ実装していません（[`roadmap.md`](roadmap.md) §12「次の計画」）。raw への変換式は B2 で確かめてあります（§7）。
+- **実装の状況（2026-09-30）:** 実機の firmware（`firmware/jtalm_action/`）は、LM、grammar、confidence gate に加えて、図の validator と dispatcher、表情の表示（M5GFX）、servo の制御（自前の SCS driver）を持ちます（A1〜A3、[`hardware.md`](hardware.md) §12）。servo の出力は標準で off（dry-run）で、実際に首を動かす確認はユーザーの立ち会いのもとで行います。
 
 ## 2. 共通 Base と派生モデル
 
@@ -331,7 +331,8 @@ Action LM はカテゴリだけを出力し、firmware の dispatcher が K151 �
 | `normal` | ∓20° / ±20° | ±10° |
 | `large` | ∓30° / ±30° | ±15° |
 
-- 上の角度は初期値（設計目標）で、実機で見え方を確認してから確定する（Action から servo を動かす dispatcher の実装時に確認する）。
+- 上の角度は初期値（設計目標）で、実機で首を動かす確認（[`hardware.md`](hardware.md) §12）で見え方を確かめてから確定する。実機の可動域は、この上限と stackchan-idf の soft limit の重なり（yaw −30〜+30°、pitch −10〜+15°）で、「下を大きく」（−15°）は −10° に制限される。
+- うなずき（`nod`）は、今の pitch を中心に 8° 下げて戻す動きを `count` 回くり返す（上を向いたままでもうなずける）。`jtalm.action.mapping.nod_targets` と firmware は同じ動き。
 - 最大値は yaw ±30°、pitch ±15° とし、公式の可動域より狭く保つ。安全上の上限は、実行側の validator で再確認する。
 - `nod` は pitch を小さく往復させ、回数は `count` に従う。
 - 連続回転（PWM mode）や raw position は、Action LM から指定させない。
@@ -521,7 +522,7 @@ union AiWorkspace {
 - latency / memory telemetry
 - watchdog、timeout、cancel
 
-**実装の状況（2026-09-29）:** `runtime/host/`（M6）と `firmware/jtalm_action/`（B4）で、loader、tokenizer、Transformer の各層、RoPE、量子化した行列の計算、KV cache、grammar 付きの Action sampler、confidence gate、latency と memory の telemetry（`JTALM {json}` の行）、host との一致の確認（golden vector は `results/m6_parity/*/golden.jsonl`）を実装しました。Chat の sampler、実機側の JSON validator、watchdog / timeout / cancel は未実装です。
+**実装の状況（2026-09-29）:** `runtime/host/`（M6）と `firmware/jtalm_action/`（B4）で、loader、tokenizer、Transformer の各層、RoPE、量子化した行列の計算、KV cache、grammar 付きの Action sampler、confidence gate、latency と memory の telemetry（`JTALM {json}` の行）、host との一致の確認（golden vector は `results/m6_parity/*/golden.jsonl`）を実装しました。実機側の JSON validator、dispatcher、watchdog、停止（画面への touch、`!stop`）も実装しました（A1〜A3）。Chat の sampler は未実装です。
 
 Host と ESP32 の双方で同じ golden vector を読み、Tokenizer、1-layer、full forward、KV incremental decode、grammar mask を段階的に照合します。
 

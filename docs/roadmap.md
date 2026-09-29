@@ -550,8 +550,8 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | 3 | 採用するモデルを INT8 / INT4 で確認する | **完了**（3M INT4 + grammar で 94.3 / 94.4%） |
 | 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | **完了**。実機の出力は、採用した構成で評価セット全 1,189件が host と一致（gate の前と後の両方）。3M INT4 は1回の依頼の中央値 1.08〜1.15 秒、5M INT4 は 1.79 秒。**3M INT4 に決定**（[`hardware.md`](hardware.md) §11） |
 | 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | **完了**（2026-09-29） |
-| 6 | Action から servo を動かす dispatcher（[`hardware.md`](hardware.md) §10 の変換式、validator、可動域の制限）を `firmware/jtalm_action` に実装し、実機で首を動かす | 未着手（**ユーザーの立ち会いが必要**） |
-| 7 | 画面、servo、M5Unified と同居させたときの内部 SRAM / PSRAM と速度を測る | 未計測 |
+| 6 | Action から servo を動かす dispatcher（[`hardware.md`](hardware.md) §10 の変換式、validator、可動域の制限）を `firmware/jtalm_action` に実装し、実機で首を動かす | **実装と dry-run の確認は完了**（2026-09-30、A1〜A3。LM の出力 200/200、動作の計画 200/200 が Python と一致）。首を実際に動かす確認は、**ユーザーの立ち会いのもとで**[`hardware.md`](hardware.md) §12 の手順で行う |
+| 7 | 画面、servo、M5Unified と同居させたときの内部 SRAM / PSRAM と速度を測る | 画面ありは計測済み（3M の読み込み後の内部 SRAM 空き 116,831 B、応答の中央値 1,226ms）。servo を実際に動かした状態は 6 の確認で測る |
 | 8 | モデルの公開（Hugging Face の user `ayousanz`、CC BY-SA 4.0、Community contributions は off） | **保留（ユーザーの判断）**。公開する場合は、直前に内容を提示して確認を取る |
 | 9 | データ v0.5: 弱点を狙って追加する（人が書いた評価セットで見つかった、数字や固有名詞だけの断片と家事など実行できない依頼での誤作動、「こっち（を）見て」など正面を向く依頼の取りこぼし。ひらがなだけの雑談、否定の言い回し、英語も） | 推奨（人が書いた評価セットで効果を測る） |
 | 10 | Chat LM（10M。事前学習の corpus を決める） | Action の完了後 |
@@ -584,7 +584,7 @@ M3 の評価セットを学習データとは別のモデルと別の prompt で
 | B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する。**完了**（2026-09-29、ユーザーの立ち会いのもとで実施）。中立は yaw 460 / pitch 620、ロボット自身の右へ回すと yaw の raw は減り、上を向くと pitch の raw は増える（[`hardware.md`](hardware.md) §10） |
 | B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う。**完了**（2026-09-29）: stories3M INT8 は forward だけで 6.5〜7.1 tok/s（上流の約半分。CoreS3 は Quad PSRAM のため） |
 | B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate）。**計測の部分は完了**（2026-09-29、`firmware/jtalm_eval/`）: 起動直後の内部 SRAM 空き 335,663 B、PSRAM 空き 8.39MB、14MB の `model` partition を1回で mmap、読み出しは PSRAM 32.8 MB/s、Flash の mmap 31.2 MB/s。servo と画面を載せた状態の計測は未実施（「次の計画」の 7） |
-| B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす。**runtime の移植と計測は完了**（2026-09-29、`firmware/jtalm_action/`、[`hardware.md`](hardware.md) §11）: 3M / 5M × INT8 / INT4 を計測して 3M INT4 に決め、評価セット全 1,189件で host と一致した。servo を動かす部分は未実施（B2 は完了。残りは dispatcher。「次の計画」の 6） |
+| B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす。**runtime の移植と計測は完了**（2026-09-29、`firmware/jtalm_action/`、[`hardware.md`](hardware.md) §11）: 3M / 5M × INT8 / INT4 を計測して 3M INT4 に決め、評価セット全 1,189件で host と一致した。dispatcher、表情、servo の driver は A1〜A3 で実装済み。実際に首を動かす確認は未実施（「次の計画」の 6） |
 
 B2 以降は、実機の firmware を書き込む前に必ずバックアップを取ります（[`development.md`](development.md) §5）。
 

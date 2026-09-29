@@ -3,7 +3,8 @@
 Conventions (docs/architecture.md section 7, docs/hardware.md section 3):
 - yaw: 0 is straight ahead, positive is RIGHT. The official firmware takes 0.1 degree units.
 - pitch: relative to the neutral angle, positive is UP.
-The degree values are initial design targets and are confirmed on the device in milestone B2.
+The directions were confirmed on the K151 in milestone B2 (docs/hardware.md section 10); the
+firmware converts degrees to raw servo positions (yaw raw decreases to the robot's right).
 """
 
 from dataclasses import dataclass
@@ -37,9 +38,21 @@ def look_target(direction: str, amount: str) -> ServoTarget:
     raise ValueError(f"unknown direction: {direction}")
 
 
-def nod_targets(count: int) -> list[ServoTarget]:
-    """A nod is a small down-and-back pitch motion, repeated ``count`` times."""
-    return [ServoTarget(None, -NOD_PITCH_DEG), ServoTarget(None, 0)] * count
+def nod_targets(count: int, base_pitch: int = 0, pitch_min: int | None = None) -> list[ServoTarget]:
+    """A nod is a small down-and-back pitch motion around the current pitch, ``count`` times.
+
+    This matches firmware/jtalm_action: the head dips ``NOD_PITCH_DEG`` below ``base_pitch``
+    (not below ``pitch_min``) and comes back, so a nod while looking up stays looking up. When the
+    lower limit leaves less than half a nod of travel, the nod goes up from the limit instead.
+    The schema accepts an integral float count (2.0); it is read as the integer.
+    """
+    low = base_pitch - NOD_PITCH_DEG
+    if pitch_min is not None:
+        low = max(low, pitch_min)
+    high = base_pitch
+    if high - low < NOD_PITCH_DEG // 2:
+        high = low + NOD_PITCH_DEG
+    return [ServoTarget(None, low), ServoTarget(None, high)] * int(count)
 
 
 def to_firmware_tenths(deg: int) -> int:
