@@ -252,7 +252,7 @@ Unified が失敗しても研究成果です。原因を capacity、data balance
 
 | 公開先 | 内容 | ライセンス |
 |---|---|---|
-| Hugging Face | FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、SHA-256 checksum | CC BY-SA 4.0 |
+| Hugging Face（model、user `ayousanz`） | FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、SHA-256 checksum。公開の前にユーザーの確認を取る | CC BY-SA 4.0 |
 | Hugging Face | モデルカード（用途、Action schema、角度への変換規約、評価結果、既知の限界、禁止用途） | CC BY-SA 4.0 |
 | Hugging Face（dataset） | 合成データセットとデータセットカード。organization `japanese-data-analyze` に **public、manual gate** で公開する。モデルより先に、M3 の時点で公開する（[`data.md`](data.md) §6） | CC BY-SA 4.0 |
 | GitHub | 学習と評価の code、training config、ESP32 runtime、build の手順 | Apache-2.0 |
@@ -367,7 +367,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | 設計文書（`docs/`） | 完了（本更新を含む） |
 | B0 実機の初回調査 | 完了 |
 | `.env` の `VAST_API_KEY` | 設定済み。認証と課金設定を確認済み |
-| `.env` の `HF_TOKEN` | 設定済み。write 権限と、`japanese-data-analyze` の admin であることを確認済み |
+| `.env` の `HF_TOKEN` | 設定済み。user `ayousanz` の write token で、`japanese-data-analyze` の admin であることも確認済み |
 | M1 リポジトリ基盤 | **完了**（2026-09-29） |
 | M2 Action schema v0 と評価の土台 | **完了**（2026-09-29） |
 | M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |

@@ -60,7 +60,7 @@
 | 変数 | 用途 |
 |---|---|
 | `VAST_API_KEY` | vast.ai の API key。公式 CLI（`vastai`）がこの環境変数を直接読む |
-| `HF_TOKEN` | Hugging Face の access token。organization `japanese-data-analyze` への write 権限が必要。合成データとモデルのアップロードに使う。vast.ai の instance には持ち込まない |
+| `HF_TOKEN` | Hugging Face の access token（user `ayousanz`）。モデルは `ayousanz` に、合成データは organization `japanese-data-analyze` にアップロードする（write 権限は確認済み）。vast.ai の instance には持ち込まない |
 
 `vastai` CLI は、API key を次の優先順位で決めます。
 
@@ -113,7 +113,7 @@ uv run python -m jtalm.infra.job train_action_v0 --approve-dph 0.40   # M4 の�
 | 対象 | ライセンス |
 |---|---|
 | ソースコードと文書（本リポジトリ） | Apache License 2.0（Copyright 2026 ayutaz） |
-| モデルの重み（Hugging Face の `japanese-data-analyze` で公開） | **CC BY-SA 4.0**。商用利用は可能。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある |
+| モデルの重み（Hugging Face の `ayousanz` で公開。公開前にユーザーの確認を取る） | **CC BY-SA 4.0**。商用利用は可能。利用時の表示が必要で、改変したモデルも同じライセンスで公開する必要がある |
 | 合成データセット（Hugging Face の `japanese-data-analyze` で公開） | **CC BY-SA 4.0**。public、manual gate（[`data.md`](data.md) §6） |
 | 第三者のコード | それぞれの条件に従う（例: 公式 StackChan firmware は MIT、`stackchan-idf` は BSL-1.0）。採用前に確認する |
 

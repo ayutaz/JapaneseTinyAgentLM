@@ -1,6 +1,6 @@
 # JapaneseTinyAgentLM
 
-ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用のための**日本語の超小型言語モデルを作るプロジェクトです。完成したモデルと合成データセットは、Hugging Face の organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開します。
+ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用のための**日本語の超小型言語モデルを作るプロジェクトです。完成したモデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz) で、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開します。
 
 ## ゴール
 
@@ -11,7 +11,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | 入力と出力 | 入力は**テキストのみ**（漢字仮名交じりの日本語）。出力は Action の JSON、または短い日本語の応答 |
 | 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
 | 対象の実機 | M5 スタックチャン K151（CoreS3、Flash 16MB、PSRAM 8MB、servo は Feetech SCS0009 ×2） |
-| 公開 | Hugging Face の `japanese-data-analyze` で公開する。モデルの重みと合成データセットは、どちらも **CC BY-SA 4.0**（商用利用可） |
+| 公開 | モデルは Hugging Face の `ayousanz`、合成データセットは `japanese-data-analyze` で公開する（モデルは公開の前にユーザーの確認を取る）。どちらも **CC BY-SA 4.0**（商用利用可）で、Community contributions は off |
 | 期限 | 決まっていない。できるだけ早く作る |
 | 進め方 | 実装、学習、評価、実機での計測は、すべて Claude Code が実行する。学習と合成データの生成は vast.ai で行う |
 
@@ -71,7 +71,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | 既存モデルの検証（TinyLM-Bench）と計画への反映 | 完了 |
 | ゴール、ライセンス、学習データの方針の決定 | 完了（2026-09-29） |
 | vast.ai の API key（`.env`） | 設定済み。認証を確認済み |
-| Hugging Face の token（`.env` の `HF_TOKEN`） | 設定済み。`japanese-data-analyze` への write 権限を確認済み |
+| Hugging Face の token（`.env` の `HF_TOKEN`） | 設定済み。user `ayousanz` の token で、`japanese-data-analyze` への write 権限も確認済み |
 | M1 リポジトリ基盤（uv、Python 3.13、`uv.lock`、pytest、ruff） | 完了 |
 | M2 Action schema v0 と評価の土台（validator、角度への変換、評価指標。TinyLM-Bench の結果を再現） | 完了 |
 | M2.5 vast.ai の実行基盤（GPU での torch と vLLM の動作確認、自動削除、費用の記録） | 完了 |
@@ -132,7 +132,7 @@ uv run --group train pytest     # test（model の test には torch が必要�
 | 変数 | 用途 |
 |---|---|
 | `VAST_API_KEY` | vast.ai の API key |
-| `HF_TOKEN` | Hugging Face の access token（`japanese-data-analyze` への write 権限が必要） |
+| `HF_TOKEN` | Hugging Face の access token（user `ayousanz`。モデルは `ayousanz` に、データセットは `japanese-data-analyze` にアップロードする） |
 
 詳しくは [`docs/development.md`](docs/development.md) を参照してください。
 

@@ -551,12 +551,12 @@ GitHub はコードと再現手順を1 repository にまとめ、Hugging Face �
 ```text
 ayutaz/JapaneseTinyAgentLM                                    # GitHub（private で作成済み）
 
-japanese-data-analyze/JapaneseTinyAgentLM-5M-Action          # HF のモデル（名前は候補）
-japanese-data-analyze/JapaneseTinyAgentLM-10M-Action
-japanese-data-analyze/JapaneseTinyAgentLM-10M-Base
-japanese-data-analyze/JapaneseTinyAgentLM-10M-Chat
-japanese-data-analyze/JapaneseTinyAgentLM-10M-Unified
+ayousanz/JapaneseTinyAgentLM-3M-Action                        # HF のモデル（名前は候補）
+ayousanz/JapaneseTinyAgentLM-5M-Action
+ayousanz/JapaneseTinyAgentLM-10M-Base
+ayousanz/JapaneseTinyAgentLM-10M-Chat
+ayousanz/JapaneseTinyAgentLM-10M-Unified
 japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth       # HF の dataset（public、manual gate。M3 で公開済み）
 ```
 
-Hugging Face の公開先は、organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。**モデルの** repository の名前は未確定で（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）、既存の名称、商標、repository との衝突を公開前に確認します。
+Hugging Face の公開先は、**モデルはユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz)**、データセットは organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。モデルを公開する前には、必ずユーザーの確認を取ります。どの repository も Community contributions は off にします。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。**モデルの** repository の名前は未確定で（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）、既存の名称、商標、repository との衝突を公開前に確認します。

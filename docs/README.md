@@ -25,7 +25,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 | 利用者 | Stack-chan などに組み込んで使う**開発者**。組み込みやすさ、仕様の明確さ、再現性を重視する |
 | 入力 | **テキストのみ**。主な対象は漢字仮名交じりの日本語で、英語の命令は評価用に少量だけ扱う |
 | 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
-| 公開 | Hugging Face の organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。モデルの重みと合成データセットは、どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate |
+| 公開 | モデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz)、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate。モデルは公開の前にユーザーの確認を取る |
 | 学習データ | Apache-2.0 のオープンモデルと、ライセンスが両立する既存データで作る。Claude Code は、コードの作成と実行だけを担当する（[`data.md`](data.md)） |
 | 期限 | 決まっていない。できるだけ早く作る |
 | 実行体制 | 実装、学習、評価、実機での計測は、すべて **Claude Code** が実行する。学習と合成データの生成は vast.ai で行う。工数は Claude Code の作業時間で見積もる（[`roadmap.md`](roadmap.md) §13） |
@@ -44,7 +44,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 
 **公開物（Hugging Face と GitHub）**
 
-- Hugging Face（`japanese-data-analyze`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果
+- Hugging Face（`ayousanz`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果（公開前にユーザーが確認する）
 - Hugging Face（`japanese-data-analyze`、dataset）: 合成データセット。public、manual gate、CC BY-SA 4.0。**2026-09-29 に公開済み**（[`data.md`](data.md) §6）
 - GitHub: 学習と評価の code、ESP32 runtime
 
@@ -217,3 +217,4 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | M4 の結果（3M 84.4%、20M 83.9%）から、精度不足の原因は capacity ではなく data の側と判断する。次は M5 の grammar と、学習データ v0.3（書き手と言い回しを増やし、`[]` の割合を下げる）。目標値は据え置き、no-action の precision 0.90 以上を加える。英語は参考値とする | [`roadmap.md`](roadmap.md) §4、§12 |
 | 2026-09-29 | Track B で、第三者のコード（`stackchan-idf`、`esp32-llm` と、それらが指定する依存物）を取得して build し、実機に書き込むことを、ユーザーが明示的に許可した | [`hardware.md`](hardware.md) |
 | 2026-09-29 | Hugging Face に公開する repository（データセットとモデル）は、すべて Community contributions（Discussions と Pull Requests）を off にする。公開済みのデータセットにも設定した | [`data.md`](data.md) §6、[`development.md`](development.md) §6 |
+| 2026-09-29 | モデルの公開先はユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz) に変更する（データセットは `japanese-data-analyze` のまま）。モデルを公開する前には必ずユーザーの確認を取る | [`architecture.md`](architecture.md) §13 |
