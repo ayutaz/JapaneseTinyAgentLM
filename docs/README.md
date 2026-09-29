@@ -216,3 +216,4 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | M4 の決定。Tokenizer は SentencePiece の 2k（unigram、byte fallback）に固定し、出力の JSON の固定の断片と enum の値を1 token にまとめる。教師の出力は `name` を先に置いた compact な JSON にする。学習データなど Git の管理外のファイルは、job runner が scp で送り、sha256 で照合する | [`roadmap.md`](roadmap.md) §12、[`architecture.md`](architecture.md) §7 |
 | 2026-09-29 | M4 の結果（3M 84.4%、20M 83.9%）から、精度不足の原因は capacity ではなく data の側と判断する。次は M5 の grammar と、学習データ v0.3（書き手と言い回しを増やし、`[]` の割合を下げる）。目標値は据え置き、no-action の precision 0.90 以上を加える。英語は参考値とする | [`roadmap.md`](roadmap.md) §4、§12 |
 | 2026-09-29 | Track B で、第三者のコード（`stackchan-idf`、`esp32-llm` と、それらが指定する依存物）を取得して build し、実機に書き込むことを、ユーザーが明示的に許可した | [`hardware.md`](hardware.md) |
+| 2026-09-29 | Hugging Face に公開する repository（データセットとモデル）は、すべて Community contributions（Discussions と Pull Requests）を off にする。公開済みのデータセットにも設定した | [`data.md`](data.md) §6、[`development.md`](development.md) §6 |

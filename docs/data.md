@@ -133,10 +133,10 @@ Action LM v0 の tokenizer は、学習データと validation の入力文と�
 |---|---|
 | 対象 | §5 で作った合成データ（single / multi_action / negation / correction / no_action）とデータセットカード。manifest は GitHub で管理する |
 | 公開先 | **[`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)**（2026-09-29 公開） |
-| 公開設定 | **public、manual gate**（利用申請を手動で承認する）。ログインしていない状態でファイルを取得すると HTTP 401 になることを確認済み |
+| 公開設定 | **public、manual gate**（利用申請を手動で承認する）。ログインしていない状態でファイルを取得すると HTTP 401 になることを確認済み。**Community contributions（Discussions と Pull Requests）は off**（2026-09-29 に設定し、Discussions の一覧が HTTP 403 になることを確認済み） |
 | 時期 | M3 の完了時（モデルより先） |
 | 件数 | train 7,919 / validation 425 / test 1,039（合成の文だけ） |
 | ライセンス | **CC BY-SA 4.0**（モデルの重みと同じ。2026-09-29 決定） |
 | データセットカード | 生成に使ったモデルとライセンス、生成方法、検査の規則、件数、既知の限界、Claude Code の役割（pipeline のコードの作成だけ） |
 | 既存データ | MASSIVE などの第三者データは再配布せず、manifest で出典を参照する |
-| 手順 | アップロードの直前に、データセットカードと件数を提示して最終確認を取る。認証には `.env` の `HF_TOKEN` を使う。`japanese-data-analyze` への write 権限が必要 |
+| 手順 | アップロードの直前に、データセットカードと件数を提示して最終確認を取る。認証には `.env` の `HF_TOKEN` を使う。`japanese-data-analyze` への write 権限が必要。`jtalm.data.publish` は、public にする前に `jtalm.infra.hf.disable_community` で Community を off にし、off になったことを確認する |

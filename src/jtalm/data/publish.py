@@ -19,6 +19,7 @@ from jtalm.action.schema import to_json
 from jtalm.data.prompts import PROMPT_VERSION, VERIFY_SYSTEM
 from jtalm.eval.cases import load_cases
 from jtalm.infra.env import read_secret
+from jtalm.infra.hf import community_disabled, disable_community
 
 REPO_ID = "japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth"
 SPLITS = {"train": "train", "val": "validation", "eval": "test"}
@@ -166,9 +167,14 @@ def publish(hf_dir: Path, repo_id: str) -> str:
         commit_message="Add JapaneseTinyAgentLM Action synthetic dataset",
     )
     api.update_repo_settings(repo_id, repo_type="dataset", gated="manual")
+    disable_community(api, repo_id, "dataset")  # before it becomes public
     api.update_repo_settings(repo_id, repo_type="dataset", private=False)
     info = api.dataset_info(repo_id)
-    return f"https://huggingface.co/datasets/{repo_id} (private={info.private}, gated={info.gated})"
+    community = "off" if community_disabled(api, repo_id, "dataset") else "ON"
+    return (
+        f"https://huggingface.co/datasets/{repo_id} "
+        f"(private={info.private}, gated={info.gated}, community={community})"
+    )
 
 
 def main() -> None:

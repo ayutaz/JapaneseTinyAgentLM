@@ -117,6 +117,8 @@ uv run python -m jtalm.infra.job train_action_v0 --approve-dph 0.40   # M4 の�
 | 合成データセット（Hugging Face の `japanese-data-analyze` で公開） | **CC BY-SA 4.0**。public、manual gate（[`data.md`](data.md) §6） |
 | 第三者のコード | それぞれの条件に従う（例: 公式 StackChan firmware は MIT、`stackchan-idf` は BSL-1.0）。採用前に確認する |
 
+Hugging Face に公開する repository（データセットもモデルも）は、すべて **Community contributions（Discussions と Pull Requests）を off** にします。`jtalm.infra.hf.disable_community` で設定し、off になったことを確かめてから public にします。
+
 ### 学習データの条件
 
 重みを CC BY-SA 4.0 で公開するため、学習データは次の条件を満たすものだけを使います。
