@@ -77,11 +77,25 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 - Model staging と scratch allocation 後に PSRAM 約5,294KiB free と記載。
 - slvDev/esp32-ai を基に8MB board target と USB prompt/response path を追加。
 
-参照会話では 11.5M parameter と整理されていたが、今回取得できた README 該当箇所では直接確認できなかったため、再確認対象とします。
+規模は TinyLM-Bench で確認しました（§3.7）。
+
+- `xiao-model-v1` は 11,509,632 parameter、int4（group 128）、export 後 5,969,116 B。
+- 公開 `model.bin` と golden が一致することも検証済み。
 
 ### 3.4 doryiii/esp32-llm
 
-参照会話では 3.3M parameter、約12 tok/s の Llama 型実装として比較されました。今回の簡易再確認では該当数値を一次ソースから抽出できなかったため、現時点では**会話時点情報**としてのみ扱います。Fork 候補にする前に commit、model config、測定条件、license、training code を確認します。
+規模は TinyLM-Bench で確認しました（§3.7）。
+
+| モデル | Parameter 数 | 形式 | Size |
+|---|---:|---|---:|
+| stories260K | 260,032 | FP32 | 1,056,540 B |
+| stories3M | 3,148,224 | INT8（group 64） | 3,352,576 B |
+
+- Windows host では、float32 engine を上流のソースを変えずに動かせた（外部 shim を使用）。
+- Xtensa PIE の INT8 kernel は実機でしか動かない。
+- 約 12 tok/s という速度は上流の値で、CoreS3 での実測はまだない。
+- stories3M INT8 は、規模も量子化も本プロジェクトの 3M / 5M Action に近い。そのため、CoreS3 での速度と PSRAM 帯域の基準値を取る対象として最適である（[`roadmap.md`](roadmap.md) §12 の B2.5）。
+- Fork 候補にする前に、commit、license、training code を確認する。
 
 ### 3.5 stackchan-idf
 
@@ -145,14 +159,29 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 - Action の出力形式をこのベンチと同じにすれば、既存モデルを外部の比較対象にできる（[`architecture.md`](architecture.md) §7）。
 - 16件は、傾向を見るには足りるが、統計的な結論には足りない。評価セットは1,000件以上、重要カテゴリは各100件以上に拡張する（[`roadmap.md`](roadmap.md) §12 の M3）。
 
+**検証から得た教訓**（TinyLM-Bench の 00 / 02 / 90 / 91 / 92 から）
+
+- **評価条件で結果が変わる:** MimiModel は Needle 2 と同じ重みなのに、厳格一致が 1/16 だった（Needle 2 は 3/16）。原因は、tool の絞り込み、prompt の組み立て、reasoning の上限、grammar の実装の違い。本プロジェクトでも、prompt template、decoding の設定（greedy）、grammar の実装を固定して記録し、Python と C runtime を同じ評価セットで比べる。
+- **量子化で挙動が変わる:** TinyTalk 2 は、FP32 では「天気は分からない」と答えたのに、組込み用の Q4 では晴れだと捏造した。量子化後は loss や logit の誤差だけでなく、カテゴリ別の評価をやり直す。
+- **語彙の embedding が大きい:** TinyTalk 2 は「8M」と表記されているが、実際は 19.7M parameter あり、差の大部分は 50,257 語の embedding である。日本語の小型モデルでは語彙サイズが parameter 数を左右する。
+- **Grammar で防げない誤り:** 構造の破損は防げても、誤った tool の選択、誤った引数、否定の無視、余分な呼び出しは防げない。FunctionGemma は、話題外の入力に同じ `look` を何度も返した。
+- **Windows で日本語を渡すとき:** needle-2-esp32 の C host では、日本語を argv で渡すと制限があった。Host runtime では、UTF-8 のファイルか stdin で入力する。
+- **Host の測定値の限界:** Windows の RSS は ESP32 の SRAM / PSRAM の必要量を示さない。実機の memory は別の gate で測る。
+- **CoreS3 に載るかどうか:** Needle 2 は重みが 13.74MB で、上流の説明では PSRAM を約 7.7MB 使う。FunctionGemma 270M と LLM-jp 150M は PC 上の baseline にとどまり、CoreS3 に直接載せる候補から外れた。
+
+**Chat の baseline**
+
+- 日本語の生成: LLM-jp-3-150M-instruct3（PC のみ）
+- 小型の英語 Chat: TinyTalk 2 / cardputer-ai
+
 ## 4. 先行例比較
 
 | 実装 | 用途 | 規模 | Model / 量子化 | 速度 | 本プロジェクトとの差 | 確度 |
 |---|---|---:|---|---:|---|---|
 | Needle 2 ESP32 | English tool calling | 45M | 約13.1〜13.7MB、CQ2系 | 1.87 tok/s | 日本語、より小型、Stack-chan action 特化 | 一次ソース確認済み |
 | slvDev/esp32-ai | TinyStories text generation | 28.9M stored | 14.9MB、4-bit PLE | 9.88 tok/s | instruction/action 向けでない | 一次ソース確認済み |
-| esp32-mind | TinyStories text generation | 11.5M と会話で整理 | 4-bit PLE | 14.22 tok/s | 日本語・action ではない | 速度等は一次ソース、規模は再確認 |
-| doryiii/esp32-llm | Tiny Llama experiment | 3.3M と会話で整理 | 要再確認 | 約12 tok/s と会話で整理 | 改造容易性を要評価 | 再確認必要 |
+| esp32-mind | TinyStories text generation | 11.5M | int4（group 128）、5.97MB | 14.22 tok/s | 日本語・action ではない | 速度は一次ソース、規模は TinyLM-Bench で確認 |
+| doryiii/esp32-llm | Tiny Llama experiment | 3.1M（stories3M） | INT8（group 64）、3.35MB | 約12 tok/s（上流の値） | 3M / 5M 規模の実機速度の基準に使える | 規模は TinyLM-Bench で確認、速度は未確認 |
 | JapaneseTinyAgentLM | 日本語 Chat + Action | 3M〜20M 候補 | INT8/INT4候補、1.5〜5MB | 未計測 | 日本語、共有 Base、K151 向けの Action（multi-action、否定、no-action を重視） | 設計目標 |
 
 数値比較では prompt length、prefill、decode、CPU clock、PSRAM mode、出力長、temperature を固定した共通 benchmark が必要です。

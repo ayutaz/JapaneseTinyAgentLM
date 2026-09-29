@@ -77,12 +77,28 @@ Phase 0 の exit gate は、実機の予算に依存する判断（partition、�
 - 無関係要求、曖昧要求、危険要求の no-action。「何もしないで」のような明示的な no-action も含む。
 - 未知 tool / 未知 slot を含む adversarial input。
 - 少量の英語の命令（評価用）。
+- **対比ペア:** 「右を向いて」と「右を向かないで」、「笑って」と「笑わないで」のように、否定の有無だけが違う組を入れる。
+- **重複の禁止:** 同じ action を繰り返さない例を入れる。
+- **Tool の範囲外の要求:** 「部屋の電気を消して」のような要求に no-action を返す例を入れる。
 
 **multi-action、否定、no-action** は、TinyLM-Bench で既存の3モデルがすべて失敗したカテゴリです（[`research_notes.md`](research_notes.md) §3.7）。この3つは独立したカテゴリとして、学習でも評価でも厚く扱います。
 
+### データの規模と配分
+
+| 項目 | 目標 |
+|---|---|
+| 最初の1周の学習データ | 高品質な日本語の合成データ 2,000〜10,000件 |
+| 否定の割合 | 20%以上 |
+| No-action の割合 | 20%以上（雑談、質問、状態の説明、曖昧な命令、tool の範囲外の要求を含む） |
+| 評価セット | 1,000件以上。重要カテゴリ（multi-action、否定、no-action）は各100件以上 |
+| 分割 | テンプレート単位で分け、文面の暗記を避ける |
+
+TinyLM-Bench の16件は、開発中の smoke test として使います。モデルの選定には使いません。
+
 ### Model axis
 
-- 3M / 5M / 10M。
+- 3M / 5M / 10M（実機に載せる候補）。
+- 20M（必要なら 50M）: PC 上だけで学習する上限参照。3M / 5M の精度が低いとき、原因が capacity なのか、data や tokenizer なのかを切り分ける（[`architecture.md`](architecture.md) §3）。
 - INT8 / INT4。
 - context 64 / 128 / 256。
 - Grammar なし / あり。
@@ -126,9 +142,16 @@ Baseline は、単純な手法（random、rule-based parser、小型 classifier 
 - Human pairwise preference。
 - 生成長別 first-token latency と tok/s。
 
+### Baseline
+
+- Rule / template による応答。
+- 日本語の生成の baseline として、LLM-jp-3-150M-instruct3（PC のみ）。日本語は流暢だが、約 1.25GB の RSS を使い、指示への追従も不安定だった（[`research_notes.md`](research_notes.md) §3.7）。
+- 英語の小型 Chat の参考として、TinyTalk 2 / cardputer-ai。日本語の入力には、即座に EOS を返すだけだった。
+
 ### Exit gate
 
 - Rule/template baseline より、対象シナリオの human preference で優位。
+- 日本語の対象シナリオで、LLM-jp-3-150M-instruct3 との差を定量的に示している（規模が 1/10 以下であることを考慮する）。
 - 最大生成長で timeout / watchdog reset がない。
 - 品質評価者間一致と rubric が記録されている。
 
@@ -154,8 +177,13 @@ Baseline は、単純な手法（random、rule-based parser、小型 classifier 
 | Memory | Peak internal SRAM、peak PSRAM、largest free block、fragmentation、stack high-water mark |
 | Flash | Firmware、model、Tokenizer、grammar、assets、partition slack |
 | 品質 | Host と実機の token match、Action exact match、quantization delta |
-| 安定性 | 連続100/1,000 request、watchdog、heap leak、thermal behavior |
+| 起動 | Cold boot、warm start、model load の時間 |
+| 安定性 | 連続10 / 100 / 1,000 request、watchdog、heap leak |
+| 温度 | Chip 温度、clock の低下（thermal throttling） |
+| 周辺機能 | 画面と servo を有効にしたときの、memory と速度の差分 |
 | 電力 | Idle / 推論中 / servo 駆動中の電流・energy per request |
+
+どの計測にも、firmware の commit と build flags、Flash の partition、model hash、同じ評価入力、serial log の生データを添えます。Windows host の RSS は、実機の memory の代わりにはなりません。
 
 ### Exit gate
 
@@ -246,8 +274,21 @@ Unified が失敗しても研究成果です。原因を capacity、data balance
 - **Sequence accuracy**: 複合 action の順序を含む一致。
 - **No-action precision / recall**: 実行すべきでない入力を止める能力。
 - **Confidence gate の効果**: gate による no-action への切り替え率と、誤作動率の変化。
-- **Critical error rate**: 逆方向、否定無視、enum 外の値、未知 action 等。
+- **Critical error rate**: 逆方向、否定無視、enum 外の値、未知 action、重複した呼び出し等。
 - **Paraphrase consistency**: 同義表現で同じ canonical action を返す率。
+- **Contrastive pair accuracy**: 否定の有無だけが違う対比ペアの、両方に正解した率。
+
+### 評価条件の固定
+
+同じ重みでも、評価条件で結果が大きく変わります。TinyLM-Bench では、Needle 2 と同じ重みの MimiModel が、prompt の組み立てと grammar の実装の違いから、厳格一致 3/16 に対して 1/16 でした（[`research_notes.md`](research_notes.md) §3.7）。そのため、次を固定して結果とともに記録します。
+
+- Prompt template と system prompt。
+- Decoding の設定。評価は greedy とし、乱数の影響をなくす。
+- Grammar の実装と version。
+- Confidence gate の閾値。
+- 評価セットの version と hash。
+
+Python の実装と C runtime は、同じ評価セットと同じ条件で比べます。
 
 ### Chat
 
@@ -275,12 +316,12 @@ Unified が失敗しても研究成果です。原因を capacity、data balance
 1. K151 上で、自前の最小 firmware（LM runtime と servo 制御）の Flash / PSRAM map を測り、LM の予算を確定する。
    - 1a. Yaw の符号と pitch の中立角度を実機で確認する。
 2. Needle 2 の artifact format、kernel、grammar の再利用可能性と license。
-3. ESP32-S3 SIMD / ESP-DSP / ESP-NN / ESP-DL を使う quantized GEMV の比較。
+3. ESP32-S3 SIMD / ESP-DSP / ESP-NN / ESP-DL を使う quantized GEMV の比較。既存の runtime（esp32-llm の Xtensa PIE INT8 kernel、esp32-mind / esp32-ai の int4 PLE runtime）を流用できるかと、その license も調べる。
 4. MQA/GQA、KV INT8、sliding window、recompute の速度・メモリ trade-off。
 5. 日本語 Action dataset の設計、合成比率、人手検証、権利。
 6. ひらがな-only と mixed Japanese の controlled comparison。
 7. Rule-based parser、小型 classifier、seq2seq との比較。
-8. 既存の日本語 on-device tool-calling model、論文、製品、特許の網羅調査。
+8. 既存の日本語 on-device tool-calling model、論文、製品、特許の網羅調査。公開されている小型モデル9種の Windows host での検証は、TinyLM-Bench で済んでいる（[`research_notes.md`](research_notes.md) §3.7）。
 9. Grammar compiler の supported subset と code size。
 10. Flash mmap、microSD streaming、external storage の latency。
 11. OTA / rollback / recovery partition を残したまま成立する構成。
@@ -295,10 +336,10 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 最初の1サイクルは次に限定します。
 
 1. Action schema v0 を `look` / `set_expression` / `nod` / no-action に絞る。形式は TinyLM-Bench と同じにし、1回の出力は 0〜2個とする（[`architecture.md`](architecture.md) §7）。
-2. ひらがなと漢字仮名交じりを対にした dataset を作る。multi-action、否定、no-action を独立したカテゴリにする。
-3. 3M と5Mを学習する（vast.ai 上）。
+2. ひらがなと漢字仮名交じりを対にした dataset を作る。学習データは 2,000〜10,000件とし、否定と no-action をそれぞれ20%以上にする。multi-action、否定、no-action を独立したカテゴリにし、対比ペアを入れる。
+3. Tokenizer を先に固定してから、3M と 5M を学習する（vast.ai 上）。PC 上だけの上限参照として 20M も学習する。
 4. Grammar なし/ありと confidence gate なし/ありで、カテゴリ別の exact match と no-action を比較する。
-5. INT8 → INT4 の精度差を測る。
+5. INT8 → INT4 の精度差を、カテゴリ別に測る。
 6. TinyLM-Bench の共通評価で、既存モデル（Needle 2、FunctionGemma 270M、MimiModel）と比べる。
 7. 5M INT4 を ESP32-S3 に載せ、Flash、PSRAM、tok/s、latency を測る。
 8. 結果を見て 10M Action または 10M Chat のどちらへ進むか決める。
@@ -322,11 +363,11 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 |---|---|---|---|
 | M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
 | M2 | Action schema v0 と評価の土台 | `grammar/action.schema.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
-| M3 | Dataset v0 と baseline | 合成データ（ひらがな版と漢字仮名交じり版の対、言い換え、multi-action、否定、no-action、少量の英語）、**手書きの test set**、ルールベース parser、既存モデルの結果（TinyLM-Bench） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている |
+| M3 | Dataset v0 と baseline | 学習用の合成データ 2,000〜10,000件（ひらがな版と漢字仮名交じり版の対、言い換え、multi-action、否定と no-action を各20%以上、対比ペア、少量の英語）、**手書きの test set**、ルールベース parser、既存モデルの結果（TinyLM-Bench） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている |
 | M3.5 | vast.ai 実行基盤 | `infra/vast/`（GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 学習 → 回収 → 削除）。CLI は `uv add --dev vastai`（1.8 系）で lock する | 小さな学習で、一連の流れと instance の削除を確認し、費用を記録している |
-| M4 | Tokenizer と 3M / 5M の学習 | SentencePiece（2k / 4k / 8k を比較）、decoder-only Transformer、学習 script | ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
-| M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | 上の手順 4〜6 の比較結果が揃っている |
-| M6 | Host C reference runtime | portable C の推論コード、golden vector | PyTorch の出力と、token が一致している |
+| M4 | Tokenizer と 3M / 5M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
+| M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | 上の手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
+| M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |
 
 M3 の test set を手書きにするのは、テンプレートで生成したデータで評価すると、テンプレートを暗記しているだけで高得点になるためです。
 
@@ -337,6 +378,7 @@ M3 の test set を手書きにするのは、テンプレートで生成した�
 | B0 | 実機の初回調査 | **完了**（2026-09-29）。対象機の特定、SoC / Flash / PSRAM、Flash 全体のバックアップ（[`hardware.md`](hardware.md)） |
 | B1 | ESP-IDF の build 環境 | ESP-IDF **v5.5.5** の公式 Docker image（`espressif/idf:v5.5.5`）で build する。ローカルへの導入は不要。書き込みは Windows から `esptool` で行う |
 | B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する |
+| B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う |
 | B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate） |
 | B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、5M INT4 の tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす |
 
@@ -346,5 +388,8 @@ B2 以降は、実機の firmware を書き込む前に必ずバックアップ�
 
 M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決めます。
 
-- **5M Action が baseline に勝ち、実機にも収まった場合:** 10M Chat（Base の事前学習を含む）へ進む。
-- **精度が足りない場合:** 10M Action、またはデータと Tokenizer の見直しへ進む。
+- **5M Action が baseline（単純な手法と既存モデル）に勝ち、実機にも収まった場合:** 10M Chat（Base の事前学習を含む）へ進む。
+- **精度が足りない場合:** 20M の上限参照と比べて原因を切り分ける。
+  - 20M が大きく上回る場合は、capacity が足りないと判断し、10M Action を試す。
+  - 20M も低い場合は、data か tokenizer の問題と判断し、そちらを見直す。
+- **速度:** B2.5 で測った stories3M INT8 の実機速度を基準にし、5M / 10M を実機に載せたときの latency を見積もって、規模の判断に使う。

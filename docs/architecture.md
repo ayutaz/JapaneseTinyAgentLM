@@ -49,12 +49,15 @@
 
 ### Action
 
-- 入力: 日本語の command または状態文。英語の命令は、評価用に少量だけ扱う。
+- 入力: 1〜2文の日本語の command または状態文。英語の命令は、評価用に少量だけ扱う。
 - 出力: action call の JSON 配列（0〜2個）。空配列 `[]` が no-action。形式は §7。
+- Tool: v0 は3種類（ベンチ互換）。v1 で 8〜16 種類に広げる。引数は enum と小さな整数だけにする。
 - 目標規模: 3M / 5M / 10M を中心に比較する。量子化後の容量は §9 の LM 予算（1.5〜5MB）に収める。
 - 目標 context: 64〜128 tokens。schema を prompt に含める方式では 256 も比較
-- 自由生成は不要。構文妥当性、slot 値、no-op、安全性を優先
+- 自由生成は不要。構文妥当性、slot 値、no-action、安全性を優先
 - Grammar 制約と confidence gate（§8）を基本機能とする
+
+この狭い契約は、TinyLM-Bench の検証（[`research_notes.md`](research_notes.md) §3.7）に基づいています。28.9M の TinyStories モデルは速くても Action を扱えず、270M の FunctionGemma でもロボット固有の schema を誤りました。
 
 ### Unified（後期実験）
 
@@ -85,6 +88,13 @@ INT4 の理論的な重み本体は、1 parameter あたり約0.5 byteです。�
 
 TinyLM-Bench の検証メモ（`94_model_validation_and_advantage_ja.md`）では、量子化後の容量を 4〜8MB とする案が出ていました。本計画では、LM 予算（§9）の 1.5〜5MB を優先します。8MB は INT4 で約 16M parameter に相当し、Action 専用のモデルとしては大きすぎるためです。
 
+### 上限参照のモデル（PC のみ）
+
+TinyLM-Bench の 91 は、Action 専用のモデルを 10M〜50M で学習することを勧めていました。本計画では、実機に載せる候補は 10M までにします。ただし、**PC 上だけで学習する上限参照**として、Action の 20M（必要なら 50M）も学習します。
+
+- 3M / 5M の精度が低いとき、原因が capacity なのか、data や tokenizer なのかを切り分けるため。
+- 上限参照のモデルは実機に載せない。Needle 2（45M、13.7MB、PSRAM 約 7.7MB）でも、CoreS3 では周辺機能と同居する余裕が小さい。
+
 ## 4. Tokenizer と vocabulary
 
 ### 候補
@@ -100,12 +110,16 @@ TinyLM-Bench の検証メモ（`94_model_validation_and_advantage_ja.md`）で�
 | 用途 | 候補 vocab | 理由 |
 |---|---:|---|
 | Action / ひらがな入力 | 2,048 / 4,096 / 8,192 | 語彙表と LM head を小さくしやすい |
-| Chat / 一般日本語 | 4,096 / 8,192 / 16,384 | 漢字・頻出 subword と系列長の折衷 |
+| Chat / 一般日本語 | 4,096 / 8,192 / 12,288 / 16,384 | 漢字・頻出 subword と系列長の折衷 |
 | Unified | 4,096 を基準、8,192 と比較 | 共通化と日本語圧縮率のバランス |
 
 例として vocab 4,096、hidden 256 の embedding は約1.05M parametersです。入力 embedding と出力 LM head は weight tying し、重複を避けます。
 
 TinyLM-Bench の検証メモは 8k〜16k から始めることを提案していました。ただし、vocab 16,384、hidden 256 の embedding は約 4.2M parameter で、5M のモデルではほぼ全体を占めてしまいます。そこで語彙サイズは、2k〜16k の範囲を実測で比べて決めます。比べる指標は、coverage、byte fallback 率、平均 token 長、量子化後の精度です。
+
+語彙の embedding が parameter 数を左右することは、既存モデルでも確認できます。TinyTalk 2 は「8M」と表記されていますが、実際は 19.7M parameter あり、その多くが 50,257 語の embedding です（[`research_notes.md`](research_notes.md) §3.7）。
+
+**Tokenizer はモデルの本学習より先に固定します**（[`roadmap.md`](roadmap.md) §12 の M4）。Tokenizer を後から変えると、学習済みのモデルがすべて無駄になるためです。
 
 Tokenizer 評価では vocabulary 数だけでなく、次も測ります。
 
@@ -151,12 +165,14 @@ GQA/MQA、短い context、INT8 KV は PSRAM 削減に大きく効きます。�
 量子化は「Flash に入るか」だけでなく、次を同時に評価します。
 
 - Host reference との logit error
-- Action exact match の劣化
+- Action exact match の劣化（カテゴリ別。特に否定と no-action）
 - Chat 品質の劣化
 - dequantization を含む tok/s
 - peak SRAM / PSRAM
 - artifact size と alignment overhead
 - 対応 kernel の保守性
+
+量子化で挙動そのものが変わることがあります。TinyTalk 2 は、FP32 では「天気は分からない」と答えたのに、Q4 では晴れだと捏造しました（[`research_notes.md`](research_notes.md) §3.7）。そのため、量子化後は logit の誤差だけでなく、評価セット全体をカテゴリ別に評価し直します。
 
 ## 7. Action schema
 
@@ -168,6 +184,10 @@ GQA/MQA、短い context、INT8 KV は PSRAM 削減に大きく効きます。�
 - 1回の出力は **0〜2個**の action に限る。
 - 方向や量は数値ではなく**カテゴリ**（enum）で出力させる。小さなモデルが数値を誤るのを避けるためで、角度への変換は firmware 側の dispatcher が行う。
 - 未知の action、未知の field、enum 外の値、必須引数の欠落、JSON 前後の説明文を拒否する。
+- 同じ action call の重複を拒否する。FunctionGemma は、話題外の入力に同じ `look` を何度も返していた。
+- Tool の範囲外の要求（例:「部屋の電気を消して」）には no-action を返す。
+
+v1 では tool を 8〜16 種類に広げます。候補は、K151 の周辺機器を使う `shake_head`（首を横に振る）、`look_around`、`set_led`（RGB LED）、`stop`（動作の停止）などです。追加する前に、TinyLM-Bench 互換の部分（v0 の3種類）の評価が崩れないことを確認します。
 - Grammar が構文を保証しても、意味的安全性は confidence gate（§8）と実行側 validator が保証する。
 - Action 実行前に、デバイス状態、速度制限、可動域、衝突条件を確認する。
 
@@ -431,6 +451,8 @@ union AiWorkspace {
 - watchdog、timeout、cancel
 
 Host と ESP32 の双方で同じ golden vector を読み、Tokenizer、1-layer、full forward、KV incremental decode、grammar mask を段階的に照合します。
+
+Windows の host runtime では、日本語の入力を UTF-8 のファイルか stdin から読みます。argv では渡しません。TinyLM-Bench では、needle-2-esp32 の C host に argv で日本語を渡すと制限がありました。
 
 ## 12. Ralomi 接続 interface 案
 

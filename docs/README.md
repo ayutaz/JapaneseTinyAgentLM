@@ -159,3 +159,4 @@ JapaneseTinyAgentLM
 | 2026-09-29 | 量子化後の LM の容量は 1.5〜5MB とする（TinyLM-Bench の検証メモにあった 4〜8MB は採らない）。語彙サイズは 2k〜16k を実測で比べて決める | [`architecture.md`](architecture.md) §3–4 |
 | 2026-09-29 | Grammar に加えて confidence gate を入れ、確信度の低い出力は no-action にする | [`architecture.md`](architecture.md) §8 |
 | 2026-09-29 | Action の目標値は、TinyLM-Bench の検証メモの値（完全一致 90%以上、no-action 95%以上など）を暫定で採用し、既存モデルを baseline に加える | [`roadmap.md`](roadmap.md) §4 |
+| 2026-09-29 | TinyLM-Bench の検証全体（00 / 02 / 90 / 91 / 92）を反映する。主な内容は次のとおり。Action の契約（入力は1〜2文、出力は0〜2個、tool は v1 で 8〜16 種類）。学習データは 2,000〜10,000件で、否定と no-action を各20%以上とし、対比ペアを入れる。Tokenizer を先に固定する。PC 上だけの上限参照（20M）を置く。評価条件（prompt、greedy、grammar の実装）を固定して記録する。量子化後はカテゴリ別に評価し直す。既存 runtime（esp32-llm stories3M INT8）で実機の基準値を取る（B2.5） | [`roadmap.md`](roadmap.md) §4、§10、§12、[`architecture.md`](architecture.md) §2–7 |

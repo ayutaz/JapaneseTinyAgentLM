@@ -24,6 +24,12 @@
 - 学習・実行基盤のスクリプトが使う CLI（`vastai`）は、`uv add --dev` で開発用の依存として lock する。
 - 実機の読み書きに使う `esptool` のような単発のツールは、`uvx --from <package> <command>` で実行する。
 
+### Windows で日本語を扱うときの注意
+
+- Windows のコンソールは既定で UTF-8 ではないため、日本語が文字化けすることがある。Python では `PYTHONIOENCODING=utf-8` を設定するか、結果を UTF-8 のファイルに書いて確認する。
+- ファイルの読み書きでは、必ず `encoding="utf-8"` を指定する。
+- C の host runtime には、日本語を argv で渡さない。UTF-8 のファイルか stdin で渡す。TinyLM-Bench では、needle-2-esp32 の C host に argv で日本語を渡すと制限があった。
+
 ### ツールのバージョン（2026-09-29 に確認）
 
 | ツール | 最新版 | 開発 PC の版 | 方針 |
