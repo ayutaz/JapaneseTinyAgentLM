@@ -93,4 +93,52 @@ GEN_ACTION_V0_NEGATION = JobSpec(
     ],
 )
 
-JOBS: dict[str, JobSpec] = {job.name: job for job in (SMOKE, GEN_ACTION_V0, GEN_ACTION_V0_NEGATION)}
+TOKENIZER = "tokenizer/out/action_v0_sp2048.model"
+ACTION_DATA = "datasets/action/v0"
+TRAIN = f"{UV} run --no-dev --group train python -m jtalm.model.train --tokenizer {TOKENIZER}"
+# (run name, size, extra args). Seeds 1-2 of 5M measure run-to-run variance.
+TRAIN_RUNS = [
+    ("3m", "3m", "--lr 1e-3"),
+    ("5m", "5m", "--lr 1e-3"),
+    ("20m", "20m", "--lr 6e-4"),
+    ("5m-s1", "5m", "--lr 1e-3 --seed 1"),
+    ("5m-s2", "5m", "--lr 1e-3 --seed 2"),
+]
+
+
+def train_action_steps(runs: list[tuple[str, str, str]], tag: str) -> list[str]:
+    ckpts = " ".join(f"artifacts/{tag}/{name}/best.pt" for name, _, _ in runs)
+    return [
+        "nvidia-smi > artifacts/nvidia_smi.txt",
+        f"{UV} sync --locked --no-dev --group train",
+        *(
+            f"{TRAIN} --size {size} {extra} --out artifacts/{tag}/{name} "
+            f"> artifacts/{tag}-{name}.log 2>&1"
+            for name, size, extra in runs
+        ),
+        f"{UV} run --no-dev --group train python -m jtalm.model.evaluate --ckpt {ckpts} "
+        f"--tokenizer {TOKENIZER} --out artifacts/{tag}/eval",
+    ]
+
+
+# The vLLM image is reused because SSH, curl, and the driver setup are proven on vast.ai (M2.5);
+# torch comes from the cu126 wheels via ``uv sync``, not from the image.
+TRAIN_ACTION_V0 = JobSpec(
+    name="train_action_v0",
+    description="M4: train 3M / 5M / 20M Action LMs from scratch and evaluate them",
+    query=f"gpu_ram>=24 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=2.0,
+    steps=train_action_steps(TRAIN_RUNS, "m4"),
+    uploads=[
+        f"{ACTION_DATA}/train.jsonl",
+        f"{ACTION_DATA}/val.jsonl",
+        f"{ACTION_DATA}/eval.jsonl",
+        TOKENIZER,
+    ],
+)
+
+JOBS: dict[str, JobSpec] = {
+    job.name: job for job in (SMOKE, GEN_ACTION_V0, GEN_ACTION_V0_NEGATION, TRAIN_ACTION_V0)
+}

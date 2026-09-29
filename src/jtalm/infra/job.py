@@ -5,10 +5,13 @@ Usage (creating an instance costs money, so ``--approve-dph`` is required):
     uv run python -m jtalm.infra.job smoke --approve-dph 0.35
 
 The committed ``HEAD`` is uploaded with ``git archive``; uncommitted changes are not included.
-Credentials in ``.env`` are never uploaded. Results land in ``runs/vast/<job>-<timestamp>/``.
+Files listed in ``JobSpec.uploads`` (e.g. gitignored datasets) are copied with scp and checked by
+sha256. Credentials in ``.env`` are never uploaded.
+Results land in ``runs/vast/<job>-<timestamp>/``.
 """
 
 import argparse
+import hashlib
 import json
 import subprocess
 import sys
@@ -46,7 +49,32 @@ def _git_archive(dest: Path) -> str:
     return commit
 
 
+def local_uploads(spec: JobSpec) -> dict[str, str]:
+    """sha256 of every upload; fails before any instance is created if a file is missing."""
+    digests = {}
+    for rel in spec.uploads:
+        path = PROJECT_ROOT / rel
+        if not path.is_file():
+            raise VastError(f"upload not found: {rel}")
+        if Path(rel).is_absolute() or ".." in Path(rel).parts or rel.startswith(".env"):
+            raise VastError(f"upload must be a project-relative path: {rel}")
+        digests[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return digests
+
+
+def upload_files(ssh: Ssh, digests: dict[str, str], log: Path) -> None:
+    for rel, digest in digests.items():
+        remote = f"{REMOTE_WORK}/{rel}"
+        if ssh.run(f"mkdir -p {Path(remote).parent.as_posix()}", log=log, timeout_s=60) != 0:
+            raise VastError(f"mkdir failed for {rel}")
+        ssh.upload(PROJECT_ROOT / rel, remote)
+        check = f"echo '{digest}  {remote}' | sha256sum -c -"
+        if ssh.run(check, log=log, timeout_s=300) != 0:
+            raise VastError(f"sha256 mismatch after upload: {rel}")
+
+
 def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
+    digests = local_uploads(spec)
     client = VastClient()
     offers = [o for o in client.search_offers(spec.query) if o["dph_total"] <= approve_dph]
     if not offers:
@@ -63,6 +91,7 @@ def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
             k: offer.get(k) for k in ("id", "gpu_name", "gpu_ram", "dph_total", "geolocation")
         },
         "started_utc": stamp,
+        "uploads": digests,
     }
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -84,9 +113,12 @@ def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
             ssh.wait_ssh()
             ssh.upload(tar, "/root/code.tar")
             deadline = created + spec.max_hours * 3600
-            steps = remote_bootstrap() + [f"cd {REMOTE_WORK} && {s}" for s in spec.steps]
+            boot = remote_bootstrap()
+            steps = boot + [f"cd {REMOTE_WORK} && {s}" for s in spec.steps]
             record["steps"] = []
-            for step in steps:
+            for n, step in enumerate(steps):
+                if n == len(boot):
+                    upload_files(ssh, digests, log)
                 remaining = int(deadline - time.monotonic())
                 if remaining <= 0:
                     raise VastError("max_hours exceeded")

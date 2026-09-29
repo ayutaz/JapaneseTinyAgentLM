@@ -1,0 +1,101 @@
+{
+  "training_text": {
+    "lines": 30587,
+    "sources": [
+      "datasets/action/v0 train+val prompts and targets",
+      "MASSIVE ja-JP train utterances (CC BY 4.0)"
+    ]
+  },
+  "tokenizers": [
+    {
+      "file": "action_v0_sp2048.model",
+      "sha256": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4",
+      "vocab_size": 2048,
+      "val_prompts": {
+        "n": 477,
+        "tokens_mean": 8.41,
+        "tokens_max": 28,
+        "byte_fallback_rate": 0.0,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 0
+      },
+      "massive_dev": {
+        "n": 2031,
+        "tokens_mean": 11.16,
+        "tokens_max": 52,
+        "byte_fallback_rate": 0.01283,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 83
+      },
+      "target_tokens_mean": 4.73,
+      "target_tokens_max": 13,
+      "target_roundtrip_ok": true,
+      "sequence_tokens_max": 52,
+      "embedding_params": {
+        "192": 393216,
+        "256": 524288,
+        "384": 786432
+      }
+    },
+    {
+      "file": "action_v0_sp4096.model",
+      "sha256": "3e4b611b8e18c9032eb5bf22ccffb79f3e3c54679626a8e0551cf1439a91a822",
+      "vocab_size": 4096,
+      "val_prompts": {
+        "n": 477,
+        "tokens_mean": 4.98,
+        "tokens_max": 19,
+        "byte_fallback_rate": 0.0,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 0
+      },
+      "massive_dev": {
+        "n": 2031,
+        "tokens_mean": 7.33,
+        "tokens_max": 34,
+        "byte_fallback_rate": 0.01954,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 83
+      },
+      "target_tokens_mean": 4.73,
+      "target_tokens_max": 13,
+      "target_roundtrip_ok": true,
+      "sequence_tokens_max": 32,
+      "embedding_params": {
+        "192": 786432,
+        "256": 1048576,
+        "384": 1572864
+      }
+    },
+    {
+      "file": "action_v0_sp8192.model",
+      "sha256": "b9e3b7d62bb89f47821f92940cd3ea4cef09a9a1d8684c366957347092c36761",
+      "vocab_size": 8192,
+      "val_prompts": {
+        "n": 477,
+        "tokens_mean": 3.96,
+        "tokens_max": 12,
+        "byte_fallback_rate": 0.0,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 0
+      },
+      "massive_dev": {
+        "n": 2031,
+        "tokens_mean": 6.38,
+        "tokens_max": 32,
+        "byte_fallback_rate": 0.02247,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 83
+      },
+      "target_tokens_mean": 4.73,
+      "target_tokens_max": 13,
+      "target_roundtrip_ok": true,
+      "sequence_tokens_max": 30,
+      "embedding_params": {
+        "192": 1572864,
+        "256": 2097152,
+        "384": 3145728
+      }
+    }
+  ]
+}
