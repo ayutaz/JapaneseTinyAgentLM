@@ -50,10 +50,10 @@ TRAIN_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507"  # Apache-2.0, bf16 61GB
 EVAL_MODEL = "llm-jp/llm-jp-3.1-13b-instruct4"  # Apache-2.0, bf16 ~27GB
 
 
-def generate(phase: str, config: str = "configs/action_v0.json") -> str:
+def generate(phase: str, config: str = "configs/action_v0.json", out: str = "") -> str:
     return (
         f"{UV} run --no-dev python -m jtalm.data.generate --phase {phase} "
-        f"--config {config} --workers 64"
+        f"--config {config} --workers 64" + (f" --out {out}" if out else "")
     )
 
 
@@ -139,6 +139,45 @@ TRAIN_ACTION_V0 = JobSpec(
     ],
 )
 
+# Data v0.3 (after M4): more writers for the TRAIN data only; the eval set is not regenerated.
+# Each writer is served alone, then Qwen3 verifies every sentence at temperature 0.
+V03_WRITERS = [
+    # (name, hf_id, gpu memory fraction)
+    ("calm3", "cyberagent/calm3-22b-chat", 0.9),  # Apache-2.0, 45GB bf16
+    ("sarashina", "sbintuitions/sarashina2.2-3b-instruct-v0.1", 0.5),  # MIT, 6.7GB
+]
+
+
+def _v03_steps() -> list[str]:
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", f"{UV} sync --locked --no-dev"]
+    for name, hf_id, mem in V03_WRITERS:
+        cfg = f"configs/action_v03_{name}.json"
+        steps += [
+            start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}"),
+            generate("train-gen", cfg, f"artifacts/raw_{name}"),
+            STOP_VLLM,
+        ]
+    steps += [
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v03_qwen.json", "artifacts/raw_qwen"),
+    ]
+    for name in [n for n, _, _ in V03_WRITERS] + ["qwen"]:
+        steps.append(
+            generate("train-verify", f"configs/action_v03_{name}.json", f"artifacts/raw_{name}")
+        )
+    return steps
+
+
+GEN_ACTION_V03 = JobSpec(
+    name="gen_action_v03",
+    description="Data v0.3: calm3 / sarashina2.2 / Qwen3 write train sentences, Qwen3 verifies",
+    query=f"gpu_ram>=79 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=2.5,
+    steps=_v03_steps(),
+)
+
 # Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
 # number of optimizer steps as M4 (5,680), so only the amount of data changes.
 SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
@@ -168,5 +207,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V0_NEGATION,
         TRAIN_ACTION_V0,
         TRAIN_ACTION_V0_SCALING,
+        GEN_ACTION_V03,
     )
 }

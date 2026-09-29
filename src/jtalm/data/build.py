@@ -18,7 +18,7 @@ from typing import Any
 from jtalm.action.schema import canonicalize
 from jtalm.data import massive
 from jtalm.data.checks import dedup_key, negation_consistent, normalize, well_formed
-from jtalm.eval.cases import EvalCase, write_cases
+from jtalm.eval.cases import EvalCase, load_cases, write_cases
 from jtalm.eval.metrics import evaluate
 from jtalm.eval.rule_baseline import predict_json
 
@@ -157,6 +157,61 @@ def build(raw_dirs: list[Path], out_dir: Path, config: dict, massive_dir: Path) 
     }
 
 
+def extend(base_dir: Path, raw_dirs: list[Path], out_dir: Path, seed: int) -> dict[str, Any]:
+    """Add newly generated train sentences to an existing dataset (v0.3 on top of v0).
+
+    The base train / val / eval files are kept as they are, so the evaluation set stays identical
+    and results stay comparable. New rows pass the same filters, must not duplicate anything in
+    the base (train, val, or eval), and are split into train / val per category.
+    """
+    rng = random.Random(seed)
+    base = {n: load_cases(base_dir / f"{n}.jsonl") for n in ("train", "val", "eval")}
+    seen = {dedup_key(c.prompt) for cases in base.values() for c in cases}
+    stats: Counter = Counter()
+    new_rows = _filter(_load(raw_dirs, "train_raw.jsonl"), seen, stats)
+
+    by_cat: dict[str, list[dict]] = defaultdict(list)
+    for row in new_rows:
+        by_cat[row["category"]].append(row)
+    new_train, new_val = [], []
+    for _, rows in sorted(by_cat.items()):
+        rng.shuffle(rows)
+        n_val = max(1, round(len(rows) * VAL_FRACTION))
+        new_val += [_case(r, "val") for r in rows[:n_val]]
+        new_train += [_case(r, "train") for r in rows[n_val:]]
+
+    files = {
+        "train": base["train"] + new_train,
+        "val": base["val"] + new_val,
+        "eval": base["eval"],
+    }
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for name, cases in files.items():
+        write_cases(out_dir / f"{name}.jsonl", cases)
+
+    def counts(cases: list[EvalCase]) -> dict[str, Any]:
+        return {
+            "total": len(cases),
+            "by_category": dict(sorted(Counter(c.category for c in cases).items())),
+            "by_source": dict(sorted(Counter(c.source for c in cases).items())),
+            "empty_label_share": round(sum(not c.expected for c in cases) / len(cases), 4),
+        }
+
+    kept_by_generator = Counter(r["generator"] for r in new_rows)
+    raw_by_generator = Counter(r["generator"] for r in _load(raw_dirs, "train_raw.jsonl"))
+    return {
+        "base": str(base_dir.as_posix()),
+        "created_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "counts": {name: counts(cases) for name, cases in files.items()},
+        "added": {"train": len(new_train), "val": len(new_val)},
+        "keep_rate_by_generator": {
+            g: round(kept_by_generator[g] / n, 4) for g, n in sorted(raw_by_generator.items())
+        },
+        "filter_stats": dict(sorted(stats.items())),
+        "files": {f"{n}.jsonl": _sha256(out_dir / f"{n}.jsonl") for n in files},
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -169,8 +224,27 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("datasets/action/v0"))
     parser.add_argument("--massive-dir", type=Path, default=Path("datasets/downloads/massive"))
     parser.add_argument("--manifest", type=Path, default=Path("datasets/manifests/action_v0.json"))
+    parser.add_argument(
+        "--base", type=Path, default=None, help="extend this dataset instead of building anew"
+    )
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
+    if args.base is not None:
+        report = extend(args.base, args.raw, args.out, config["seed"])
+        report["configs"] = {
+            str(p.as_posix()): json.loads(p.read_text(encoding="utf-8"))
+            for p in [args.config, *args.extra_config]
+        }
+        report["generation_runs"] = {
+            f"{raw.parent.parent.name}/{raw.name}/{s.name}": json.loads(s.read_text("utf-8"))
+            for raw in args.raw
+            for s in sorted(raw.glob("summary_*.json"))
+        }
+        args.manifest.parent.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(report, ensure_ascii=False, indent=2)
+        args.manifest.write_text(text, encoding="utf-8")
+        print(json.dumps(report["counts"], ensure_ascii=False, indent=2))
+        return
     report = build(args.raw, args.out, config, args.massive_dir)
     generation = {
         f"{raw.parent.parent.name}/{s.name}": json.loads(s.read_text(encoding="utf-8"))

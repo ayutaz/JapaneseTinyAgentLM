@@ -89,3 +89,41 @@ def test_build_filters_dedups_removes_leaks_and_adds_massive(tmp_path: Path) -> 
     assert set(first) == {"id", "input", "output", "category", "language", "pair_id", "generator"}
     card = (hf / "README.md").read_text("utf-8")
     assert card.startswith("---\nlicense: cc-by-sa-4.0")
+
+
+def test_extend_keeps_base_and_eval_and_skips_anything_already_present(tmp_path: Path) -> None:
+    from jtalm.data.build import extend
+
+    raw = tmp_path / "raw"
+    raw.mkdir()
+    write_jsonl(
+        raw / "train_raw.jsonl",
+        [row("右を向いて", LOOK_R, LOOK_R)] * 2
+        + [row("左を向かないで", [], [], category="negation")],
+    )
+    write_jsonl(raw / "eval_raw.jsonl", [row("みぎをむいて", LOOK_R, LOOK_R, generator="gen/eval")])
+    fake_massive(tmp_path / "massive")
+    base = tmp_path / "base"
+    build([raw], base, CONFIG, tmp_path / "massive")
+    base_eval = (base / "eval.jsonl").read_text(encoding="utf-8")
+
+    new = tmp_path / "new"
+    new.mkdir()
+    write_jsonl(
+        new / "train_raw.jsonl",
+        [
+            row("右を向いて", LOOK_R, LOOK_R, generator="gen/new"),  # already in base train
+            row("みぎをむいて", LOOK_R, LOOK_R, generator="gen/new"),  # in base eval (leak)
+            row("右のほう見てくれる?", LOOK_R, LOOK_R, generator="gen/new"),
+            row("右むいて", LOOK_R, [], generator="gen/new"),  # verifier disagrees
+        ],
+    )
+    out = tmp_path / "out"
+    report = extend(base, [new], out, seed=1)
+
+    assert (out / "eval.jsonl").read_text(encoding="utf-8") == base_eval
+    added = load_cases(out / "train.jsonl") + load_cases(out / "val.jsonl")
+    base_all = load_cases(base / "train.jsonl") + load_cases(base / "val.jsonl")
+    assert len(added) == len(base_all) + 1
+    assert "右のほう見てくれる?" in {c.prompt for c in added}
+    assert report["keep_rate_by_generator"] == {"gen/new": 0.25}

@@ -74,6 +74,7 @@ def _parallel(fn: Callable[[Any], list[dict]], items: list, workers: int) -> tup
 
 
 def _row(spec: Spec, text: str, split: str, generator: str, **extra: Any) -> dict:
+    extra.setdefault("prompt_version", prompts.PROMPT_VERSION)
     return {
         "split": split,
         "spec_id": spec.id,
@@ -82,7 +83,6 @@ def _row(spec: Spec, text: str, split: str, generator: str, **extra: Any) -> dic
         "text": text.strip(),
         "language": "ja",
         "generator": generator,
-        "prompt_version": prompts.PROMPT_VERSION,
         **extra,
     }
 
@@ -100,15 +100,24 @@ def generate_sentences(gen: Generator, name: str, split: str, quota: dict, cfg: 
     rng = random.Random(seed0)
     requests = list(enumerate(sample_requests(all_specs(), quota, n, rng)))
 
+    style_set = cfg.get("train_styles", "v0.2") if split == "train" else "v0.2"
+    version = cfg.get("prompt_version", prompts.PROMPT_VERSION)
+
     def fn(item: tuple[int, Spec]) -> list[dict]:
         i, spec = item
+        styles = None
+        if style_set == "v0.3":
+            styles = prompts.pick_styles(random.Random(seed0 + i))
         data = gen.chat_json(
-            prompts.generation_messages(spec, n, split),
+            prompts.generation_messages(spec, n, split, styles),
             prompts.json_response_format("sentences", prompts.sentence_schema(n)),
             seed=seed0 + i,
             temperature=cfg["temperature"],
         )
-        return [_row(spec, t, split, name, seed=seed0 + i) for t in data["sentences"]]
+        return [
+            _row(spec, t, split, name, seed=seed0 + i, prompt_version=version)
+            for t in data["sentences"]
+        ]
 
     return fn, requests
 

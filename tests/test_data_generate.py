@@ -75,3 +75,36 @@ def test_phases_produce_raw_files_with_labels(run_phase) -> None:
     assert {r["category"] for r in pairs} == {"single", "negation"}
     assert sum(r["language"] == "en" for r in evals) == CFG["eval_english"]
     assert all(isinstance(r["label"], list) for r in train + evals)
+
+
+def test_v03_writer_config_uses_style_subsets_and_the_separate_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[str] = []
+
+    class Recording(FakeGenerator):
+        def chat_json(self, messages, fmt, seed, temperature):
+            seen.append(messages[-1]["content"])
+            return super().chat_json(messages, fmt, seed, temperature)
+
+    cfg = {
+        **CFG,
+        "prompt_version": "action-v0.3",
+        "train_styles": "v0.3",
+        "train_generator": {"served_name": "calm3", "hf_id": "gen/writer"},
+        "verifier": {"served_name": "qwen", "hf_id": "gen/verifier"},
+        "train_verifier": "verifier",
+    }
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    monkeypatch.setattr(generate, "Generator", Recording)
+    for phase in ("train-gen", "train-verify"):
+        generate.run(
+            Namespace(phase=phase, config=str(cfg_path), base_url="x", workers=1, out=str(tmp_path))
+        )
+    rows = [json.loads(x) for x in (tmp_path / "train_raw.jsonl").read_text("utf-8").splitlines()]
+    assert {r["generator"] for r in rows} == {"gen/writer"}
+    assert {r["verifier"] for r in rows} == {"gen/verifier"}
+    assert {r["prompt_version"] for r in rows} == {"action-v0.3"}
+    gen_prompts = [p for p in seen if "意味:" in p]
+    assert len({p.split("例: ")[1].split("）")[0] for p in gen_prompts}) > 1  # styles vary

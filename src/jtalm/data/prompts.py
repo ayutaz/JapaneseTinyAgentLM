@@ -1,6 +1,7 @@
 """Prompts for sentence generation and cross-model label verification (versioned)."""
 
 import json
+import random
 
 from jtalm.action.schema import load_schema
 from jtalm.data.specs import Spec
@@ -12,6 +13,26 @@ ROBOT = "首を左右・上下に動かせて、画面に表情を出せる、�
 STYLES_TRAIN = (
     "丁寧語、くだけた口語、短い命令、少し長めの依頼、子どもっぽい言い方、関西弁などの方言、"
     "句読点なし、ひらがな多め、文末に「〜ね」「〜よ」などを付ける"
+)
+# v0.3 (train only): a longer list; each request gets a random subset (``pick_styles``) so that
+# writers do not converge on the same few phrasings. Question forms and indirect requests were the
+# main misses of the M4 models, so they are listed explicitly.
+STYLES_TRAIN_V03 = (
+    "「〜してくれる?」「〜できる?」のような疑問形の依頼",
+    "「〜してほしいな」「〜してもらえると嬉しい」のような遠回しな依頼",
+    "「〜しよう」「〜してみよっか」のような誘う言い方",
+    "ロボットに名前やあだ名で呼びかけてから頼む言い方",
+    "敬語でていねいな依頼",
+    "友だち同士のくだけた口語",
+    "2〜4語だけの短い命令",
+    "理由や状況を一言そえた少し長めの依頼",
+    "子どもっぽい言い方",
+    "関西弁などの方言",
+    "句読点なしで打った文",
+    "ひらがなを多めに使った文",
+    "カタカナ語を混ぜた言い方",
+    "「〜ね」「〜よ」「〜な」などの文末",
+    "独り言のようにつぶやく言い方",
 )
 STYLES_EVAL = (
     "友だちに話すような言い方、目上の人への丁寧な言い方、独り言のような言い方、急いでいる言い方、"
@@ -63,8 +84,14 @@ def requirements(spec: Spec) -> list[str]:
     return reqs
 
 
-def generation_messages(spec: Spec, n: int, split: str) -> list[dict]:
-    styles = STYLES_TRAIN if split == "train" else STYLES_EVAL
+def pick_styles(rng: random.Random, k: int = 4) -> str:
+    return "、".join(rng.sample(STYLES_TRAIN_V03, k))
+
+
+def generation_messages(spec: Spec, n: int, split: str, styles: str | None = None) -> list[dict]:
+    """``styles`` overrides the default style list (v0.3 passes a random subset)."""
+    if styles is None:
+        styles = STYLES_TRAIN if split == "train" else STYLES_EVAL
     extra = "".join(f"- {r}\n" for r in requirements(spec))
     user = (
         f"{ROBOT}に、人が話しかける日本語の短い文を{n}個作ってください。\n\n"
