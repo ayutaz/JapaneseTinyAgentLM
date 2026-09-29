@@ -90,6 +90,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
 
     codec = Codec(args.tokenizer)
     train_cases = load_cases(Path(args.data) / "train.jsonl")
+    if args.train_fraction < 1.0:
+        # Fixed subset (independent of --seed) so runs with different seeds see the same data.
+        k = round(len(train_cases) * args.train_fraction)
+        train_cases = random.Random(12345).sample(train_cases, k)
     val_cases = load_cases(Path(args.data) / "val.jsonl")
     train_ex = encode_cases(codec, train_cases)
     val_ex = encode_cases(codec, val_cases)
@@ -187,6 +191,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dropout", type=float, default=0.1)
     p.add_argument("--eval-every", type=int, default=2, help="epochs between validations")
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--train-fraction", type=float, default=1.0, help="use a fixed subset")
     p.add_argument("--device", default="auto")
     return p
 

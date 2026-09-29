@@ -139,6 +139,34 @@ TRAIN_ACTION_V0 = JobSpec(
     ],
 )
 
+# Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
+# number of optimizer steps as M4 (5,680), so only the amount of data changes.
+SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
+SCALING_RUNS = [
+    ("3m-f025", "3m", f"{SCALING_STEPS} --train-fraction 0.25"),
+    ("3m-f025-s1", "3m", f"{SCALING_STEPS} --train-fraction 0.25 --seed 1"),
+    ("3m-f050", "3m", f"{SCALING_STEPS} --train-fraction 0.5"),
+    ("3m-f050-s1", "3m", f"{SCALING_STEPS} --train-fraction 0.5 --seed 1"),
+    ("3m-f100-s1", "3m", f"{SCALING_STEPS} --seed 1"),
+]
+TRAIN_ACTION_V0_SCALING = JobSpec(
+    name="train_action_v0_scaling",
+    description="After M4: does more v0 data help? 3M on 25/50/100% of the training data",
+    query=f"gpu_ram>=24 compute_cap>=800 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=2.0,
+    steps=train_action_steps(SCALING_RUNS, "scaling"),
+    uploads=TRAIN_ACTION_V0.uploads,
+)
+
 JOBS: dict[str, JobSpec] = {
-    job.name: job for job in (SMOKE, GEN_ACTION_V0, GEN_ACTION_V0_NEGATION, TRAIN_ACTION_V0)
+    job.name: job
+    for job in (
+        SMOKE,
+        GEN_ACTION_V0,
+        GEN_ACTION_V0_NEGATION,
+        TRAIN_ACTION_V0,
+        TRAIN_ACTION_V0_SCALING,
+    )
 }
