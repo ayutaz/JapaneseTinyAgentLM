@@ -41,7 +41,9 @@ Claude が書いた生成用の指示文（prompt）やコードまで問題に�
 |---|---|---|
 | **`Qwen/Qwen3-30B-A3B-Instruct-2507`**（bf16、61GB） | Apache-2.0（確認済み） | **学習データ**の文を書き、温度 0 で検証する。**評価セット**の文を検証する |
 | **`llm-jp/llm-jp-3.1-13b-instruct4`**（bf16、約27GB） | Apache-2.0（確認済み） | **評価セット**の文を書く（学習データには書かない） |
-| gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備 |
+| **`cyberagent/calm3-22b-chat`**（bf16、45GB） | Apache-2.0（モデルカードで確認済み。CyberAgent が一から学習した日本語モデル） | **学習データ**の文を書く（v0.3 から） |
+| **`sbintuitions/sarashina2.2-3b-instruct-v0.1`**（bf16、6.7GB） | MIT（モデルカードで確認済み。SB Intuitions の日本語モデル） | **学習データ**の文を書く（v0.3 から） |
+| gpt-oss-20b / 120b | Apache-2.0（確認済み） | 学習データの生成の予備（v0.4 の候補） |
 
 - 生成元を分けることで、生成のくせを暗記しただけのモデルを評価で見抜けるようにしています。
 - 当初は llm-jp-4.1 を評価セット用にする予定でした。しかし llm-jp-4.1 には思考過程を出す（thinking）版しかなく、出力形式の制約と両立させにくいため、同じ llm-jp 系の llm-jp-3.1 の instruct 版に変えました（M3、2026-09-29）。
@@ -121,11 +123,27 @@ uv run python -m jtalm.data.publish publish --confirm                        # �
 
 Action LM v0 の tokenizer は、学習データと validation の入力文と出力に加えて、MASSIVE ja-JP の train の発話（CC BY 4.0）で学習しました。語彙の選定の指標には、ほかのどの工程にも使っていない MASSIVE の dev を使いました。評価セットは使っていません。記録は `datasets/manifests/tokenizer_action_v0.json` です（[`architecture.md`](architecture.md) §4）。
 
-### M4 の結果から分かったデータの課題（次の v0.3 へ）
+### M4 の結果から分かったデータの課題
 
 - 学習データの正解の 48.8% が `[]`（no_action と negation）で、別の書き手の言い回しの依頼を `[]` と答える誤りが多い（[`roadmap.md`](roadmap.md) §12「M4 の結果」）。
 - validation（学習データと同じ Qwen3 が書いた文）では約 99% だが、評価セット（llm-jp が書いた文）では 80〜84% になる。書き手が1つしかないことが原因と考えられる。
-- v0.3 では、学習データの書き手に Apache-2.0 の別のモデル（gpt-oss-20b など）を加え、疑問形、婉曲な依頼、話し言葉、ひらがなの依頼を増やす。動作ありの例を増やして `[]` の割合を下げる（否定と no-action は各20%以上を保つ）。評価セットは変えない。
+- 他のモデルの学習データ量と比べると、v0 の 9千件は、事前学習済みのモデルを追加学習するデータ（Google Mobile Actions 9,650件、SNIPS 13,084件）と同程度で、TinyAgent（4万件）より少ない。本プロジェクトは一から学習するので、より多くの多様な例が要ると考える（2026-09-29 の検討）。
+
+### v0.3（2026-09-29）
+
+v0 のファイルはそのまま残し、学習データだけを追加しました（`jtalm.data.build --base`）。評価セットは v0 と同じファイルです（sha256 `24120eb2…`）。
+
+| 項目 | 内容 |
+|---|---|
+| 書き手 | calm3-22b（6,000文）、sarashina2.2-3b（4,000文）、Qwen3（4,000文）。検証は Qwen3 が温度 0 で行う |
+| 生成の指示（action-v0.3） | 文体を 15 種類に増やし（疑問形の依頼、遠回しな依頼、誘う言い方、呼びかけ、カタカナ語など）、依頼ごとに4つを無作為に選ぶ（`prompts.pick_styles`） |
+| 通過率 | Qwen3 73%、calm3 69%、sarashina2.2 62% |
+| 件数 | train 18,071（+9,004）、validation 951（+474）。single 4,252、multi_action 4,235、negation 3,780（20.9%）、no_action 4,111（22.7%）、correction 1,693 |
+| 正解が `[]` の割合 | 48.8% → 43.7% |
+| 生成の費用 | A100 PCIe で 0.311 h、約 $0.31（1回目は host の起動が遅く失敗し、約 $0.37） |
+| 記録 | `datasets/manifests/action_v0.3.json`。設定は `configs/action_v03_*.json`、job は `gen_action_v03` |
+
+次の v0.4 は、量の確認（学習データの 25% / 50% / 100% で 3M を学習して比べる）と v0.3 の学習結果を見て決めます。量が効いていれば、書き手をさらに増やして 4〜5万件にします。
 
 ## 6. Hugging Face への公開
 

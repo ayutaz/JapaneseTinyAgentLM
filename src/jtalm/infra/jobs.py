@@ -124,6 +124,8 @@ def train_action_steps(
     ]
 
 
+# compute_cap 800-900 (Ampere to Hopper): the cu126 torch wheels have no Blackwell (sm_120)
+# kernels, so an RTX PRO 4000 host failed on the first training step (2026-09-29).
 # The vLLM image is reused because SSH, curl, and the driver setup are proven on vast.ai (M2.5);
 # torch comes from the cu126 wheels via ``uv sync``, not from the image.
 TRAIN_ACTION_V0 = JobSpec(
@@ -193,7 +195,7 @@ V03_RUNS = [
 TRAIN_ACTION_V03 = JobSpec(
     name="train_action_v03",
     description="Train 3M / 5M / 20M on data v0.3 and evaluate on the unchanged v0 eval set",
-    query=f"gpu_ram>=24 compute_cap>=800 {BASE_QUERY}",
+    query=f"gpu_ram>=24 compute_cap>=800 compute_cap<=900 {BASE_QUERY}",
     image=VLLM_IMAGE,
     disk_gb=80,
     max_hours=3.0,
@@ -219,7 +221,7 @@ SCALING_RUNS = [
 TRAIN_ACTION_V0_SCALING = JobSpec(
     name="train_action_v0_scaling",
     description="After M4: does more v0 data help? 3M on 25/50/100% of the training data",
-    query=f"gpu_ram>=24 compute_cap>=800 {BASE_QUERY}",
+    query=f"gpu_ram>=24 compute_cap>=800 compute_cap<=900 {BASE_QUERY}",
     image=VLLM_IMAGE,
     disk_gb=80,
     max_hours=2.0,

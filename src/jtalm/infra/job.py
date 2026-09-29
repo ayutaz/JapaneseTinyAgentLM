@@ -178,6 +178,11 @@ def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
         except BaseException as e:
             record["status"] = f"failed: {e}"
             _save_debug(client, instance_id, out_dir)
+            for path in spec.fetch:  # best effort: keep partial logs for diagnosis
+                try:
+                    ssh.download(f"{REMOTE_WORK}/{path}", out_dir)
+                except Exception as fetch_error:
+                    print(f"could not fetch {path}: {fetch_error}")
             raise
         finally:
             record["destroyed"] = _destroy(client, instance_id)
