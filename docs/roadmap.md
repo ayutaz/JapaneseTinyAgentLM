@@ -505,10 +505,23 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 
 **confidence gate（v0.4、`results/v04_gate`）:** 書き手7つの validation（2,497件）で閾値を選ぶと 0.970 になり、3M INT4 + grammar に gate をかけると、全体は 94.4%（gate なしは 94.3%）のまま、致命的な誤りが 2.0% → 0.6%（false_action 23 → 7件）に減った。negation は 97.8%、no_action の recall は 99.7% に上がり、single（87.2%）と correction（85.5%）は下がり、no-action の precision は 0.93 になる。誤って動くことを最も避けたいので、**実機では gate を標準で有効にし、閾値は開発者が変えられるようにする**。M4 では gate が逆効果だったが、validation の書き手が1つで、閾値の選び方が実際の分布とずれていたためと考えられる。
 
+**B4（実機、`results/b4_device`、[`hardware.md`](hardware.md) §11）:** M6 の runtime を CoreS3 に載せ、評価セットの先頭 200件で、実機の出力が host と一致した（3M FP32 / INT8 / INT4、5M INT8 / INT4 のすべてで 200/200）。
+
+| model | decode（ms/token） | 1回の依頼（中央値 / p90） | 内部 SRAM の空き（読み込み後） |
+|---|---:|---:|---:|
+| 3M INT8 | 115 | 1.27 秒 / 1.76 秒 | 140KB |
+| **3M INT4** | **105** | **1.15 秒 / 1.53 秒** | 140KB |
+| 5M INT8 | 179 | 1.99 秒 / 2.41 秒 | 90KB |
+| 5M INT4 | 161 | 1.79 秒 / 2.23 秒 | 90KB |
+
+- 重みは Flash から mmap し、KV cache は PSRAM、activation は内部 SRAM に置く。入力はまとめて処理（batch prefill）し、行列の計算を2つの core で分ける。
+- 3M の decode は esp32-llm の stories3M INT8（6.5〜7.1 tok/s）より 1.2〜1.3 倍速い。`[]` の応答は中央値 0.65 秒。
+- 1 token の decode に約 0.1 秒かかるので、応答時間は出力の token 数に比例する。JSON の断片を1 token にまとめた tokenizer（M4）が、そのまま速さに効いている。
+
 **データ量とモデルサイズの候補（2026-09-29）:**
 
 - **データ:** v0.4 を採用する。さらに増やす（v0.5、10万件規模）と +1〜2 point と見込まれるが、目標は満たしたので、次は弱点（ひらがなの雑談、否定の言い回し）を狙った追加を優先する。
-- **モデルサイズ:** 精度の面では **3M（INT4、約 2.0MB の `.jtlm`）が第一候補**。最終決定は、B4 の実機速度を見て行う。
+- **モデルサイズ:** **3M（INT4、約 2.0MB の `.jtlm`）に決定**（2026-09-29）。精度は 5M より高く（94.3% と 93.3%）、実機では 5M より速い（1回の依頼の中央値 1.15 秒と 1.79 秒）。20M は実機に載らず、精度の差も +0.7 point にとどまる。
 
 ### 次の計画（2026-09-29）
 
@@ -517,7 +530,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | 1 | データ v0.4: 書き手を 7 つにして約 5 万件に増やす（ABEJA-Qwen2.5-32B-Japanese、Mistral-Nemo-Japanese、granite-3.3-8b、ELYZA-Shortcut-32B、calm3、sarashina2.2、Qwen3） | **完了**（47,450件。1回目は host の disk 不足で3つの書き手が失敗し、成功した4つを回収して `gen_action_v04b` で残りを生成した） |
 | 2 | v0.4 で 3M / 5M / 20M を再学習し、v0 / v0.3 / v0.4 の曲線から、**データ量とモデルサイズの候補**を決める | **完了**（データは v0.4、サイズは 3M が第一候補） |
 | 3 | 採用するモデルを INT8 / INT4 で確認する | **完了**（3M INT4 + grammar で 94.3 / 94.4%） |
-| 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | B4 は実行中（担当 agent） |
+| 4 | B4（M6 の runtime を実機に移植し、速度を計測） → **モデルサイズの最終決定** | **完了**。実機の出力は host と 200/200 一致。3M INT4 は1回の依頼の中央値 1.15 秒（p90 1.53 秒）、5M INT4 は 1.79 秒。**3M INT4 に決定**（[`hardware.md`](hardware.md) §11） |
 | 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | 手順は [`hardware.md`](hardware.md) §10 |
 
 - 英語は学習データに入れていないので、完了条件の判定では参考値として扱う（完全一致の全体の値には含まれる）。
@@ -551,7 +564,7 @@ M3 の評価セットを学習データとは別のモデルと別の prompt で
 | B2 | Servo の座標の確認 | K151 に対応した `stackchan-idf`（v5.5.5 で検証済み）を build して書き込み、yaw の符号と pitch の中立角度を確認する。**build まで完了**。起動直後から首が動くので、書き込みと確認はユーザーの立ち会いのもとで行う（手順は [`hardware.md`](hardware.md) §10、5〜10分） |
 | B2.5 | 既存 runtime による実機の基準値 | TinyLM-Bench の CoreS3 計画（92）に沿い、既存の小さな runtime を K151 で動かす。まず esp32-llm stories260K（FP32、1.06MB）で起動と 100 token の連続生成を確かめる。次に **stories3M INT8**（3.1M params、3.35MB）で、tok/s と Quad PSRAM の帯域を測る。上流の約 12 tok/s との差も見る。本プロジェクトの 3M / 5M に近い規模なので、自前の runtime の目標速度と、モデル規模の判断に使う。**完了**（2026-09-29）: stories3M INT8 は forward だけで 6.5〜7.1 tok/s（上流の約半分。CoreS3 は Quad PSRAM のため） |
 | B3 | LM 評価用の最小 firmware | LM runtime の枠組み、servo 制御、計測用の telemetry だけを持つ自前の firmware を作る。Flash map と状態ごとの SRAM / PSRAM の peak を測り、LM の予算を確定する（Phase 0 の exit gate）。**計測の部分は完了**（2026-09-29、`firmware/jtalm_eval/`）: 起動直後の内部 SRAM 空き 335,663 B、PSRAM 空き 8.39MB、14MB の `model` partition を1回で mmap、読み出しは PSRAM 32.8 MB/s、Flash の mmap 31.2 MB/s。servo と画面を載せた状態の計測は B4 で行う |
-| B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、5M INT4 の tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす |
+| B4 | ESP32 への移植 | M6 の C runtime を B3 の firmware に載せ、5M INT4 の tok/s、latency、PSRAM の peak を測る。Action を servo の命令に変換して実際に動かす。**runtime の移植と計測は完了**（2026-09-29、`firmware/jtalm_action/`、[`hardware.md`](hardware.md) §11）。servo を動かす部分は、ユーザーの立ち会いのもとで B2 と合わせて行う |
 
 B2 以降は、実機の firmware を書き込む前に必ずバックアップを取ります（[`development.md`](development.md) §5）。
 
