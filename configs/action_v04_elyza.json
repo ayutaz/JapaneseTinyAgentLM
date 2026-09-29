@@ -1,0 +1,40 @@
+{
+  "dataset_version": "action-v0.4",
+  "seed": 20261104,
+  "per_request": 8,
+  "temperature": 0.9,
+  "top_p": 0.95,
+  "max_tokens": 900,
+  "prompt_version": "action-v0.3",
+  "train_styles": "v0.3",
+  "train_generator": {
+    "served_name": "elyza",
+    "hf_id": "elyza/ELYZA-Shortcut-1.0-Qwen-32B",
+    "license": "Apache-2.0"
+  },
+  "eval_generator": {
+    "served_name": "llmjp",
+    "hf_id": "llm-jp/llm-jp-3.1-13b-instruct4",
+    "license": "Apache-2.0"
+  },
+  "verifier": {
+    "served_name": "qwen",
+    "hf_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "license": "Apache-2.0"
+  },
+  "train_verifier": "verifier",
+  "train_quota": {
+    "single": 2100,
+    "multi_action": 1540,
+    "correction": 840,
+    "negation": 1400,
+    "no_action": 1120
+  },
+  "eval_quota": {},
+  "eval_pairs": 0,
+  "eval_english": 0,
+  "massive": {
+    "train_negatives": 0,
+    "eval_negatives": 0
+  }
+}

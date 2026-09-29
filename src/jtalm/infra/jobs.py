@@ -183,6 +183,57 @@ GEN_ACTION_V03 = JobSpec(
     steps=_v03_steps(),
 )
 
+# Data v0.4 (after the scaling check): many writers at once, about 48k requested sentences.
+# More sentences from the same writer stopped helping beyond 50% of v0 (results/data_scaling_v0),
+# so v0.4 scales through new writer families. Weights are deleted after each writer (disk), a
+# failing writer does not stop the others, and Qwen3 (also a writer) verifies everything at the end.
+V04_WRITERS = [
+    # (name, hf_id, gpu memory fraction)
+    ("abeja", "abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0", 0.92),  # Apache-2.0, 65GB
+    ("nemoja", "cyberagent/Mistral-Nemo-Japanese-Instruct-2408", 0.9),  # Apache-2.0, 25GB
+    ("granite", "ibm-granite/granite-3.3-8b-instruct", 0.9),  # Apache-2.0, 16GB
+    ("elyza", "elyza/ELYZA-Shortcut-1.0-Qwen-32B", 0.92),  # Apache-2.0, 65GB
+    ("calm3", "cyberagent/calm3-22b-chat", 0.9),  # Apache-2.0, 45GB
+    ("sarashina", "sbintuitions/sarashina2.2-3b-instruct-v0.1", 0.5),  # MIT, 7GB
+]
+HF_CACHE = "$HOME/.cache/huggingface/hub"
+
+
+def _drop_weights(hf_id: str) -> str:
+    return f"rm -rf {HF_CACHE}/models--{hf_id.replace('/', '--')}"
+
+
+def _v04_steps() -> list[str]:
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", f"{UV} sync --locked --no-dev"]
+    for name, hf_id, mem in V04_WRITERS:
+        cfg = f"configs/action_v04_{name}.json"
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", cfg, f"artifacts/raw04_{name}")
+        steps += [
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v04_qwen.json", "artifacts/raw04_qwen"),
+    ]
+    for name in [n for n, _, _ in V04_WRITERS] + ["qwen"]:
+        out = f"artifacts/raw04_{name}"
+        verify = generate("train-verify", f"configs/action_v04_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    return steps
+
+
+GEN_ACTION_V04 = JobSpec(
+    name="gen_action_v04",
+    description="Data v0.4: seven writers (~48k sentences) for the train data, Qwen3 verifies",
+    query=f"gpu_ram>=79 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=3.0,
+    steps=_v04_steps(),
+)
+
 # Retrain on v0.3 (v0 plus the new writers) and compare with M4 on the same evaluation set.
 ACTION_DATA_V03 = "datasets/action/v0.3"
 V03_RUNS = [
@@ -239,5 +290,6 @@ JOBS: dict[str, JobSpec] = {
         TRAIN_ACTION_V0_SCALING,
         GEN_ACTION_V03,
         TRAIN_ACTION_V03,
+        GEN_ACTION_V04,
     )
 }
