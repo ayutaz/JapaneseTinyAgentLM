@@ -106,18 +106,21 @@ TRAIN_RUNS = [
 ]
 
 
-def train_action_steps(runs: list[tuple[str, str, str]], tag: str) -> list[str]:
+def train_action_steps(
+    runs: list[tuple[str, str, str]], tag: str, data: str = ACTION_DATA
+) -> list[str]:
+    """Train each run, then evaluate all of them on the v0 evaluation set (never changes)."""
     ckpts = " ".join(f"artifacts/{tag}/{name}/best.pt" for name, _, _ in runs)
     return [
         "nvidia-smi > artifacts/nvidia_smi.txt",
         f"{UV} sync --locked --no-dev --group train",
         *(
-            f"{TRAIN} --size {size} {extra} --out artifacts/{tag}/{name} "
+            f"{TRAIN} --data {data} --size {size} {extra} --out artifacts/{tag}/{name} "
             f"> artifacts/{tag}-{name}.log 2>&1"
             for name, size, extra in runs
         ),
         f"{UV} run --no-dev --group train python -m jtalm.model.evaluate --ckpt {ckpts} "
-        f"--tokenizer {TOKENIZER} --out artifacts/{tag}/eval",
+        f"--tokenizer {TOKENIZER} --cases {ACTION_DATA}/eval.jsonl --out artifacts/{tag}/eval",
     ]
 
 
@@ -178,6 +181,31 @@ GEN_ACTION_V03 = JobSpec(
     steps=_v03_steps(),
 )
 
+# Retrain on v0.3 (v0 plus the new writers) and compare with M4 on the same evaluation set.
+ACTION_DATA_V03 = "datasets/action/v0.3"
+V03_RUNS = [
+    ("3m", "3m", "--lr 1e-3"),
+    ("3m-s1", "3m", "--lr 1e-3 --seed 1"),
+    ("5m", "5m", "--lr 1e-3"),
+    ("5m-s1", "5m", "--lr 1e-3 --seed 1"),
+    ("20m", "20m", "--lr 6e-4"),
+]
+TRAIN_ACTION_V03 = JobSpec(
+    name="train_action_v03",
+    description="Train 3M / 5M / 20M on data v0.3 and evaluate on the unchanged v0 eval set",
+    query=f"gpu_ram>=24 compute_cap>=800 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=3.0,
+    steps=train_action_steps(V03_RUNS, "v03", ACTION_DATA_V03),
+    uploads=[
+        f"{ACTION_DATA_V03}/train.jsonl",
+        f"{ACTION_DATA_V03}/val.jsonl",
+        f"{ACTION_DATA}/eval.jsonl",
+        TOKENIZER,
+    ],
+)
+
 # Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
 # number of optimizer steps as M4 (5,680), so only the amount of data changes.
 SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
@@ -208,5 +236,6 @@ JOBS: dict[str, JobSpec] = {
         TRAIN_ACTION_V0,
         TRAIN_ACTION_V0_SCALING,
         GEN_ACTION_V03,
+        TRAIN_ACTION_V03,
     )
 }
