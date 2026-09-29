@@ -364,6 +364,8 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | Private repository の作成、LICENSE（Apache-2.0）、`.gitignore` | 完了 |
 | 設計文書（`docs/`） | 完了（本更新を含む） |
 | B0 実機の初回調査 | 完了 |
+| `.env` の `VAST_API_KEY` | 設定済み。認証と課金設定を確認済み |
+| `.env` の `HF_TOKEN` | 設定済み。write 権限と、`japanese-data-analyze` の admin であることを確認済み |
 | M1 以降 | 未着手。次は M1 と M2 |
 
 ### Track A: PC 上の実装マイルストーン
@@ -419,8 +421,8 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 |---|---|---:|---|---|
 | M1 | リポジトリ基盤 | 1〜2 h | — | uv の更新 |
 | M2 | Action schema v0 と評価の土台 | 2〜3 h | — | — |
-| M2.5 | vast.ai 実行基盤 | 2〜4 h | 小さな生成と学習 10〜30 分 | `.env` への API key の設定、費用の承認 |
-| M3 | Dataset v0 と baseline | 5〜9 h | GPU での生成 1〜3 時間 | 費用の承認、`.env` への `HF_TOKEN` の設定、**Hugging Face へのアップロード直前の最終確認** |
+| M2.5 | vast.ai 実行基盤 | 2〜4 h | 小さな生成と学習 10〜30 分 | 費用の承認（API key は設定済み） |
+| M3 | Dataset v0 と baseline | 5〜9 h | GPU での生成 1〜3 時間 | 費用の承認、**Hugging Face へのアップロード直前の最終確認**（`HF_TOKEN` は設定済み） |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | 4〜6 h | GPU で数時間 | 費用の承認 |
 | M5 | Grammar、confidence gate、量子化 | 3〜5 h | — | — |
 | M6 | Host C reference runtime | 4〜8 h | — | — |

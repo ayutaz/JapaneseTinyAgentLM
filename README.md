@@ -69,6 +69,8 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | 実機（K151）の初回調査と Flash のバックアップ（B0） | 完了 |
 | 既存モデルの検証（TinyLM-Bench）と計画への反映 | 完了 |
 | ゴール、ライセンス、学習データの方針の決定 | 完了（2026-09-29） |
+| vast.ai の API key（`.env`） | 設定済み。認証を確認済み |
+| Hugging Face の token（`.env` の `HF_TOKEN`） | 設定済み。`japanese-data-analyze` への write 権限を確認済み |
 | 実装 | 未着手 |
 
 次の作業は、次の順序で進めます（[`docs/roadmap.md`](docs/roadmap.md) §12）。
