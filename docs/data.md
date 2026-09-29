@@ -8,7 +8,7 @@
 
 | 項目 | 決定 |
 |---|---|
-| データの中身（文章と正解ラベル） | **Apache-2.0 / MIT のオープンモデル**で生成するか、**ライセンスが両立する既存データ**を使う |
+| データの中身（文章と正解ラベル） | 正解ラベルは schema の組み合わせからプログラムで先に決め（label-first）、文章は **Apache-2.0 / MIT のオープンモデル**が書く。または **ライセンスが両立する既存データ**を使う |
 | Claude Code の役割 | 生成、検査、重複の除去、分割、manifest の記録を行う**コードを作って実行するだけ**。学習データの文章やラベルは書かない |
 | Codex（ChatGPT のプラン） | データの中身の作成には使わない |
 | 合成データを生成する場所 | **vast.ai**（GPU instance 上でオープンモデルを動かす） |
@@ -85,7 +85,7 @@ v0 の実装は `src/jtalm/data/`（M3）です。
 1. **正解を先に決める（label-first）:** `jtalm.data.specs` が、意図（spec）とその正解の JSON をプログラムで網羅的に決める。
    - single: 20 通り
    - multi_action: 順序つきの2動作、126 通り
-   - negation: 9 通り
+   - negation: 9 通り（本生成）。追加生成で 21 通りに増やした（下の 7.）
    - correction: 16 通り（「A ではなく B」と、一部だけを否定する依頼）
    - no_action: 8 つの話題
 2. **文を書かせる:** vast.ai の GPU instance で、vLLM（v0.30.0）を使って §3 のモデルを動かし、spec の意味の日本語の文を書かせる。出力は JSON に制約する（`response_format`）。
@@ -121,7 +121,7 @@ uv run python -m jtalm.data.publish publish --confirm                        # �
 
 | 項目 | 内容 |
 |---|---|
-| 対象 | §5 で作った合成データ（正例、否定、言い換え）と manifest |
+| 対象 | §5 で作った合成データ（single / multi_action / negation / correction / no_action）とデータセットカード。manifest は GitHub で管理する |
 | 公開先 | **[`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)**（2026-09-29 公開） |
 | 公開設定 | **public、manual gate**（利用申請を手動で承認する）。ログインしていない状態でファイルを取得すると HTTP 401 になることを確認済み |
 | 時期 | M3 の完了時（モデルより先） |

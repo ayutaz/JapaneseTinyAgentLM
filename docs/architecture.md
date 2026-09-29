@@ -97,7 +97,7 @@ TinyLM-Bench の検証メモ（`94_model_validation_and_advantage_ja.md`）で�
 
 ### 上限参照のモデル（PC のみ）
 
-TinyLM-Bench の 91 は、Action 専用のモデルを 10M〜50M で学習することを勧めていました。本計画では、実機に載せる候補は 10M までにします。ただし、**PC 上だけで学習する上限参照**として、Action の 20M（必要なら 50M）も学習します。
+TinyLM-Bench の 91 は、Action 専用のモデルを 10M〜50M で学習することを勧めていました。本計画では、実機に載せる候補は 10M までにします。ただし、**実機には載せない上限参照**として、Action の 20M（必要なら 50M）も学習します（学習は vast.ai、評価は PC 上の host だけで行う）。
 
 - 3M / 5M の精度が低いとき、原因が capacity なのか、data や tokenizer なのかを切り分けるため。
 - 上限参照のモデルは実機に載せない。Needle 2（45M、13.7MB、PSRAM 約 7.7MB）でも、CoreS3 では周辺機能と同居する余裕が小さい。
@@ -511,12 +511,15 @@ JapaneseTinyAgentLM/
 │   └── training/           # 学習 script（M4）
 ├── datasets/
 │   ├── manifests/          # データの出典・ライセンス・hash（commit する）
-│   └── action/             # 生成したデータ本体（Git 管理外。Hugging Face で公開）
+│   ├── action/             # 生成したデータ本体（Git 管理外。Hugging Face で公開）
+│   └── downloads/          # MASSIVE などの取得物（Git 管理外）
+├── tokenizer/out/          # 学習した tokenizer の出力（Git 管理外。M4）
+├── runs/vast/              # vast.ai の実行記録と回収物（Git 管理外）
 ├── configs/                # 生成と学習の設定
 ├── runtime/
 │   ├── host/               # Host C reference runtime（M6）
 │   └── esp32/              # ESP32 の firmware と runtime（Track B）
-├── tests/
+├── tests/                  # fixtures/tinylm_bench/ に TinyLM-Bench の16件と既存モデルの出力
 └── backups/                # 実機 Flash のバックアップ（Git 管理外）
 ```
 
@@ -535,4 +538,4 @@ japanese-data-analyze/JapaneseTinyAgentLM-10M-Unified
 japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth       # HF の dataset（public、manual gate。M3 で公開済み）
 ```
 
-Hugging Face の公開先は、organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。repository の名前は未確定で、既存の名称、商標、repository との衝突を公開前に確認します。
+Hugging Face の公開先は、organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。**モデルの** repository の名前は未確定で（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）、既存の名称、商標、repository との衝突を公開前に確認します。

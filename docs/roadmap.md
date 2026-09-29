@@ -28,10 +28,10 @@ Phase 0 の exit gate は、実機の予算に依存する判断（partition、�
   - Servo の driver は、`stackchan-idf`（BSL-1.0）の `scs_servo` か、公式（MIT）の driver を流用する。
 - 実機を動かして、yaw の符号（公式規約では正の値が右）と pitch の中立角度を確認する。
 - 自前の最小 firmware で、Flash の使用量と、状態ごと（idle / 画面表示 / servo 駆動 / LM 推論）の内部 SRAM・PSRAM の peak を実測し、**LM が使える予算を確定する**。
-- Action vocabulary、値域、no-action policy を定義。→ **方針決定**（Action schema v0、`[]` と confidence gate。[`architecture.md`](architecture.md) §7–8）。M2 で実装する。
+- Action vocabulary、値域、no-action policy を定義。→ **完了**（M2。Action schema v0 と `[]` の扱いは `src/jtalm/action/`、評価は `jtalm.eval`。confidence gate は M5 で実装する。[`architecture.md`](architecture.md) §7–8）。
 - LM の入力仕様を文書化する。→ **決定済み**（テキストのみ、UTF-8、漢字仮名交じり文が主。[`architecture.md`](architecture.md) §12）。
-- Dataset provenance と license policy を定義。→ **方針決定**（[`data.md`](data.md)）。
-- 共通 benchmark harness と結果 JSON schema を作る。
+- Dataset provenance と license policy を定義。→ **完了**（[`data.md`](data.md)、M3 の manifest `datasets/manifests/action_v0.json`）。
+- 共通 benchmark harness と結果 JSON schema を作る。→ Action の評価器は M2 で実装済み（`jtalm.eval`）。実機の harness と結果の JSON schema は、B2.5 / B3 で作る。
 
 ### Exit gate
 
@@ -91,14 +91,14 @@ Phase 0 の exit gate は、実機の予算に依存する判断（partition、�
 | 否定の割合 | 20%以上 |
 | No-action の割合 | 20%以上（雑談、質問、状態の説明、曖昧な命令、tool の範囲外の要求を含む） |
 | 評価セット | 1,000件以上。重要カテゴリ（multi-action、否定、no-action）は各100件以上 |
-| 分割 | テンプレート単位で分け、文面の暗記を避ける |
+| 分割 | 生成元（モデルと prompt）で学習データと評価セットを分け、重複と重なりを除く（M3 で実施。テンプレート単位の分割は行っていない。label-first の生成にしたため） |
 
 TinyLM-Bench の16件は、開発中の smoke test として使います。モデルの選定には使いません。
 
 ### Model axis
 
 - 3M / 5M / 10M（実機に載せる候補）。
-- 20M（必要なら 50M）: PC 上だけで学習する上限参照。3M / 5M の精度が低いとき、原因が capacity なのか、data や tokenizer なのかを切り分ける（[`architecture.md`](architecture.md) §3）。
+- 20M（必要なら 50M）: 実機には載せない上限参照（学習は vast.ai、評価は PC 上の host だけで行う）。3M / 5M の精度が低いとき、原因が capacity なのか、data や tokenizer なのかを切り分ける（[`architecture.md`](architecture.md) §3）。
 - INT8 / INT4。
 - context 64 / 128 / 256。
 - Grammar なし / あり。
@@ -116,10 +116,11 @@ TinyLM-Bench の16件は、開発中の smoke test として使います。モ�
 | No-action の正解率 | 95%以上（最優先） |
 | Host INT4 と FP reference の差 | 許容範囲内 |
 
-- 上の目標値は、TinyLM-Bench の検証メモ（94）の提案を**暫定値**として採用したものです。Baseline とデータセットの難易度を見てから見直します。
+- 上の目標値は、TinyLM-Bench の検証メモ（94）の提案を**暫定値**として採用したものです。M3 でルールベースの baseline が取れた（no_action の recall は 0.94、precision は 0.80）ので、M4 の最初の評価の後に見直し、no-action には precision の目標も加えるかを決めます。Baseline とデータセットの難易度を見てから見直します。
 - Critical slot（方向、否定、量）の error budget は別に設定する。
 - OOD / 無関係な入力で誤って動作してしまう率を、許容値以下にする。
-- **既存モデルに勝つこと:** TinyLM-Bench の共通評価（16件と、その拡張版）で、Needle 2、FunctionGemma 270M、MimiModel の厳格一致率を上回る。
+- **既存モデルに勝つこと:** TinyLM-Bench の共通評価（16件）で、Needle 2、FunctionGemma 270M、MimiModel の厳格一致率を上回る。既存モデルは 16件分の出力しか手元にないため、1,189件の評価セットでの比較は、M5 で TinyLM-Bench の host 環境で流せるかを判断する。
+- **ルールベースの baseline に勝つこと:** M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別（特に single 60.9%、multi_action 46.9%）の両方で上回る。
 
 Baseline は、単純な手法（random、rule-based parser、小型 classifier / seq2seq）と、既存モデル（TinyLM-Bench の上記3モデル）の両方にします。モデルは、単純な手法と既存モデルの両方を上回ることを要求します。
 
@@ -327,15 +328,15 @@ Python の実装と C runtime は、同じ評価セットと同じ条件で比�
 2. Needle 2 の artifact format、kernel、grammar の再利用可能性と license。
 3. ESP32-S3 SIMD / ESP-DSP / ESP-NN / ESP-DL を使う quantized GEMV の比較。既存の runtime（esp32-llm の Xtensa PIE INT8 kernel、esp32-mind / esp32-ai の int4 PLE runtime）を流用できるかと、その license も調べる。
 4. MQA/GQA、KV INT8、sliding window、recompute の速度・メモリ trade-off。
-5. 日本語 Action dataset の合成比率と品質の検証。方針と権利の整理は済んでいる（[`data.md`](data.md)）。
-6. Rule-based parser、小型 classifier、seq2seq との比較。
+5. 日本語 Action dataset の品質の検証。v0 は M3 で作成・公開済み（[`data.md`](data.md)）。残りは、学習結果を見たうえでの人手の抜き取り確認、生成元の偏り、評価セットの難易度の確認。
+6. Rule-based parser、小型 classifier、seq2seq との比較。ルールベースは M3 で測定済み（評価セットで 76.4%）。小型 classifier / seq2seq は未実施。
 7. 既存の日本語 on-device tool-calling model、論文、製品、特許の網羅調査。公開されている小型モデル9種の Windows host での検証は、TinyLM-Bench で済んでいる（[`research_notes.md`](research_notes.md) §3.7）。
 8. Grammar compiler の supported subset と code size。
 9. Flash mmap、microSD streaming、external storage の latency。
 10. OTA / rollback / recovery partition を残したまま成立する構成。
 11. Servo safety、privacy、offline data retention の要件。
 12. 開発者が求める latency と品質の水準。
-13. Hugging Face の repository 名、商標、release packaging。ライセンスは決定済み（重みとデータセットは CC BY-SA 4.0）。
+13. Hugging Face の**モデルの** repository 名、商標、release packaging（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）。ライセンスは決定済み（重みとデータセットは CC BY-SA 4.0）。
 14. （優先度低）ひらがなだけの入力と、漢字仮名交じり文の比較。入力はテキストのみと決まったので、ひらがなは頑健性の確認用の一部として評価するだけにする。
 
 TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲外として外しました（2026-09-29）。
@@ -344,9 +345,9 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 
 最初の1サイクルは次に限定します。
 
-1. Action schema v0 を `look` / `set_expression` / `nod` / no-action に絞る。形式は TinyLM-Bench と同じにし、1回の出力は 0〜2個とする（[`architecture.md`](architecture.md) §7）。
-2. 漢字仮名交じり文を主とした dataset を作る（ひらがなだけの入力は一部）。学習データは 2,000〜10,000件とし、否定と no-action をそれぞれ20%以上にする。multi-action、否定、no-action を独立したカテゴリにし、対比ペアを入れる。データはすべて CC BY-SA 4.0 と両立させ、出典を manifest に記録する。
-3. Tokenizer を先に固定してから、3M と 5M を学習する（vast.ai 上）。PC 上だけの上限参照として 20M も学習する。
+1. （M2 で完了）Action schema v0 を `look` / `set_expression` / `nod` / no-action に絞る。形式は TinyLM-Bench と同じにし、1回の出力は 0〜2個とする（[`architecture.md`](architecture.md) §7）。
+2. （M3 で完了）漢字仮名交じり文を主とした dataset を作る（ひらがなだけの入力は一部）。学習データは 2,000〜10,000件とし、否定と no-action をそれぞれ20%以上にする。multi-action、否定、no-action を独立したカテゴリにし、対比ペアを入れる。データはすべて CC BY-SA 4.0 と両立させ、出典を manifest に記録する。
+3. Tokenizer を先に固定してから、3M と 5M を学習する（vast.ai 上）。実機には載せない上限参照として 20M も学習する。
 4. Grammar なし/ありと confidence gate なし/ありで、カテゴリ別の exact match と no-action を比較する。
 5. INT8 → INT4 の精度差を、カテゴリ別に測る。
 6. TinyLM-Bench の共通評価で、既存モデル（Needle 2、FunctionGemma 270M、MimiModel）と比べる。
@@ -370,7 +371,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | M2 Action schema v0 と評価の土台 | **完了**（2026-09-29） |
 | M2.5 vast.ai 実行基盤 | **完了**（2026-09-29） |
 | M3 合成データセット | **完了**（2026-09-29）。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
-| M4 以降 | 未着手。次は M4（Tokenizer と 3M / 5M / 20M の学習）。並行して Track B（B1、B2） |
+| M4 以降 | 未着手。次は M4（下の「M4 の計画」）。並行して Track B（B1、B2）。**M4 の GPU 費用は、新たな承認が必要**（M2.5〜M3 の承認は使い切らずに終了） |
 | vast.ai の費用（M2.5〜M3 の累計） | 約 $1.03（承認済みの上限 約 $4 の範囲内） |
 
 ### M1〜M3 の目的と完了条件
@@ -403,14 +404,37 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 
 M4 で Action LM が超えるべき基準は、このルールベースの baseline（完全一致 76.4%）と、TinyLM-Bench の既存モデルの結果です。特に multi_action（46.9%）と single（60.9%）で、差をつける余地が大きくあります。
 
+### M4 の計画（次の作業）
+
+- **目的:** 3M / 5M の Action LM を学習し、ルールベースの baseline（76.4%）と既存モデルを上回れるかを確かめる。実機に載せない 20M の上限参照と比べて、精度不足の原因（capacity か、data / tokenizer か）を切り分けられるようにする。
+- **完了条件:**
+  - Tokenizer を固定し、hash を記録している。
+  - 3M / 5M / 20M の学習が vast.ai で完走している。
+  - 評価セット 1,189件を greedy で生成し、`jtalm.eval` でカテゴリ別に採点して、ルールベースと比べた表がある。
+  - checkpoint、学習の記録、費用を残している。
+
+| 手順 | 内容 |
+|---|---|
+| 1. 学習データの転送 | `datasets/action/` は Git の管理外なので、`git archive` では instance に届かない。Hugging Face の dataset も manual gate なので、`HF_TOKEN` を持ち込まない方針では取りに行けない。そこで job runner に、ローカルのファイルを scp で送る項目（例: `JobSpec.uploads`）を加え、送った `train.jsonl` / `val.jsonl` と tokenizer の sha256 を manifest と照合する |
+| 2. Tokenizer | SentencePiece の 2k / 4k / 8k を、train と validation の入力文と出力（`to_json` の正規形）で学習する。評価セットは使わない。数秒で終わる前処理なので、ローカルの CPU で行う（モデルの学習は vast.ai）。coverage、byte fallback 率、1件あたりの token 数、embedding の parameter 数で選んで固定する。出力先は `tokenizer/out/`（Git の管理外）にそろえる |
+| 3. モデル | decoder-only Transformer（RMSNorm、RoPE、GQA / MQA、weight tying）。3M / 5M / 20M の config は、embedding を含めた parameter 数で決める。入力は `<action>` と発話、出力は正規形の JSON で、loss は出力の部分だけにかける |
+| 4. 学習の job | ローカルの CPU で数 step の smoke test を通してから、vast.ai で学習する。この規模なら 24GB 級の GPU（RTX 3090 / 4090、約 $0.15〜0.4/h）で足りる。image は vLLM ではなく CUDA 12.6 以上の base image にし、torch は `uv sync --locked --group train` で入れる（cu126） |
+| 5. 評価 | 評価セット 1,189件を greedy で生成し、カテゴリ別の完全一致、no-action の precision / recall、致命的な誤り、対比ペアの正解率を、ルールベースと既存モデル（16件）と比べる。評価条件（prompt、greedy、評価セットの hash）を記録する |
+| 6. 費用の承認 | GPU の種類、時間単価の上限、想定時間、費用の上限を提示し、承認を得てから instance を作る。M3 の実績（A100 で 1回あたり 0.2〜0.5 h）から、M4 の GPU 費用は合計 $1〜3 程度と見込む |
+
+**Track B を並行して進めるための前提:**
+
+- **B1:** ESP-IDF の Docker image を使うので、ユーザーに Docker Desktop を起動してもらう。
+- **B2:** `stackchan-idf` を書き込むと、受領時の firmware が上書きされる。B0 のバックアップ（[`hardware.md`](hardware.md) §6）から戻せる手順を確認しておく。servo の動作に立ち会ってもらう日を調整する。
+
 ### Track A: PC 上の実装マイルストーン
 
 | # | マイルストーン | 成果物 | 完了条件 |
 |---|---|---|---|
-| M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
+| M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`（権限の設定で作成できず、[`development.md`](development.md) §3 の表で代替）。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
 | M2 | Action schema v0 と評価の土台 | `src/jtalm/action/action_schema_v0.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
 | M2.5 | vast.ai 実行基盤 | `src/jtalm/infra/`（`uv run python -m jtalm.infra.job <job> --approve-dph <上限>`。GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 各手順 → 回収 → 必ず削除 → 費用の記録）。CLI は `uv add --dev vastai`（1.8 系）で lock する。vLLM（`vllm/vllm-openai:v0.30.0`）を使う生成用の構成を含める | 小さな生成と、GPU 上での torch の動作確認で一連の流れが通り、instance の削除と費用が記録されている（学習そのものの確認は M4 で行う） |
-| M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書いて llm-jp が検証、評価セットは llm-jp-3.1-13b-instruct4 が書いて Qwen3 が検証）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
+| M3 | Dataset v0 と baseline | vast.ai 上で、正解を先に決めた spec から、Apache-2.0 のオープンモデルに文を書かせ、別のモデルで検証した合成データ（学習データは Qwen3-30B-A3B-Instruct-2507 が書き、同じモデルが温度 0 で検証する。v0.1 の llm-jp-3.1 による検証は機能しなかったため変更した。評価セットは llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証する）。学習データは 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア）。少量の英語の命令は評価セットにだけ入れる。負例には MASSIVE（ja-JP）も使う。ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。生成元（モデルと prompt）で学習データと評価セットを分け、重なりを除いて、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
 | M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | §12 冒頭のリストの手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
 | M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |
@@ -456,7 +480,7 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 |---|---|---:|---|---|
 | M1 | リポジトリ基盤 | 1〜2 h | — | uv の更新 |
 | M2 | Action schema v0 と評価の土台 | 2〜3 h | — | — |
-| M2.5 | vast.ai 実行基盤 | 2〜4 h | 小さな生成と学習 10〜30 分 | 費用の承認（API key は設定済み） |
+| M2.5 | vast.ai 実行基盤 | 2〜4 h | 小さな生成と GPU 上の torch の確認 10〜30 分 | 費用の承認（API key は設定済み） |
 | M3 | Dataset v0 と baseline | 5〜9 h | GPU での生成 1〜3 時間 | 費用の承認、**Hugging Face へのアップロード直前の最終確認**（`HF_TOKEN` は設定済み） |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | 4〜6 h | GPU で数時間 | 費用の承認 |
 | M5 | Grammar、confidence gate、量子化 | 3〜5 h | — | — |
@@ -467,6 +491,18 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 | B3 | LM 評価用の最小 firmware | 3〜5 h | — | — |
 | B4 | 実機への移植と servo の制御 | 4〜8 h | — | **Servo の動作に立ち会う** |
 | 合計 | | **約 32〜57 h** | GPU で数時間 | |
+
+### M1〜M3 の実績（2026-09-29）
+
+| # | Claude Code の作業時間 | GPU と費用 | 見積もりとの差 |
+|---|---|---|---|
+| M1 | 未記録 | — | — |
+| M2 | 未記録 | — | — |
+| M2.5 | 未記録 | RTX 3090 で 0.208 h（ほかに失敗 1回、0.105 h）。計 約 $0.055 | SSH の失敗（vLLM の image の権限）の修正が加わった |
+| M3 | 未記録 | A100 80GB で 3回、計 約 1.04 h。$0.50 + $0.31 + $0.17 = 約 $0.98 | 見積もりの前提外だった反復（v0.1 の失敗、否定の追加生成）を含む |
+| 合計 | — | 約 $1.03 | GPU の時間は、見積もり（数時間）より短かった |
+
+Claude Code の作業時間は計測していないため、「未記録」としています。M4 以降は、主な手順の開始と終了の時刻を記録します。
 
 ### 速く進めるための並行化
 

@@ -39,6 +39,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 
 - 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
 - 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
+- M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別の両方で上回る
 - 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たし、servo を実際に動かす
 
 **公開物（Hugging Face と GitHub）**
@@ -209,3 +210,6 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | Hugging Face の公開先は organization `japanese-data-analyze` とする。合成データセットのライセンスは CC BY-SA 4.0 とする | [`data.md`](data.md) §6、[`architecture.md`](architecture.md) §13 |
 | 2026-09-29 | M3 の実行結果による変更。評価セットは llm-jp-3.1-13b-instruct4 が書く（llm-jp-4.1 は thinking 版しかないため）。学習データは Qwen3-30B-A3B-Instruct-2507（bf16）が書き、温度 0 で検証する（llm-jp-3.1 は検証役として機能しなかったため）。否定の spec を 21 通りに増やし、否定だけを追加で生成する | [`data.md`](data.md) §3、§5 |
 | 2026-09-29 | 合成データセットを [`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) として公開した（public、manual gate、CC BY-SA 4.0） | [`roadmap.md`](roadmap.md) §12 |
+| 2026-09-29 | 開発環境を固定する。Python 3.13、torch 2.14.0（Linux は cu126、Windows は CPU 版）、vLLM の image は `vllm/vllm-openai:v0.30.0`、依存は `uv.lock` で固定し、instance では `--no-dev` を使う | [`development.md`](development.md) §2、§4 |
+| 2026-09-29 | 学習データと評価セットは、テンプレート単位ではなく生成元（モデルと prompt）で分ける。キーワードの規則で正解を確かめる検査は入れない（入れると、ルールベースの baseline が不当に高くなるため） | [`data.md`](data.md) §5 |
+| 2026-09-29 | Action LM の完了条件に、ルールベースの baseline（評価セットで完全一致 76.4%）を全体とカテゴリ別で上回ることを加える。M4 の GPU 費用は、あらためて承認を得る | [`roadmap.md`](roadmap.md) §4、§12 |

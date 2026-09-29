@@ -48,13 +48,14 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 
 - 完全一致 90%以上、否定と multi-action それぞれ 90%以上、no-action 95%以上、schema 妥当 100%
 - 既存の小型モデル（Needle 2、FunctionGemma 270M、MimiModel）に、厳格一致率で勝つ
+- M3 の評価セット（1,189件）で、ルールベースの baseline（完全一致 76.4%）を、全体とカテゴリ別の両方で上回る
 - 量子化後も精度を保ち、host の C 実装と一致し、K151 の実機で容量、速度、安定性の基準を満たし、servo を実際に動かす
 
 目標値は、baseline を取ってから見直します。詳しくは [`docs/README.md`](docs/README.md) §1 と [`docs/roadmap.md`](docs/roadmap.md) を参照してください。
 
 ## 学習データの方針
 
-- 文章と正解ラベルは、**Apache-2.0 / MIT のオープンモデル**を vast.ai 上で動かして生成する。学習データは Qwen3（予備に gpt-oss）、評価セットは別のモデル（llm-jp-3.1-13b-instruct4）と別の prompt で作る。
+- **正解ラベルは、schema の組み合わせからプログラムで先に決め（label-first）、その意味の文章を Apache-2.0 / MIT のオープンモデル**に vast.ai 上で書かせる。モデルが文を JSON に変換し直して正解と一致した文だけを残す。学習データは Qwen3（予備に gpt-oss）、評価セットは別のモデル（llm-jp-3.1-13b-instruct4）と別の prompt で作る。
 - no-action の負例には、ライセンスが両立する既存の人手データ（MASSIVE の日本語など）を使う。
 - **Claude Code は、生成・検査・分割のコードを作って実行するだけ**で、学習データの文章やラベルは書かない。Codex（ChatGPT のプラン）もデータの中身には使わない。どちらも、利用規約で出力を学習に使うことに制限があるため。
 - すべてのデータの出典とライセンスを manifest に記録する。
@@ -99,7 +100,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 3. Action の出力は、TinyLM-Bench と同じ形式の action call の配列にする。方向と量はカテゴリで出力し、角度への変換は firmware 側で行う（yaw は正の値が右）。
 4. grammar-constrained decoding、confidence gate、実行側の validation の3段で、出力を制約する。
 5. 既存の小型モデルがすべて失敗した **multi-action、否定、no-action** を重点的に学習する。
-6. 最初の1周は、3M / 5M の **Action 専用のスクラッチ学習**で行う。原因を切り分けるために、PC 上だけで 20M も学習する。
+6. 最初の1周は、3M / 5M の **Action 専用のスクラッチ学習**で行う。原因を切り分けるために、実機には載せない上限参照として 20M も学習する（学習は vast.ai）。
 7. 実機の build は ESP-IDF v5.5.5（Docker image）に固定する。
 
 ## 文書
@@ -140,4 +141,4 @@ uv run pytest                   # test
 | 合成データセット（Hugging Face） | **CC BY-SA 4.0**（public、manual gate） |
 | 学習データ | CC BY-SA 4.0 と両立するものだけを使う（[`docs/data.md`](docs/data.md)） |
 
-公開するのは、データの出典、ライセンス、再現性、実機での評価、安全性の審査をすべて通過した artifact だけです。
+モデルを公開するのは、データの出典、ライセンス、再現性、実機での評価、安全性の審査をすべて通過したものだけです。データセットは、出典、ライセンス、再現性、規約の確認を通過して公開しました（2026-09-29）。
