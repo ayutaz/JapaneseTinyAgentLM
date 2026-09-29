@@ -218,3 +218,4 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | Track B で、第三者のコード（`stackchan-idf`、`esp32-llm` と、それらが指定する依存物）を取得して build し、実機に書き込むことを、ユーザーが明示的に許可した | [`hardware.md`](hardware.md) |
 | 2026-09-29 | Hugging Face に公開する repository（データセットとモデル）は、すべて Community contributions（Discussions と Pull Requests）を off にする。公開済みのデータセットにも設定した | [`data.md`](data.md) §6、[`development.md`](development.md) §6 |
 | 2026-09-29 | モデルの公開先はユーザーのアカウント [`ayousanz`](https://huggingface.co/ayousanz) に変更する（データセットは `japanese-data-analyze` のまま）。モデルを公開する前には必ずユーザーの確認を取る | [`architecture.md`](architecture.md) §13 |
+| 2026-09-29 | 学習データは v0.4（書き手7つ、47,450件）を採用する。モデルサイズは、精度の面では 3M（INT4）を第一候補とし、B4 の実機速度を見て最終決定する | [`roadmap.md`](roadmap.md) §12 |

@@ -77,6 +77,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | M2.5 vast.ai の実行基盤（GPU での torch と vLLM の動作確認、自動削除、費用の記録） | 完了 |
 | M3 合成データセット（学習 9,544 件、評価 1,189 件、ルールベースの baseline 76.4%） | 完了。[Hugging Face で公開](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)（public、manual gate） |
 | M4 Tokenizer（SentencePiece 2k）と 3M / 5M / 20M の学習 | 完了。評価セットの完全一致は 3M が 84.4%、20M が 83.9%（ルールベースは 76.4%）。single、correction、英語はまだ届かない |
+| M5（grammar、量子化）、データ v0.3 / v0.4、M6（Host C runtime） | 完了。3M INT4 + grammar で評価セットの完全一致 94.3%（C の runtime も同じ出力） |
 | Track B（ESP-IDF の環境、評価用 firmware、既存 runtime の実機速度、servo の確認の準備） | 完了（servo の確認だけ、ユーザーの立ち会いが必要）。3M 級 INT8 の実機速度は約 7 tok/s |
 
 次の作業は、次の順序で進めます。各マイルストーンの目的と完了条件は [`docs/roadmap.md`](docs/roadmap.md) §12 にあります。
@@ -89,7 +90,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 6. ~~**M5:** grammar と量子化~~（完了。INT4 でも精度は落ちない）
 7. ~~**データ v0.3:** 書き手を3つに~~（完了。3M で 91〜92%）
 8. ~~**M6:** Host C runtime~~（完了。PyTorch と出力が完全に一致）
-9. **データ v0.4:** 書き手を7つにして約 5 万件（学習中）→ データ量とモデルサイズの候補を決める
+9. ~~**データ v0.4:** 書き手を7つにして約 5 万件~~（完了。3M で 94.2〜94.4%、Action の目標値をすべて満たした。データは v0.4、サイズは 3M が第一候補）
 10. **B4:** 実機への移植と速度の計測 → モデルサイズの最終決定
 
 > [!IMPORTANT]

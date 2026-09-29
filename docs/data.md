@@ -143,7 +143,22 @@ v0 のファイルはそのまま残し、学習データだけを追加しま�
 | 生成の費用 | A100 PCIe で 0.311 h、約 $0.31（1回目は host の起動が遅く失敗し、約 $0.37） |
 | 記録 | `datasets/manifests/action_v0.3.json`。設定は `configs/action_v03_*.json`、job は `gen_action_v03` |
 
-次の v0.4 は、量の確認（学習データの 25% / 50% / 100% で 3M を学習して比べる）と v0.3 の学習結果を見て決めます。量が効いていれば、書き手をさらに増やして 4〜5万件にします。
+量の確認（同じ書き手のデータを 50% から 100% に増やしても +1.3 point）と v0.3 の結果（書き手を増やして +7〜8 point）から、量は書き手を増やして稼ぐことにしました。
+
+### v0.4（2026-09-29）
+
+v0.3 に、7つの書き手で書いた文を追加しました（`jtalm.data.build --base datasets/action/v0.3`）。評価セットは v0 と同じです。
+
+| 項目 | 内容 |
+|---|---|
+| 新しい書き手 | `abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0`（Apache-2.0）、`cyberagent/Mistral-Nemo-Japanese-Instruct-2408`（Apache-2.0）、`ibm-granite/granite-3.3-8b-instruct`（Apache-2.0）、`elyza/ELYZA-Shortcut-1.0-Qwen-32B`（Apache-2.0）。いずれもモデルカードでライセンスと chat template を確認済み |
+| 続けて使う書き手 | calm3-22b、sarashina2.2-3b、Qwen3（seed を変えて追加） |
+| 生成と検証 | 47,920文を生成し、Qwen3 が温度 0 で検証した。通過率は 48%（granite）〜72%（ABEJA） |
+| 件数 | train 47,450（+29,379）、validation 2,497。single 12,628、multi_action 12,005、negation 8,791（18.5%）、no_action 10,142（21.4%）、correction 3,884 |
+| 正解が `[]` の割合 | 43.7% → 39.9% |
+| 規則からの逸脱 | negation が 18.5% で、「20%以上」をわずかに下回った。評価では negation の精度は 94〜96% を保った |
+| 生成の費用 | 1回目（A100 PCIe、$1.12）は host の空き disk が 152GB しかなく、3つの書き手が失敗した。成功した4つの出力を回収し、`gen_action_v04b`（A100 SXM4、$0.65）で残りを生成して、全体を検証した |
+| 記録 | `datasets/manifests/action_v0.4.json`、設定は `configs/action_v04_*.json` |
 
 ## 6. Hugging Face への公開
 
