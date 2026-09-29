@@ -331,13 +331,17 @@ static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v;
 #define PITCH_MAX \
   (ACT_PITCH_LIMIT_DEG < HW_PITCH_MAX_DEG ? ACT_PITCH_LIMIT_DEG : HW_PITCH_MAX_DEG)
 
-uint16_t act_move_ms(double deg) {
+uint16_t act_move_ms_limits(double deg, double vmax_dps, double amax_dps2) {
   if (deg <= 0) return 0;
   // Cosine ease over T: peak speed pi*D/(2T), peak acceleration pi^2*D/(2T^2).
-  double t_v = M_PI * deg / (2.0 * MOTION_VMAX_DPS);
-  double t_a = M_PI * sqrt(deg / (2.0 * MOTION_AMAX_DPS2));
+  double t_v = M_PI * deg / (2.0 * vmax_dps);
+  double t_a = M_PI * sqrt(deg / (2.0 * amax_dps2));
   double t = t_v > t_a ? t_v : t_a;
   return (uint16_t)(ceil(t * 1000.0 / MOTION_TICK_MS - 1e-9) * MOTION_TICK_MS);
+}
+
+uint16_t act_move_ms(double deg) {
+  return act_move_ms_limits(deg, MOTION_VMAX_DPS, MOTION_AMAX_DPS2);
 }
 
 uint16_t act_yaw_raw(double deg) { return (uint16_t)lround(SERVO_YAW_ZERO - deg * 16.0 / 5.0); }
@@ -351,7 +355,7 @@ double act_yaw_deg(int raw) { return (SERVO_YAW_ZERO - raw) * 5.0 / 16.0; }
 double act_pitch_deg(int raw) { return (raw - SERVO_PITCH_ZERO) * 5.0 / 16.0; }
 
 static void add_move(act_plan_t *p, int call, int yaw_req, int pitch_req, int *yaw,
-                     int *pitch) {
+                     int *pitch, int nod) {
   if (p->n_steps >= ACT_MAX_STEPS) return;
   act_step_t *s = &p->steps[p->n_steps++];
   memset(s, 0, sizeof(*s));
@@ -363,7 +367,9 @@ static void add_move(act_plan_t *p, int call, int yaw_req, int pitch_req, int *y
   s->yaw_raw = act_yaw_raw(s->yaw);
   s->pitch_raw = act_pitch_raw(s->pitch);
   int dy = abs(s->yaw - *yaw), dp = abs(s->pitch - *pitch);
-  s->ms = act_move_ms(dy > dp ? dy : dp);
+  int d = dy > dp ? dy : dp;
+  s->ms = nod ? act_move_ms_limits(d, MOTION_NOD_VMAX_DPS, MOTION_NOD_AMAX_DPS2)
+              : act_move_ms(d);
   p->total_ms += s->ms;
   *yaw = s->yaw;
   *pitch = s->pitch;
@@ -396,21 +402,22 @@ void act_plan(act_plan_t *p, int yaw, int pitch) {
         case DIR_UP: pt = kPitchDeg[call->amount]; break;
         case DIR_DOWN: pt = -kPitchDeg[call->amount]; break;
       }
-      add_move(p, c, y, pt, &yaw, &pitch);
+      add_move(p, c, y, pt, &yaw, &pitch, 0);
     } else {
-      // mapping.nod_targets: down by NOD_PITCH_DEG and back, `count` times. On the device
-      // the nod is around the current pitch (so "look up, then nod" nods while looking up).
-      // Near the lower limit the down point is clamped; if less than half the amplitude is
-      // left, the nod goes up from the limit instead. It always ends at the pitch it began.
+      // mapping.nod_targets(count, base_pitch, pitch_min, pitch_max): a swing of
+      // NOD_PITCH_DEG down from the current pitch and back, `count` times, so "look up, then
+      // nod" nods while looking up. Near the lower limit the swing keeps its full amplitude
+      // by moving up (from 0 with a -10 limit: between -10 and +4). It ends at the start.
       int start = pitch;
-      int low = start - ACT_NOD_PITCH_DEG, high = start;
+      int low = start - ACT_NOD_PITCH_DEG;
       if (low < PITCH_MIN) low = PITCH_MIN;
-      if (high - low < ACT_NOD_PITCH_DEG / 2) high = low + ACT_NOD_PITCH_DEG;
+      int high = low + ACT_NOD_PITCH_DEG;
+      if (high > PITCH_MAX) high = PITCH_MAX;
       for (int i = 0; i < call->count; i++) {
-        add_move(p, c, yaw, low, &yaw, &pitch);
-        add_move(p, c, yaw, high, &yaw, &pitch);
+        add_move(p, c, yaw, low, &yaw, &pitch, 1);
+        add_move(p, c, yaw, high, &yaw, &pitch, 1);
       }
-      if (high != start) add_move(p, c, yaw, start, &yaw, &pitch);
+      if (high != start) add_move(p, c, yaw, start, &yaw, &pitch, 1);
     }
   }
   p->yaw1 = yaw;

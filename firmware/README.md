@@ -11,7 +11,7 @@ M5Stack CoreS3（StackChan K151）向けの firmware です。実機の構成と
 | `tools/serial_capture.py` | Serial log の取得。reset、prompt への自動応答、終了条件を指定できる | Apache-2.0 |
 | `tools/lm_serial.py` | `jtalm_action` に prompt を1件ずつ送り、応答を JSONL に保存する。host の runtime の出力と比べ、latency をまとめる。`--act` で dispatcher の計画（`act` の行）も保存する | Apache-2.0 |
 | `tools/dispatch_check.py` | dispatcher の計画を、Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz` で `!act` を使った validator の検査 | Apache-2.0 |
-| `tools/servo_test.py` | servo の動作確認の手順を流す（[`docs/hardware.md`](../docs/hardware.md) §12）。`--servo` を付けないと dry-run。**`--servo` は首が動くので、ユーザーが立ち会うときだけ使う** | Apache-2.0 |
+| `tools/servo_test.py` | servo の動作確認の手順を流す（[`docs/hardware.md`](../docs/hardware.md) §12）。`--servo` を付けないと dry-run。`--only <文字列>` で一部の項目だけを流す。**`--servo` は首が動くので、ユーザーが立ち会うときだけ使う** | Apache-2.0 |
 | `third_party/` | 第三者の repository の clone。Git の管理外 | 各 upstream |
 
 ## Build と書き込み
@@ -36,7 +36,7 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
 
 ### jtalm_action（B4、A1〜A3）
 
-**実機の現在の状態（2026-09-29）:** A1〜A3 の `jtalm_action`（app の SHA-256 `125e375c…28f0bf1e3f`）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** servo の電源を入れて ping と位置の読み取りまでは確かめました（首は動かしていない）。首を動かす確認はまだ行っていません（[`docs/hardware.md`](../docs/hardware.md) §12 の手順で、ユーザーの立ち会いのもとで行う）。
+**実機の現在の状態（2026-09-29）:** A1〜A3 の `jtalm_action`（app の SHA-256 `0aff3e1a…abcdba01`。うなずきを 14°、900°/s² にした版）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** 首を動かす確認は、うなずきを変える前の版で済ませました（[`docs/hardware.md`](../docs/hardware.md) §12）。変更後のうなずきの目視は、`servo_test.py --servo --only うなずき` で、ユーザーの立ち会いのもとで行います。
 
 `runtime/host/` を参照するので、repository の root を mount します。画面には M5Unified と M5GFX を使い、`third_party/stackchan-idf` の submodule（下の stackchan-idf の手順で取得したもの）をそのまま build します（`CMakeLists.txt` の `M5UNIFIED_DIR` / `M5GFX_DIR`）。
 

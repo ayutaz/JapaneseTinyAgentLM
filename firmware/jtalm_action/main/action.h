@@ -24,7 +24,7 @@ enum { EXPR_HAPPY, EXPR_SAD, EXPR_SURPRISED, EXPR_NEUTRAL, EXPR_COUNT };
 // mapping.py: YAW_DEG, PITCH_DEG, YAW_LIMIT_DEG, PITCH_LIMIT_DEG, NOD_PITCH_DEG
 #define ACT_YAW_LIMIT_DEG 30
 #define ACT_PITCH_LIMIT_DEG 15
-#define ACT_NOD_PITCH_DEG 8
+#define ACT_NOD_PITCH_DEG 14  // nod amplitude (8 was too small to notice, 2026-09-30)
 // stackchan-idf soft limits (relative to the zero position), docs/hardware.md section 10
 #define HW_YAW_MIN_DEG (-40)
 #define HW_YAW_MAX_DEG 40
@@ -38,6 +38,10 @@ enum { EXPR_HAPPY, EXPR_SAD, EXPR_SURPRISED, EXPR_NEUTRAL, EXPR_COUNT };
 // keeps the peak speed and acceleration under these limits, rounded up to the servo tick.
 #define MOTION_VMAX_DPS 90.0
 #define MOTION_AMAX_DPS2 360.0
+// Nod strokes are faster. With the cosine ease the acceleration limit decides the time of
+// any stroke below 2*v^2/a degrees (here 50 deg): 14 deg takes 280 ms, peaking at ~79 deg/s.
+#define MOTION_NOD_VMAX_DPS 150.0
+#define MOTION_NOD_AMAX_DPS2 900.0
 #define MOTION_TICK_MS 20
 #define MOTION_CALL_GAP_MS 200  // pause between the two calls of one request
 
@@ -78,8 +82,10 @@ int act_parse(const char *s, size_t n, act_call_t *calls, int *n_calls, const ch
 // Plans validated calls from the pose (yaw, pitch) in degrees.
 void act_plan(act_plan_t *p, int yaw, int pitch);
 
-// Move duration in ms for a distance in degrees (0 for 0).
+// Move duration in ms for a distance in degrees (0 for 0): act_move_ms with the general
+// limits, act_move_ms_limits with the given peak speed and acceleration.
 uint16_t act_move_ms(double deg);
+uint16_t act_move_ms_limits(double deg, double vmax_dps, double amax_dps2);
 uint16_t act_yaw_raw(double deg);
 uint16_t act_pitch_raw(double deg);
 double act_yaw_deg(int raw);

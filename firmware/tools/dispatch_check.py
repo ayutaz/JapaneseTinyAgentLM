@@ -62,24 +62,27 @@ class Policy:
         self.pitch_zero = d["SERVO_PITCH_ZERO"]
         self.vmax = d["MOTION_VMAX_DPS"]
         self.amax = d["MOTION_AMAX_DPS2"]
+        self.nod_vmax = d["MOTION_NOD_VMAX_DPS"]
+        self.nod_amax = d["MOTION_NOD_AMAX_DPS2"]
         self.tick = d["MOTION_TICK_MS"]
         self.gap = int(d["MOTION_CALL_GAP_MS"])
 
-    def move_ms(self, deg: float) -> int:
+    def move_ms(self, deg: float, nod: bool = False) -> int:
         if deg <= 0:
             return 0
-        t = max(math.pi * deg / (2 * self.vmax), math.pi * math.sqrt(deg / (2 * self.amax)))
+        vmax, amax = (self.nod_vmax, self.nod_amax) if nod else (self.vmax, self.amax)
+        t = max(math.pi * deg / (2 * vmax), math.pi * math.sqrt(deg / (2 * amax)))
         return int(math.ceil(t * 1000 / self.tick - 1e-9) * self.tick)
 
     def plan(self, calls: list[dict], yaw: int, pitch: int) -> dict:
         steps: list[dict] = []
         total = 0
 
-        def move(c: int, y: int, p: int) -> None:
+        def move(c: int, y: int, p: int, nod: bool = False) -> None:
             nonlocal yaw, pitch, total
             cy = min(max(y, self.yaw_min), self.yaw_max)
             cp = min(max(p, self.pitch_min), self.pitch_max)
-            ms = self.move_ms(max(abs(cy - yaw), abs(cp - pitch)))
+            ms = self.move_ms(max(abs(cy - yaw), abs(cp - pitch)), nod)
             steps.append(
                 {
                     "c": c,
@@ -110,22 +113,16 @@ class Policy:
                     pitch if t.pitch_deg is None else t.pitch_deg,
                 )
             else:
-                # mapping.nod_targets gives (down, back) pairs relative to neutral; the device
-                # applies the same offsets around the current pitch, within the soft limits.
-                # The schema also accepts an integral float count (2.0); the device reads it
-                # as the integer.
-                count = int(call["arguments"]["count"])
-                targets = mapping.servo_targets({"name": "nod", "arguments": {"count": count}})
-                down, back = targets[0].pitch_deg, targets[1].pitch_deg
+                # The swing around the current pitch within the soft limits comes from
+                # mapping.nod_targets; the device then returns to the pitch it started from.
                 start = pitch
-                low, high = max(start + down, self.pitch_min), start + back
-                if high - low < abs(down) // 2:
-                    high = low + abs(down)
-                for _ in range(len(targets) // 2):
-                    move(c, yaw, low)
-                    move(c, yaw, high)
-                if high != start:
-                    move(c, yaw, start)
+                targets = mapping.nod_targets(
+                    call["arguments"]["count"], start, self.pitch_min, self.pitch_max
+                )
+                for t in targets:
+                    move(c, yaw, t.pitch_deg, nod=True)
+                if targets and targets[-1].pitch_deg != start:
+                    move(c, yaw, start, nod=True)
         return {
             "from": [start_yaw, start_pitch],
             "steps": steps,

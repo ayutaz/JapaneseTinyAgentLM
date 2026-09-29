@@ -15,6 +15,7 @@ Each item waits for its plan to finish (`act_done`) and then `--pause` seconds, 
 observer can compare the motion with the printed plan. Any `fault` or `stop` record (a touch
 on the screen, the watchdog, a servo error) or Ctrl+C ends the run with `!stop`. At the end
 the head is centered and servo output is turned off (`!servo off`).
+`--only うなずき` runs just the items whose label or line contains the text.
 """
 
 import argparse
@@ -142,6 +143,7 @@ def main() -> int:
     ap.add_argument("--servo", action="store_true", help="turn servo output ON (head moves)")
     ap.add_argument("--section", choices=["act", "lm", "all"], default="all")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between items")
+    ap.add_argument("--only", help="run only the items whose label or line contains this")
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
@@ -154,6 +156,10 @@ def main() -> int:
         items += [(label, line, None) for label, line in ACT_ITEMS]
     if args.section in ("lm", "all"):
         items += [(text, text, expect) for text, expect in LM_ITEMS]
+    if args.only:
+        items = [it for it in items if args.only in it[0] or args.only in it[1]]
+        if not items:
+            ap.error(f"no item matches --only {args.only!r}")
     rc = 0
     with args.out.open("w", encoding="utf-8") as f:
         try:
