@@ -177,6 +177,13 @@ def yj_utterances(root: Path) -> list[str]:
     return [line.split("\t")[1] for line in path.open(encoding="utf-8") if "\t" in line]
 
 
+def clean_transcript(text: str) -> str:
+    """Drop J-CRe3 transcription markup: ``(F えっと)`` -> ``えっと``, ``(P)`` and ``<H>`` -> ""."""
+    text = re.sub(r"<[^>]*>", "", text)
+    text = re.sub(r"\([A-Z]+\)", "", text)
+    return re.sub(r"\([A-Z]+ ?([^)]*)\)", r"\1", text).strip()
+
+
 def jcre3_master(root: Path) -> list[str]:
     out = []
     for f in sorted((root / "J-CRe3/transcriptions").glob("*/*.txt")):
@@ -185,7 +192,7 @@ def jcre3_master(root: Path) -> list[str]:
         for line in f.open(encoding="utf-8"):
             cols = line.rstrip("\n").split("\t")
             if cols and cols[0] == "主人":
-                out.append(re.sub(r"<[^>]*>", "", cols[-1]))
+                out.append(clean_transcript(cols[-1]))
     return out
 
 
@@ -265,11 +272,14 @@ def build(raw_dirs: list[Path], out_dir: Path) -> dict[str, Any]:
         stats[f"{r['category']}:{'kept' if ok else 'verifier_disagrees'}"] += 1
         if not ok:
             continue
-        digest = hashlib.sha1(r["text"].encode()).hexdigest()[:12]
+        text = clean_transcript(r["text"]) if r["generator"] == "human:jcre3" else r["text"]
+        if not text:
+            continue
+        digest = hashlib.sha1(text.encode()).hexdigest()[:12]
         cases.append(
             EvalCase(
                 id=f"human-{digest}",
-                prompt=r["text"],
+                prompt=text,
                 expected=canonicalize(r["label"]),
                 category=r["category"],
                 language="ja",

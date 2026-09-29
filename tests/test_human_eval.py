@@ -43,3 +43,9 @@ def test_negated_requests() -> None:
     assert is_negated_request("こっち見ないで")
     assert is_negated_request("笑わないでよ")
     assert not is_negated_request("見ないで済むように準備した")
+
+
+def test_transcript_markup_is_removed() -> None:
+    from jtalm.data.human_eval import clean_transcript
+
+    assert clean_transcript("(F えっと)(R うん)それ取って。(P)<H>") == "えっとうんそれ取って。"

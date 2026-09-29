@@ -1,0 +1,49 @@
+{
+  "counts": {
+    "single": 62,
+    "negation": 9,
+    "no_action": 1088
+  },
+  "by_source": {
+    "human:tatoeba": 6,
+    "human:jesc": 65,
+    "human:yj_ambig": 389,
+    "human:jcre3": 223,
+    "human:dslc3": 294,
+    "human:massive": 182
+  },
+  "filter_stats": {
+    "negation:kept": 9,
+    "no_action:kept": 1088,
+    "no_action:verifier_disagrees": 18,
+    "single:kept": 62,
+    "single:verifier_disagrees": 1
+  },
+  "sha256": "911f060a53efd98c18f4e9f38d4e58fbf7552d3a72c6edd16937b4769efaef50",
+  "sources": {
+    "tatoeba": {
+      "url": "https://tatoeba.org/en/downloads",
+      "license": "CC BY 2.0 FR"
+    },
+    "jesc": {
+      "url": "https://nlp.stanford.edu/projects/jesc/",
+      "license": "CC BY-SA 4.0"
+    },
+    "yj_ambig": {
+      "url": "https://github.com/yahoojapan/YJ_AmbigDialogue",
+      "license": "CC BY 4.0"
+    },
+    "jcre3": {
+      "url": "https://github.com/riken-grp/J-CRe3",
+      "license": "CC BY-SA 4.0"
+    },
+    "dslc3": {
+      "url": "https://dialog-system-live-competition.github.io/dslc3/data.html",
+      "license": "MIT"
+    },
+    "massive": {
+      "url": "https://amazon-massive-nlu-dataset.s3.amazonaws.com/amazon-massive-dataset-1.1.tar.gz",
+      "license": "CC BY 4.0"
+    }
+  }
+}
