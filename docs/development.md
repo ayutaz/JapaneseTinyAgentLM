@@ -48,6 +48,7 @@
 | 変数 | 用途 |
 |---|---|
 | `VAST_API_KEY` | vast.ai の API key。公式 CLI（`vastai`）がこの環境変数を直接読む |
+| `HF_TOKEN` | Hugging Face の access token。organization `japanese-data-analyze` への write 権限が必要。合成データとモデルのアップロードに使う。vast.ai の instance には持ち込まない |
 
 `vastai` CLI は、API key を次の優先順位で決めます。
 
@@ -60,9 +61,9 @@
 
 ## 4. vast.ai の運用ルール
 
-実行基盤は `infra/vast/` に置く予定です（[`roadmap.md`](roadmap.md) の M3.5）。
+実行基盤は `infra/vast/` に置く予定です（[`roadmap.md`](roadmap.md) の M2.5）。vast.ai は、学習に加えて合成データの生成にも使います（[`data.md`](data.md) §5）。
 
-1. **学習前の確認:** ローカルの CPU で数 step の smoke test を通してから instance を借りる。バグで課金されるのを防ぐため。
+1. **実行前の確認:** 学習ならローカルの CPU で数 step の smoke test、データの生成なら少数の生成と検査を通してから instance を借りる。バグで課金されるのを防ぐため。
 2. **作成前の承認:** Instance を作る前に、GPU の種類、時間単価、想定時間、上限費用を提示して承認を得る。
 3. **Instance の削除:** 結果を回収したら、ローカル側の orchestrator から必ず instance を削除する。実行時間の上限も設ける。
 4. **認証情報を持ち込まない:** vast.ai の host は第三者のマシンなので、`.env`、GitHub の認証情報、Ralomi など private project のデータは転送しない。コードは commit 済みの状態を `git archive` で固めて転送する。
@@ -94,12 +95,13 @@
 | 使える | 使えない |
 |---|---|
 | CC BY-SA、CC BY、CC0、パブリックドメイン、MIT / Apache-2.0 などの寛容なライセンスのデータ | 非営利限定（NC）や改変禁止（ND）のデータ |
-| テンプレートによる自前の生成データ | 利用規約で「出力を使ったモデルの学習や公開」を制限しているサービスの出力 |
-| 規約上問題のない、寛容なライセンスのオープンモデルによる生成データ | 出典やライセンスが分からないデータ |
+| Apache-2.0 / MIT のオープンモデル（Qwen3、llm-jp-4.1、gpt-oss）で生成したデータ | Claude（Claude Code を含む）、ChatGPT（Codex を含む）、Gemini などの、利用規約で学習への利用を制限しているサービスの出力 |
+| — | 出典やライセンスが分からないデータ |
 
+- 具体的な方針、規約の調査結果、使うデータとモデルの一覧は [`data.md`](data.md) にまとめています。
 - すべてのデータについて、出典、ライセンス、作り方、件数を manifest（`datasets/manifests/`）に記録する。
-- Chat の事前学習の corpus として、日本語版 Wikipedia（CC BY-SA 4.0）はライセンス上両立する。
-- **確認事項:** Claude Code が作ったデータ（Claude の出力）を学習に使う場合は、公開前に Anthropic の利用規約上の扱いを確認する。利用規約には、競合する AI モデルの開発や学習に出力を使うことを制限する条項がある。そのため、データ本体はテンプレートと規則による生成を主にする。Claude Code は、生成の仕組み（コード）を作り、結果を検証する役割にとどめる。
+- Chat の事前学習の corpus として、日本語版 Wikipedia（CC BY-SA。現行は 4.0 で、Hugging Face 上の既存の dump は 3.0 と GFDL の表記）はライセンス上両立する。
+- **Claude Code の役割（2026-09-29 決定）:** Claude Code は、生成、検査、分割を行うコードを作って実行するだけにとどめ、学習データの文章やラベルは書かない。Anthropic の Usage Policy が、事前の許可なく出力を AI モデルの学習に使うことを禁止しているため（[`data.md`](data.md) §2）。
 - 重みを組み込んだ firmware を開発者が配布する場合、重みの部分には CC BY-SA 4.0 の表示義務がかかる。重みは独立したファイルとして配布し、firmware のコードとは分けて扱う想定を、モデルカードに明記する。
 
 ## 7. 実機の build 環境（ESP-IDF）

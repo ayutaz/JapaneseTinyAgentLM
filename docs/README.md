@@ -43,9 +43,10 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 **公開物（Hugging Face と GitHub）**
 
 - Hugging Face: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果
+- Hugging Face（dataset）: 合成データセット。public、manual gate で公開する（[`data.md`](data.md) §6）
 - GitHub: 学習と評価の code、ESP32 runtime
 
-開発者が使いやすいように、次の2つも候補にしています（未確定）。
+開発者向けの追加の公開物として、次の2つがあります。これらは**モデルが完成してから判断します**。まずはモデルを作ることを優先します。
 
 - ESP-IDF の component としての runtime
 - Tool を追加するための、データ生成と fine-tuning の手順（recipe）
@@ -160,6 +161,7 @@ JapaneseTinyAgentLM
 - [`architecture.md`](architecture.md): モデル構成、Action schema、Runtime、Flash/PSRAM 設計
 - [`hardware.md`](hardware.md): 対象の実機（K151）の構成、Phase 0 の初回調査の計測値、Flash のバックアップ
 - [`development.md`](development.md): uv、vast.ai、認証情報、実機操作の運用ルール
+- [`data.md`](data.md): 学習データの方針、規約の調査結果、使うデータと生成モデル、合成データの公開方法
 - [`research_notes.md`](research_notes.md): 先行例、比較、差別化、市場・新規性の仮説
 - [`roadmap.md`](roadmap.md): 実装順、マイルストーン、評価、gate、今後の調査項目
 
@@ -198,3 +200,7 @@ JapaneseTinyAgentLM
 | 2026-09-29 | TinyLM-Bench の検証全体（00 / 02 / 90 / 91 / 92）を反映する。主な内容は次のとおり。Action の契約（入力は1〜2文、出力は0〜2個、tool は v1 で 8〜16 種類）。学習データは 2,000〜10,000件で、否定と no-action を各20%以上とし、対比ペアを入れる。Tokenizer を先に固定する。PC 上だけの上限参照（20M）を置く。評価条件（prompt、greedy、grammar の実装）を固定して記録する。量子化後はカテゴリ別に評価し直す。既存 runtime（esp32-llm stories3M INT8）で実機の基準値を取る（B2.5） | [`roadmap.md`](roadmap.md) §4、§10、§12、[`architecture.md`](architecture.md) §2–7 |
 | 2026-09-29 | **ゴールを確定する。** 実用のためのモデルとし、利用者は開発者とする。入力はテキストのみとする。Action LM を実機で完成させてから Chat LM に取り組む。期限は設けず、できるだけ早く作る。実装と学習はすべて Claude Code が実行する | 本文書 §1 |
 | 2026-09-29 | モデルの重みは Hugging Face で **CC BY-SA 4.0**（商用利用可）で公開する。学習データは CC BY-SA 4.0 と両立するものだけを使う | [`development.md`](development.md) §6 |
+| 2026-09-29 | まずモデルを作ることを優先する。開発者向けの追加の公開物（ESP-IDF の component、fine-tuning の手順）は、モデルが完成してから判断する | 本文書 §1、[`roadmap.md`](roadmap.md) §9 |
+| 2026-09-29 | 学習データの中身は、Apache-2.0 / MIT のオープンモデル（Qwen3、llm-jp-4.1、gpt-oss）と、ライセンスが両立する既存データ（MASSIVE など）で作る。Claude Code はコードの作成と実行だけを担当し、文章やラベルは書かない。Codex（ChatGPT のプラン）はデータの中身の作成に使わない | [`data.md`](data.md) §1–2 |
+| 2026-09-29 | 合成データは vast.ai 上で生成し、Hugging Face に public、manual gate でアップロードする | [`data.md`](data.md) §5–6 |
+| 2026-09-29 | Hugging Face の公開先は organization `japanese-data-analyze` とする。合成データセットのライセンスは CC BY-SA 4.0 とする | [`data.md`](data.md) §6、[`architecture.md`](architecture.md) §13 |

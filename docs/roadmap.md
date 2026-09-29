@@ -252,16 +252,17 @@ Unified が失敗しても研究成果です。原因を capacity、data balance
 |---|---|---|
 | Hugging Face | FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、SHA-256 checksum | CC BY-SA 4.0 |
 | Hugging Face | モデルカード（用途、Action schema、角度への変換規約、評価結果、既知の限界、禁止用途） | CC BY-SA 4.0 |
+| Hugging Face（dataset） | 合成データセットとデータセットカード。organization `japanese-data-analyze` に **public、manual gate** で公開する。モデルより先に、M3 の時点で公開する（[`data.md`](data.md) §6） | CC BY-SA 4.0 |
 | GitHub | 学習と評価の code、training config、ESP32 runtime、build の手順 | Apache-2.0 |
 | GitHub | Dataset manifest と provenance、host と実機の benchmark の生の JSON | Apache-2.0（データ本体は、それぞれのライセンスに従う） |
 
 - デモには、再現できる commit、board、config を明記する。
-- 開発者向けの候補（未確定）として、ESP-IDF の component としての runtime と、tool を追加するための fine-tuning の手順も検討する。
+- ESP-IDF の component としての runtime と、tool を追加するための fine-tuning の手順を公開するかは、モデルが完成してから判断する（2026-09-29 決定）。
 
 ### Release gate
 
 - 学習データがすべて CC BY-SA 4.0 と両立すること。出典とライセンスが manifest に記録されていること（[`development.md`](development.md) §6）。
-- Claude Code が作ったデータを含む場合、Anthropic の利用規約上の扱いを確認済みであること。
+- 学習データの中身（文章とラベル）に、Claude や ChatGPT などの規約で制限された出力が含まれていないこと（[`data.md`](data.md) §1）。
 - Private data、個人情報、credential の除外。
 - Git history と artifact の secret scan。
 - Hardware safety test（servo の可動域、no-action、confidence gate）。
@@ -370,13 +371,13 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 |---|---|---|---|
 | M1 | リポジトリ基盤 | `pyproject.toml` / `uv.lock`（`uv add` のみ）、pytest、ruff、`.env.example`。Python は PyTorch 2.14 系と SentencePiece の wheel がそろう版に固定する（第一候補は 3.13） | `uv sync --locked` と test がローカルで通る |
 | M2 | Action schema v0 と評価の土台 | `grammar/action.schema.json`（TinyLM-Bench と同じ形式、0〜2個）、validator、正規化処理、評価指標（カテゴリ別の exact match、slot、no-action の precision / recall、critical error）、カテゴリから角度への変換表 | TinyLM-Bench の16件の期待値が、validator と評価器を通る。K151 の座標規約（[`architecture.md`](architecture.md) §7）に沿った unit test が通る |
-| M3 | Dataset v0 と baseline | 学習用の合成データ 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア、少量の英語）。テンプレートと規則で生成する。**テンプレートの外で作る test set**、ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている |
-| M3.5 | vast.ai 実行基盤 | `infra/vast/`（GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 学習 → 回収 → 削除）。CLI は `uv add --dev vastai`（1.8 系）で lock する | 小さな学習で、一連の流れと instance の削除を確認し、費用を記録している |
+| M2.5 | vast.ai 実行基盤 | `infra/vast/`（GPU の検索 → instance 作成 → `git archive` で転送 → `uv sync --locked` → 生成または学習 → 回収 → 削除）。CLI は `uv add --dev vastai`（1.8 系）で lock する。オープンモデルを vLLM などで動かす生成用の構成も含める | 小さな生成と学習で、一連の流れと instance の削除を確認し、費用を記録している |
+| M3 | Dataset v0 と baseline | vast.ai 上で Apache-2.0 のオープンモデル（Qwen3 など）を動かして生成した合成データ 2,000〜10,000件（漢字仮名交じり文が主で一部ひらがな、言い換え、multi-action、否定と no-action を各20%以上、対比ペア、少量の英語）。負例には MASSIVE などの既存データも使う。**学習データとは別のモデル（llm-jp-4.1）で作る評価セット**、ルールベース parser、既存モデルの結果（TinyLM-Bench）、dataset manifest。合成データは Hugging Face に public、manual gate で公開する（[`data.md`](data.md)） | 評価セットが1,000件以上で、重要カテゴリ（multi-action、否定、no-action）が各100件以上ある。テンプレート単位で分割し、baseline の数値が出ている。全データの出典とライセンス（CC BY-SA 4.0 と両立すること）が manifest に記録されている。学習データの中身に Claude や ChatGPT の出力が含まれていない |
 | M4 | Tokenizer と 3M / 5M の学習 | SentencePiece（2k / 4k / 8k を比較し、coverage、byte fallback 率、token 長で選ぶ）、decoder-only Transformer、学習 script、PC だけの上限参照（20M） | **Tokenizer を固定してから**本学習を始める。ローカルの CPU smoke test を通してから、vast.ai 上で学習を完走する |
 | M5 | Grammar 制約、confidence gate、量子化 | grammar-constrained decoding（Python）、confidence gate、INT8 / INT4 の fake quant、比較表 | 上の手順 4〜6 の比較結果が、固定した評価条件（§10）でカテゴリ別に揃っている |
 | M6 | Host C reference runtime | portable C の推論コード、golden vector。日本語の入力は UTF-8 のファイルか stdin で渡す（argv は使わない） | PyTorch の出力と token が一致し、同じ評価セットで Python の実装と同じ結果になる |
 
-M3 の test set をテンプレートの外で作るのは、テンプレートで生成したデータで評価すると、テンプレートを暗記しているだけで高得点になるためです。Test set は評価だけに使い、学習には使いません。
+M3 の評価セットを学習データとは別のモデルと別の prompt で作るのは、同じ生成元のデータで評価すると、生成のくせを暗記しているだけで高得点になるためです。評価セットは評価だけに使い、学習には使いません。
 
 ### Track B: 実機上のマイルストーン
 
@@ -417,8 +418,8 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 |---|---|---:|---|---|
 | M1 | リポジトリ基盤 | 1〜2 h | — | uv の更新 |
 | M2 | Action schema v0 と評価の土台 | 2〜3 h | — | — |
-| M3 | Dataset v0 と baseline | 4〜8 h | — | データの作り方の承認（規約の確認を含む） |
-| M3.5 | vast.ai 実行基盤 | 2〜3 h | 小さな学習 10〜30 分 | `.env` への API key の設定、費用の承認 |
+| M2.5 | vast.ai 実行基盤 | 2〜4 h | 小さな生成と学習 10〜30 分 | `.env` への API key の設定、費用の承認 |
+| M3 | Dataset v0 と baseline | 5〜9 h | GPU での生成 1〜3 時間 | 費用の承認、`.env` への `HF_TOKEN` の設定、**Hugging Face へのアップロード直前の最終確認** |
 | M4 | Tokenizer と 3M / 5M / 20M の学習 | 4〜6 h | GPU で数時間 | 費用の承認 |
 | M5 | Grammar、confidence gate、量子化 | 3〜5 h | — | — |
 | M6 | Host C reference runtime | 4〜8 h | — | — |
@@ -431,7 +432,7 @@ M5 と B4 の結果が揃った時点で、次のどちらへ進むかを決め�
 
 ### 速く進めるための並行化
 
-最短の経路（critical path）は M1 → M2 → M3 → M3.5 → M4 → M5 → M6 → B4 です。
+最短の経路（critical path）は M1 → M2 → M2.5 → M3 → M4 → M5 → M6 → B4 です。
 
 - GPU で学習している間（M4）に、Track B の B1〜B3 と B2.5 を進める。
 - 実機の作業のうち、ユーザーの立ち会いが要るのは B2 と B4 の servo の確認だけ。まとめて行えば、待ちを減らせる。

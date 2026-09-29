@@ -41,6 +41,7 @@ Chat と Action は、評価で原因を切り分けやすいように最初は�
 - [`docs/architecture.md`](docs/architecture.md): モデル、Runtime、Action schema、メモリ設計、公開構成案
 - [`docs/hardware.md`](docs/hardware.md): 対象の実機（K151）の構成、実機調査の計測値、Flash のバックアップ
 - [`docs/development.md`](docs/development.md): uv、vast.ai での学習、認証情報、実機操作の運用ルール
+- [`docs/data.md`](docs/data.md): 学習データの方針（オープンモデルと既存データで作る）、合成データの公開方法
 - [`docs/research_notes.md`](docs/research_notes.md): 先行例比較、差別化仮説、確認済み事項と未検証事項
 - [`docs/roadmap.md`](docs/roadmap.md): 開発フェーズ、実装マイルストーン、評価指標、各フェーズの完了条件、追加調査
 

@@ -82,3 +82,6 @@ CMakeCache.txt
 
 # ==== Device flash backups (never commit) ====
 backups/
+
+# ==== Browser automation artifacts ====
+.playwright-mcp/

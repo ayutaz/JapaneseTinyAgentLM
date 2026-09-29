@@ -533,14 +533,14 @@ JapaneseTinyAgentLM/
 GitHub はコードと再現手順を1 repository にまとめ、Hugging Face は artifact を用途・サイズ・量子化ごとに分離します。
 
 ```text
-ayutaz/JapaneseTinyAgentLM                  # GitHub（private で作成済み）
+ayutaz/JapaneseTinyAgentLM                                    # GitHub（private で作成済み）
 
-ayutaz/JapaneseTinyAgentLM-5M-Base         # HF 候補
-ayutaz/JapaneseTinyAgentLM-5M-Action
-ayutaz/JapaneseTinyAgentLM-10M-Base
-ayutaz/JapaneseTinyAgentLM-10M-Chat
-ayutaz/JapaneseTinyAgentLM-10M-Action
-ayutaz/JapaneseTinyAgentLM-10M-Unified
+japanese-data-analyze/JapaneseTinyAgentLM-5M-Action          # HF のモデル（名前は候補）
+japanese-data-analyze/JapaneseTinyAgentLM-10M-Action
+japanese-data-analyze/JapaneseTinyAgentLM-10M-Base
+japanese-data-analyze/JapaneseTinyAgentLM-10M-Chat
+japanese-data-analyze/JapaneseTinyAgentLM-10M-Unified
+japanese-data-analyze/<合成データセット>                        # HF の dataset（public、manual gate。名前は M3 で決める）
 ```
 
-各 model card には architecture、Tokenizer、training data、license、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。命名と公開先は未確定であり、既存名称・商標・repository との衝突を公開前に再確認します。
+Hugging Face の公開先は、organization の [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) です（2026-09-29 決定）。各 model card には architecture、Tokenizer、training data、license（CC BY-SA 4.0）、quantization、Host/ESP32 評価、既知の限界、推奨用途、禁止用途を記載します。repository の名前は未確定で、既存の名称、商標、repository との衝突を公開前に確認します。
