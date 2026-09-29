@@ -105,7 +105,7 @@ LM の評価には自前の最小 firmware を使い、partition も自分で設
 
 ## 5. 設計への影響
 
-1. **内部 SRAM:** 受領時の firmware では、起動直後の空きは約 155KB、最大連続ブロックは約 98KB でした。当初は、重みを Flash から mmap し、KV cache と activation を PSRAM に置いて、内部 SRAM は数十 KB 以下に抑える計画でした。**実装（B4、§11）では、速さのために activation（3M で約 126KB）と tokenizer の作業領域（32KB）を内部 SRAM に置き、KV cache（f32、3M で 458,752 B）を PSRAM に置きました。** 自前の firmware では起動直後の内部 SRAM の空きが約 328KB あり（§8）、3M を読み込んだ後も約 140KB 残ります（[`architecture.md`](architecture.md) §10）。
+1. **内部 SRAM:** 受領時の firmware では、起動直後の空きは約 155KB、最大連続ブロックは約 98KB でした。当初は、重みを Flash から mmap し、KV cache と activation を PSRAM に置いて、内部 SRAM は数十 KB 以下に抑える計画でした。**実装（B4、§11）では、速さのために activation（3M で約 126KB）と tokenizer の作業領域（32KB）を内部 SRAM に置き、KV cache（f32、3M で 458,752 B）を PSRAM に置きました。** 自前の firmware では起動直後の内部 SRAM の空きが約 328KB あり（§8）、3M を読み込んだ後も約 140KB 残ります（[`architecture.md`](architecture.md) §10）。画面（M5Unified / M5GFX）と dispatcher を載せると、200件の処理の後で約 99KB（最大連続ブロック 57KB）になりました（§12）。
 2. **Action:** Action schema は K151 の servo 仕様に合わせます。
    - LM はカテゴリ（`direction` / `amount`）だけを出力し、firmware の dispatcher が角度に変換する（[`architecture.md`](architecture.md) §7）。
    - yaw の正の値を右とする。実機では右へ回すと yaw の raw が減るので、dispatcher で符号を反転する（§10、2026-09-29 に確認）。
@@ -115,7 +115,7 @@ LM の評価には自前の最小 firmware を使い、partition も自分で設
    - 公式の `m5stack/StackChan`（ESP-IDF v5.5.4、MIT）
    - `stackchan-idf`（ESP-IDF v5.5.5 で検証、BSL-1.0）。README に、PY32 の Pin 0 で servo の VM 電源を入れ、200ms 待ってから bus を使う手順が記載されている。
 
-   LM の評価には、自前の最小 firmware を使います（B3 の `jtalm_eval`、B4 の `jtalm_action`）。Servo の driver は、Action から servo を動かす dispatcher を実装するときに流用します（未実装）。
+   LM の評価には、自前の最小 firmware を使います（B3 の `jtalm_eval`、B4 の `jtalm_action`）。Action から servo を動かす dispatcher（A1）では、stackchan-idf の register の仕様を参考にして、SCS の driver を自前で書きました（§12）。
 
 ## 6. Flash のバックアップ
 
@@ -201,7 +201,7 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 | 計測後の idle（buffer を解放） | 334,847 | 270,336 | 269,964 | 8,386,192 | 8,257,536 |
 
 - 起動直後の内部 SRAM の空きは約 328KB、最大連続ブロックは約 264KB。§4 の受領時 firmware（Arduino + M5Unified、約 155KB / 98KB）より大きいのは、Arduino、M5Unified、TTS の常駐分がないためと考えられる（推測）。
-- 画面、servo、M5Unified を載せると、この値から減る。それらを載せた状態の memory は、まだ測っていない（B4 は LM だけを載せた。§12）。
+- 画面、servo、M5Unified を載せると、この値から減る。載せた状態の値は §12（A1〜A3）にある。
 - Flash の mmap は heap を消費しない（312 B の差は計測コードの誤差の範囲）。
 - Main task の stack（8KB）の high-water mark は 6,404 B の余り。
 
@@ -426,7 +426,7 @@ uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
 
 - 右へ回すと raw が**減った**ので、dispatcher で yaw の符号を反転する。Action schema の「yaw の正 = 右」（[`architecture.md`](architecture.md) §7）は変えない。
 - この個体の中立位置（yaw の中央、pitch の水平）は yaw 460 / pitch 620（stackchan-idf の既定値）。公式 firmware の pitch の範囲（3°〜87°）との対応は、この raw を基準にして換算する。
-- 変換式は上の「dispatcher での変換」のとおり。Action から servo を実際に動かす部分は、まだ実装していない（§12）。
+- 変換式は上の「dispatcher での変換」のとおり。dispatcher は A1 で実装した（§12）。実機で首を動かす確認は、まだ行っていない（§12 の手順。ユーザーの立ち会いが必要）。
 
 ## 11. Action LM の実機での実行（B4、2026-09-29）
 
@@ -476,7 +476,7 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 - 実機の出力を Python の `gate` の予測（`v04/3m/best_q4_g64.pt`）と直接比べても、gate 後の出力と gate 前の出力は 1,189件すべて一致した（先頭 200件では 200 / 200、gate で `[]` にしたのは 11件）。実機と host の `min_prob` の差は最大 1.4e-5 で、gate の判定が host（`double`）や Python と食い違った例はない。0.970 に最も近い値は 0.970307。
 - `min_prob` が 0.970 から 1e-4 以内の例は1件もなく、C と Python の確率のわずかな差（最大 1e-5 程度）で gate の判定が変わるおそれはない。Python が validation で選んだ閾値（INT4 で 0.97004）と 0.970 のどちらでも、評価セットの結果は同じ。
 - 速度は M4 の 3M INT4 と同じ（decode 105.4 ms/token、prefill 45.4 ms/token）。評価セット全体（prompt 平均 14.8 token、生成 平均 5.5 token）で、1件の latency は中央値 1,075ms、p90 1,859ms、最大 4,134ms。出力が `[]` の件は中央値 724ms。先頭 200件だけでは中央値 1,222ms、p90 1,434ms。
-- 作業の終わりに、実機はこの firmware（`bf5d82461`）と v0.4 の 3M INT4 の状態にしてある。
+- 作業の終わりに、実機はこの firmware（`bf5d82461`）と v0.4 の 3M INT4 の状態にした（その後、A1〜A3 の firmware に更新した。§12）。
 
 ### 速度（実測）
 
@@ -552,10 +552,133 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 - 最も効いたのは prefill のまとめ処理で、prefill は 166 → 88 ms/token、2 core と合わせて 49 ms/token（約 1/3.4）になった。発話が長いほど効果が大きい。
 - 生 log と JSONL は `runs/device/b4/`（Git の管理外）。`full_*.jsonl` が各 model の 200件、`abl_*.jsonl` が上の段階ごとの計測。
 
-## 12. 未確認事項
+## 12. Action の実行: dispatcher と表情（A1〜A3、2026-09-29）
 
-- Action を servo の命令に変換して、実機で実際に首を動かす（§10 の変換式を使う。validator と可動域の確認を含む。ユーザーの立ち会いが必要）。
-- 画面、servo、M5Unified を載せた状態での SRAM / PSRAM（dispatcher の実装時に測る。LM だけの値は §11）。
+`firmware/jtalm_action/` に、LM の出力を実行する dispatcher（A1）と、画面の顔（A2）を加え、実機で確かめました（A3）。LM の処理と `gen` の行は B4（§11）と同じです。**servo の出力は起動時に off（dry-run）**で、今回の作業では servo の電源（VM_EN）を一度も入れていません。首を実際に動かす確認は、下の「Servo の動作確認の手順」で、ユーザーの立ち会いのもとで行います。作業は 14:47〜15:35 UTC。
+
+### 構成
+
+| 項目 | 内容 | 確度 |
+|---|---|---|
+| 流れ | LM の task（core 1）が `gen` の行を出した後、gate の後の `output` を実機で検査し、今の姿勢から計画を立てて `act` の行を出し、待ち行列（4件）に入れる。dispatcher の task（core 0、priority 6）が、計画の手順を順に実行する（顔の切り替え、首の移動）。LM は次の依頼の処理に進める | 確認済み |
+| 実機の validator（`main/action.c`） | JSON を Python の `json.loads` と同じ規則で読み（同じ key が重なると後の値、`2.0` も整数）、Action schema v0 と重複の禁止を検査する。`jtalm.action.parse_output(...).schema_valid` と同じものだけを通す。通らない出力と `[]` は何もしない | 実測（下の検査） |
+| 角度 | `src/jtalm/action/mapping.py` と同じ（yaw は slight 10° / normal 20° / large 30°、pitch は 5° / 10° / 15°）。`left` / `right` は yaw だけ、`up` / `down` は pitch だけを変え、もう一方の軸はそのまま。`center` は両軸を 0° にする | 実測（照合） |
+| 可動域 | mapping.py の上限（yaw ±30°、pitch ±15°）と stackchan-idf の soft limit（yaw −40〜+40°、pitch −10〜+25°）の重なり、つまり **yaw −30〜+30°、pitch −10〜+15°** に制限する。`down` の `large`（−15°）は −10° になる（`act` の行に `clamped` を出す） | 確認済み |
+| raw への変換 | yaw は `460 − deg × 16 / 5`、pitch は `620 + deg × 16 / 5`（§10）を四捨五入。可動域の中では yaw 364〜556、pitch 588〜668 | 確認済み |
+| 動きの滑らかさ | 1回の移動は cosine の加減速（始めと終わりの速度が 0）。時間は、最大速度 90°/s と最大加速度 360°/s² を超えない最短の長さを 20ms 単位に切り上げる（10° で 380ms、20° で 540ms、30° で 660ms、60° で 1,060ms）。20ms ごとに目標位置を送り、SCS の goal time を 20ms にする | 実測（dry-run の時間） |
+| 2つの call | 書かれた順に実行し、間に 200ms 置く | 確認済み |
+| うなずき（`nod`） | mapping.py の `nod_targets` の変位（下へ 8°、戻る）を、**今の pitch を中心に** `count` 回くり返す。下の限界（−10°）に近いときは下の点を −10° にし、余地が 4° 未満なら限界から上へ 8° 往復する。最後は始めの pitch に戻る。mapping.py の値は中立からの相対なので、正面を向いているときは同じ動きになる。上を向いているときは、上を向いたままうなずく | 確認済み |
+| Torque | 計画を始める直前に、今の位置を目標にしてから torque を入れる（跳ねない）。今の位置が計画の始点から 1° 以上ずれていれば、まず始点へ同じ滑らかさで動く（`sync_ms`）。計画の 0.5 秒後に torque を切る（止まっている間は torque を切るのは stackchan-idf と同じ） | 未実測（servo を動かしていない） |
+| 停止 | `!stop` / `!servo off`、**画面への touch**、servo の通信の error、watchdog で、実行中と待ち行列の計画を捨て、torque を切り（broadcast と各 ID）、VM_EN を切って dry-run に戻る。`!relax` は torque だけを切る。これらは LM の処理中でもすぐに効く（serial の読み取りを別の task にした） | dry-run で確認済み（touch は未確認） |
+| Watchdog | 監視の task（core 1、priority 7、50ms ごと）が、計画の予定時間 + 2 秒（始点への移動の時間を足す）を過ぎても終わらない実行と、計画がないのに torque が 3 秒以上入っている状態を止める | dry-run で確認済み（`!wdtest`） |
+| Servo の driver（`main/servo.c`） | 自前（Apache-2.0）。UART1、TX=G6、RX=G7、1Mbps。ping、torque、goal（位置、時間）、今の位置の読み取り。応答は checksum と ID を確かめる。register と byte の順（big-endian）は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした。UART は `!servo on` まで開かない | 未実測（servo を動かしていない） |
+| Servo の電源 | 起動時に PY32L020 の VM_EN（pin 0）を、出力の値を 0 にしてから出力にする（一瞬も on にならない順序）。起動時に読んだ値は mode 1 / output 0 で、もともと off だった。`!servo on` で on、200ms 待って ping | 実測（読み返し） |
+| 画面（A2） | M5Unified 0.2.17 / M5GFX 0.2.23（MIT、stackchan-idf の submodule をそのまま build）。320×240 の RGB565 の frame（153,600 B）を PSRAM に置き、描いてから全体を転送する。起動時は neutral。顔は白い線で、neutral（丸い目、横一文字の口）、happy（`^ ^` の目、笑った口）、sad（小さい目、内側が上がった眉、への字の口）、surprised（大きい目、開いた口） | 実測（CRC と時間）。**見た目は未確認** |
+
+- Command と `act` / `face` / `act_done` の行の形式は [`firmware/README.md`](../firmware/README.md) にあります。
+- M5GFX の自動判別は、この個体を `board_M5StackChan` と判定しました（CoreS3 と同じ扱い）。M5Unified は speaker、mic、IMU、RTC を使わない設定で初期化します（`M5.begin` は 189ms）。
+
+### 確認の結果（servo は dry-run、実測）
+
+| 確認 | 結果 |
+|---|---|
+| LM の出力（評価セットの先頭 200件。host の C と比較） | 生成した id、gate の前、gate の後の出力がすべて 200 / 200 一致（gate で `[]` にしたのは 11件）。B4 と同じ |
+| 計画（`firmware/tools/dispatch_check.py`。Python の `parse_output` と `mapping` で計算し直し、姿勢も1件ずつ引き継ぐ） | 200 / 200 一致（valid 200、実行した計画 183、`[]` 17） |
+| 実行（serial log） | `act_done` 183 / 183。中断、error、fault はなし。20ms ごとの更新の間隔は最大 20.0ms で、LM の処理と並行しても遅れなかった。予定との差は最大 +53ms（顔の描画の時間） |
+| Validator（`!act` で 400件） | valid / invalid の判定と計画が 400 / 400 で Python と一致。valid 251、invalid 149（JSON でない、配列でない、3個以上、重複、未知の tool や key、enum の外、`count` が 0 / 4 / 1.5 / `true` / `"2"` など） |
+| 顔 | 4種類とも frame の CRC-32 が毎回同じで、互いに異なる（neutral `b799fb2a`、happy `0005cc0b`、sad `4fee8a51`、surprised `24d9d978`）。描画 8〜10ms、転送 34ms |
+| 停止 | `!stop` と `!relax` で、実行中の計画が次の 20ms の区切りで中断した。`!wdtest`（期限 100ms の計画が 1 秒止まる）で watchdog が `fault` を出し、停止した |
+| Servo の電源と UART | 作業の間ずっと `vm_en` 0、UART は未使用（`uart` 0） |
+| `firmware/tools/servo_test.py`（dry-run） | 下の手順の 28項目を最後まで流せた（停止なし。最後は `state` off、`vm_en` 0） |
+
+生 log と JSONL は `runs/device/a1/`（Git の管理外）にあります（`eval200.*`、`eval200_dispatch.summary.json`、`fuzz.*`、`servo_test_dry.*`、`commands.log`）。
+
+### メモリと速度（画面あり、servo は dry-run、実測）
+
+内部 SRAM は `MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT` の値です（単位 B。括弧内は B4 の値、§11）。
+
+| 段階 | 内部 SRAM の空き | 最大連続ブロック | 最小空き | PSRAM の空き |
+|---|---:|---:|---:|---:|
+| `app_main` の開始直後 | 294,731（317,899） | 241,664（262,144） | 262,700 | 8,381,876 |
+| 3M の読み込み後 | 116,831（140,219） | 65,536（90,112） | 84,800 | 7,914,924 |
+| 画面と dispatcher の初期化後 | 102,843 | 60,416 | 70,812 | 7,756,968 |
+| 200件の処理の後 | 99,039 | 57,344 | 67,008 | 7,756,968 |
+
+- M5Unified / M5GFX と dispatcher で、静的な内部 RAM が約 23KB 増えた（IRAM の code +13.3KB、`.data` と `.bss` +9.7KB）。画面の初期化と、dispatcher と監視の task（stack 6KB と 4KB）で約 14KB、serial の読み取りの task（stack 3KB）と1件目の処理で、さらに約 3.4KB 使う。App は 246KB から 494KB になった。
+- LM の state の置き場所は B4 と同じ（activation 125,952 B は内部 SRAM、KV cache は PSRAM）。顔の frame と待ち行列は PSRAM（約 158KB）。
+- **速度は変わらない。** 評価セットの先頭 200件で、1件の latency は中央値 1,226ms、p90 1,439ms（B4 は 1,222ms / 1,434ms）。Prefill 45.8 ms/token、decode 104.8 ms/token。Dispatcher は LM と並行して計画を実行していた。PC 側で測った送信から応答までは中央値 1,299ms。
+- 5M（読み込み後の空きが B4 で約 90KB）に画面を載せると、空きは約 50KB になる見込み（推測）。
+
+### Servo の動作確認の手順（ユーザーの立ち会いが必要。未実施）
+
+目的は、実機の首が計画どおりに動くこと（向き、量、うなずきの回数、2つの依頼の順序）と、動いてはいけない依頼で動かないこと、止める手段が効くことを、目で確かめることです。所要 10〜15分。
+
+**準備（ユーザー）:** 本体を平らな机に置き、首の周りに物や手を置かない。USB で PC につなぐ。本体は battery で動き続けるので、USB を抜いても止まりません。
+
+**非常時の止め方（強い順）:**
+
+1. **画面に触れる。** どこに触れても、torque を切り、servo の電源（VM_EN）を切る（`stop` の行、`src` は `touch`）。
+2. Claude Code が `!stop` を送る（`servo_test.py` は Ctrl+C でも `!stop` を送る）。
+3. 電源 button を長押しして電源を切る。
+
+**1. 準備の確認（Claude Code、servo は off のまま）**
+
+```sh
+# バックアップの確認
+sha256sum backups/cores3/coreS3_full_backup_20260929.bin   # 05abdb21…e564c5 であること
+# 今の firmware で dry-run の手順を最後まで流す（首は動かない）
+uv run --no-project --with pyserial python firmware/tools/servo_test.py --port COM3 \
+  --out runs/device/a1/servo_test_dry2.jsonl
+```
+
+**2. 画面の確認と touch による停止（ユーザー）:** 画面に neutral の顔が出ていることを見る。画面に触れて、log に `{"t":"stop","src":"touch",...}` が出ることを確かめる（serial の log は `uv run --no-project --with pyserial python firmware/tools/serial_capture.py --port COM3 --seconds 20` で見る）。**この停止が効かないときは、先に進まない。**
+
+**3. 動作確認（Claude Code が実行し、ユーザーが見る）**
+
+```sh
+uv run --no-project --with pyserial python firmware/tools/servo_test.py --port COM3 --servo \
+  --pause 3 --out runs/device/a1/servo_test.jsonl
+```
+
+- 始めに `!servo on` で servo の電源を入れ、今の位置から正面（raw 460 / 620）へゆっくり戻る。
+- 1項目ごとに、依頼、LM の出力、計画（角度、raw、時間）を表示し、動き終わってから 3 秒待つ。ユーザーは、表示と実際の動きが合っているかを見る。
+- `stop` や `fault` の行が出る（画面に触れた、watchdog、servo の通信の error）か Ctrl+C で、`!stop` を送って終わる。最後は正面に戻し、`!servo off` で dry-run に戻して、`vm_en` が 0 であることを確かめる。
+
+| # | 依頼 | 計画（dry-run で確認済み。yaw / pitch、右と上が正） | 見ること |
+|---:|---|---|---|
+| 1〜3 | `!act`: 右 slight → normal → large | yaw +10° → +20° → +30°（raw 428 → 396 → 364）、各 380ms | ロボット自身の右（向かい合った人から見て左）へ、3段階で回る |
+| 4 | `!act`: 左 large | yaw −30°（raw 556）、1,060ms | 右端から左端へ、ゆっくり加速して減速する |
+| 5 | `!act`: 正面 | (0°, 0°)、660ms | 正面に戻る |
+| 6 | `!act`: 上 slight → 上 large | pitch +5° → +15°（raw 636 → 668）、間に 200ms | 2段階で上を向く |
+| 7 | `!act`: 下 normal | pitch −10°（raw 588）、600ms | 下を向く |
+| 8 | `!act`: 下 large | −15° は −10° に制限（`clamped`）。すでに −10° なので動かない | 動かないこと |
+| 9 | `!act`: 正面 | 380ms | 正面に戻る |
+| 10〜12 | `!act`: うなずき 1 / 2 / 3回 | pitch −8° と 0° の往復（raw 594 / 620）、片道 340ms | 回数が合っていること |
+| 13〜14 | `!act`: 表情 happy → sad、surprised → neutral | 顔だけ（首は動かない） | 顔の見た目（4種類） |
+| 15 | `!act`: 上 normal → うなずき 2回 | pitch +10° へ、+2° と +10° の往復を2回 | 上を向いたままうなずく |
+| 16 | `!act`: 正面 | 380ms | 正面に戻る |
+| 17 | 「右を向いて」 | LM: look right normal。yaw +20°、540ms | 右を向く |
+| 18 | 「少し左を向いて」 | LM: look left slight。yaw −10°、660ms | 少し左 |
+| 19 | 「上を向いて」 | LM: look up normal。pitch +10°（yaw は −10° のまま） | 上を向く（左右はそのまま） |
+| 20 | 「正面を向いて」 | LM: look center | 正面に戻る |
+| 21 | 「2回うなずいて」 | LM: nod 2 | 2回うなずく |
+| 22 | 「笑って」 | LM: set_expression happy | 顔だけ |
+| 23 | 「右を向いて、ちょっと嬉しそうにして」（2つの依頼） | LM: look right **slight**、set_expression happy。右を向いてから 200ms 後に顔 | 順序どおり（LM は「ちょっと」を向きの量と解釈した） |
+| 24 | 「右を向かないで」（否定） | LM: `[]` | **動かないこと** |
+| 25 | 「今日はいい天気だね」（雑談） | LM: `[]` | **動かないこと** |
+| 26 | 「富士山について長く説明して」（範囲外） | LM: `[]` | **動かないこと** |
+| 27 | 「普通の顔に戻して」 | LM: set_expression neutral | 顔だけ |
+| 28 | 「正面を向いて」 | LM: look center | 正面に戻る |
+
+- 24〜26 で計画に移動が含まれていたら、`servo_test.py` はその場で `!stop` を送って終わる。
+- 記録すること: 各項目の向きと量が表示と合っていたか、動きが滑らかか（がくつき、うなり、首が当たる音がないか）、torque を切った後に首が垂れないか（計画の 0.5 秒後に切る）、顔の見た目、touch による停止が効いたか。
+- 結果が良ければ、角度の初期値（[`architecture.md`](architecture.md) §7）を確定値として扱う。首が当たる、または量が大きすぎる場合は、`main/action.h` の制限か速度を下げて、同じ手順をやり直す。
+- 終わったら、実機は dry-run（servo の電源 off）のままにしておく。
+
+## 13. 未確認事項
+
+- 実機で実際に首を動かす確認（§12 の手順。ユーザーの立ち会いが必要）。SCS の driver、torque の入れ方と切り方、touch による停止は、まだ実機で試していない。
+- 顔の見た目（§12。CRC と時間は測った）。
 - `-DJTLM_BATCH=8` にしたときの速度（5M の内部 SRAM を約 82KB 減らせる）。
 - 消費電流と温度（LM を連続で動かしたとき）。
 - INT8 の KV cache（未実装。今は f32 で PSRAM に置いている）。
@@ -567,3 +690,4 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 
 - `stackchan-idf` が K151 に対応しているかどうか（2026-09-29 に README で確認。§5）。
 - Yaw の符号と、pitch の中立位置（2026-09-29 に B2 で確認。§10）。
+- 画面、M5Unified、dispatcher を載せた状態での SRAM / PSRAM と速度（2026-09-29 に A3 で測定。§12）。

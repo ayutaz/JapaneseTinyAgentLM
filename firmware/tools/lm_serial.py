@@ -11,6 +11,9 @@ Run without adding a project dependency:
 Each prompt is one line; the device answers with one `JTALM {"t":"gen",...}` record.
 `--ref` is the host runtime's output for the same prompts (`runtime/host/build/jtalm
 --grammar`, one JSON object per line); generated ids and output text are compared.
+With `--act`, the `JTALM {"t":"act",...}` record that follows each reply (the dispatcher's
+plan, firmware A1 and later) is stored under "act"; `firmware/tools/dispatch_check.py`
+checks it. `wall_ms` is the time from sending the prompt to receiving the reply.
 The raw serial log goes to `--log` (default: next to `--out`).
 """
 
@@ -119,6 +122,9 @@ def summarize(results: list[dict], ref: list[dict] | None) -> dict:
         "n_prompt_mean": statistics.mean(r["n_prompt"] for r in results),
         "n_gen_mean": statistics.mean(r["n_gen"] for r in results),
     }
+    if all("wall_ms" in r for r in results):
+        wall = [r["wall_ms"] for r in results]
+        out.update(wall_ms_median=statistics.median(wall), wall_ms_p90=pct(wall, 0.9))
     if ref is not None:
         same_ids = same_out = same_gated = near_gate = 0
         mismatches = []
@@ -155,6 +161,7 @@ def main() -> int:
     ap.add_argument("--cases", type=Path, required=True, help=".jsonl with 'prompt', or .txt")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--no-grammar", action="store_true")
+    ap.add_argument("--act", action="store_true", help="also store each reply's plan record")
     ap.add_argument(
         "--cmd", action="append", default=[], help='device command sent first, e.g. "!par 0"'
     )
@@ -183,9 +190,12 @@ def main() -> int:
         results = []
         with args.out.open("w", encoding="utf-8") as f:
             for i, prompt in enumerate(prompts):
+                t0 = time.monotonic()
                 dev.send(prompt)
                 rec = dev.wait_for("gen", args.timeout, boot)
-                rec.update(i=i, prompt=prompt)
+                rec.update(i=i, prompt=prompt, wall_ms=(time.monotonic() - t0) * 1000.0)
+                if args.act:
+                    rec["act"] = dev.wait_for("act", args.timeout, boot)
                 results.append(rec)
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
                 if (i + 1) % 25 == 0:
@@ -196,7 +206,8 @@ def main() -> int:
         dev.close()
 
     summary = summarize(results, ref)
-    summary["device"] = [r for r in boot if r.get("t") in ("info", "load", "heap", "ok")]
+    kinds = ("info", "load", "heap", "ok", "board")
+    summary["device"] = [r for r in boot if r.get("t") in kinds]
     args.out.with_suffix(".summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8"
     )

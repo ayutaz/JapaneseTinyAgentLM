@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 JapaneseTinyAgentLM contributors
 //
-// Action LM firmware for M5Stack CoreS3 (StackChan K151), milestone B4.
+// Action LM firmware for M5Stack CoreS3 (StackChan K151), milestones B4 and A1-A3.
 //
 // Runs the M6 reference runtime (runtime/host, compiled with -DJTLM_ACC=float) on the
 // .jtlm image in the "model" partition, which is read in place through esp_partition_mmap.
@@ -16,7 +16,16 @@
 // (0 turns it off), "!par 0|1" (split
 // matrix products across both cores), "!batch 0|1" (batched prefill; 0 runs the prompt one
 // token at a time through jtlm_forward, as a baseline).
-// No Wi-Fi, no display, no servo: the only I/O is the console.
+//
+// Action dispatch (A1-A3): "output" is validated again (action.c), planned from the pose left
+// by the previous plan, reported as JTALM {"t":"act",...} and queued to the dispatcher
+// (servo.c), which changes the face on the display (board.cpp) and moves the head. Servo
+// output is off after boot (dry-run: plans run with their timing but nothing is sent to the
+// servos). Commands: "!act <json>" (dispatch an Action JSON without the LM), "!center",
+// "!servo on" (power the servos and center the head), and, handled at once even while the
+// LM is busy, "!stop" / "!servo off" (torque off and servo power off), "!relax" (torque
+// off), "!servo" (status). A touch on the screen also stops. "!wdtest" (dry-run only) runs a
+// plan that overruns its deadline, to check the watchdog. No Wi-Fi.
 
 #include <inttypes.h>
 #include <math.h>
@@ -24,6 +33,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "action.h"
+#include "board.h"
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "esp_app_desc.h"
@@ -31,10 +42,13 @@
 #include "esp_partition.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include "jtalm.h"
 #include "mbedtls/sha256.h"
 #include "sdkconfig.h"
+#include "servo.h"
 #include "soc/extmem_reg.h"
 
 #define MODEL_PARTITION_SUBTYPE 0x40
@@ -42,6 +56,9 @@
 #define LM_TASK_CORE 1
 #define WORKER_TASK_STACK (6 * 1024)
 #define WORKER_TASK_CORE 0
+#define READER_TASK_STACK (3 * 1024)
+#define READER_TASK_CORE 0
+#define LINE_QUEUE_LEN 4
 #define LINE_MAX_BYTES 1024
 #define WORK_BYTES (32 * 1024)  // tokenizer workspace: 16 B per normalized byte + text
 #define OUT_BYTES 1024
@@ -63,9 +80,18 @@ typedef struct {
   int use_grammar, use_par, use_batch;
   double gate;  // confidence gate threshold (0: off)
   long n_requests;
+  uint32_t act_seq;
+  int pose_yaw, pose_pitch;  // pose after the last queued plan (degrees)
 } lm_t;
 
 static lm_t g_lm;
+
+typedef struct {
+  size_t len;
+  char text[LINE_MAX_BYTES];
+} line_t;
+
+static QueueHandle_t g_lines;  // console lines for the LM task
 
 // Second core for jtlm_set_parallel: the LM task (core 1) runs the first half of the rows of
 // each matrix product and a worker task on core 0 the second half.
@@ -249,6 +275,76 @@ static void reset_state(lm_t *lm) {
   }
 }
 
+static void print_call(const act_call_t *c) {
+  if (c->kind == ACT_LOOK) {
+    printf(
+        "{\"name\":\"look\",\"arguments\":{\"direction\":\"%s\",\"amount\":\"%s\"}}",
+        act_dir_names[c->dir], act_amount_names[c->amount]
+    );
+  } else if (c->kind == ACT_EXPR) {
+    printf(
+        "{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"%s\"}}",
+        act_expr_names[c->expr]
+    );
+  } else {
+    printf("{\"name\":\"nod\",\"arguments\":{\"count\":%d}}", c->count);
+  }
+}
+
+// Validates an Action JSON string, plans it from the current pose, queues it and prints
+//   JTALM {"t":"act","seq":..,"valid":..,"calls":[..],"from":[yaw,pitch],"steps":[..],...}
+// Only "output" (after the gate) is dispatched; "[]" and invalid outputs do nothing.
+static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
+  static act_plan_t plan;
+  int64_t t0 = now_us();
+  const char *err = NULL;
+  int valid = act_parse(json, len, plan.calls, &plan.n_calls, &err) == 0;
+  if (!valid) plan.n_calls = 0;
+  act_plan(&plan, lm->pose_yaw, lm->pose_pitch);
+  uint32_t seq = ++lm->act_seq;
+  int queued = 0, dropped = 0;
+  if (plan.n_steps > 0) {
+    queued = servo_submit(&plan, seq) == 0;
+    dropped = !queued;
+    if (queued) {
+      lm->pose_yaw = plan.yaw1;
+      lm->pose_pitch = plan.pitch1;
+    }
+  }
+  int64_t t1 = now_us();
+  out_lock();
+  printf(
+      "JTALM {\"t\":\"act\",\"seq\":%" PRIu32 ",\"src\":\"%s\",\"valid\":%d,\"err\":%s%s%s"
+      ",\"calls\":[",
+      seq, src, valid, err ? "\"" : "", err ? err : "null", err ? "\"" : ""
+  );
+  for (int i = 0; i < plan.n_calls; i++) {
+    if (i) putchar(',');
+    print_call(&plan.calls[i]);
+  }
+  printf("],\"from\":[%d,%d],\"steps\":[", plan.yaw0, plan.pitch0);
+  for (int i = 0; i < plan.n_steps; i++) {
+    const act_step_t *s = &plan.steps[i];
+    if (i) putchar(',');
+    if (s->kind == STEP_EXPR) {
+      printf("{\"c\":%d,\"k\":\"expr\",\"expr\":\"%s\"}", s->call, act_expr_names[s->expr]);
+    } else {
+      printf(
+          "{\"c\":%d,\"k\":\"move\",\"yaw\":%d,\"pitch\":%d,\"yaw_raw\":%d,\"pitch_raw\":%d"
+          ",\"ms\":%d,\"clamped\":%d}",
+          s->call, s->yaw, s->pitch, s->yaw_raw, s->pitch_raw, s->ms, s->clamped
+      );
+    }
+  }
+  printf(
+      "],\"to\":[%d,%d],\"total_ms\":%" PRIu32 ",\"queued\":%d,\"dropped\":%d"
+      ",\"servo\":\"%s\",\"plan_us\":%" PRId64 "}\n",
+      plan.yaw1, plan.pitch1, plan.total_ms, queued, dropped,
+      servo_output_on() ? "on" : "dry", t1 - t0
+  );
+  out_unlock();
+}
+
 static void run_prompt(lm_t *lm, const char *text, size_t len) {
   const jtlm_model *m = &lm->model;
   int64_t t0 = now_us();
@@ -287,6 +383,7 @@ static void run_prompt(lm_t *lm, const char *text, size_t len) {
   // Same comparison as jtalm.model.evaluate (a float probability against a double threshold).
   int gated = (double)r.min_prob < lm->gate;
   if (olen >= OUT_BYTES) olen = OUT_BYTES - 1;
+  out_lock();
   fputs("JTALM {\"t\":\"gen\",\"output\":", stdout);
   print_json_string(gated ? "[]" : lm->out, gated ? 2 : olen);
   fputs(",\"raw\":", stdout);
@@ -306,6 +403,8 @@ static void run_prompt(lm_t *lm, const char *text, size_t len) {
       (t5 - t4) / 1000.0, total_ms, (prefill_ms + decode_ms) / n_fwd,
       n_fwd * 1000.0 / (prefill_ms + decode_ms)
   );
+  out_unlock();
+  dispatch(lm, "lm", gated ? "[]" : lm->out, gated ? 2 : olen);
   if (lm->n_requests++ == 0) emit_heap("first_request");
 }
 
@@ -352,6 +451,9 @@ static void set_autoload(lm_t *lm, int trigger, int size) {
   );
 }
 
+static const char kCenter[] =
+    "[{\"name\":\"look\",\"arguments\":{\"direction\":\"center\",\"amount\":\"normal\"}}]";
+
 static void run_command(lm_t *lm, const char *line) {
   if (!strcmp(line, "!bench")) {
     run_bench(lm);
@@ -376,9 +478,38 @@ static void run_command(lm_t *lm, const char *line) {
   } else if (!strncmp(line, "!batch ", 7)) {
     lm->use_batch = line[7] == '1';
     printf("JTALM {\"t\":\"ok\",\"batch_prefill\":%d}\n", lm->use_batch);
+  } else if (!strncmp(line, "!act ", 5)) {
+    dispatch(lm, "cmd", line + 5, strlen(line + 5));
+  } else if (!strcmp(line, "!center")) {
+    dispatch(lm, "center", kCenter, strlen(kCenter));
+  } else if (!strcmp(line, "!servo on")) {
+    // Power up and read the present pose, then a center plan: the dispatcher first moves
+    // from wherever the head is to the plan's start (0, 0).
+    if (servo_request_on() != 0) {
+      emit_error("dispatcher queue full");
+      return;
+    }
+    lm->pose_yaw = lm->pose_pitch = 0;
+    dispatch(lm, "servo_on", kCenter, strlen(kCenter));
+  } else if (!strcmp(line, "!wdtest")) {
+    if (servo_output_on() || servo_request_wdtest() != 0) emit_error("wdtest: dry-run only");
   } else {
     emit_error("unknown command");
   }
+}
+
+// Commands that must not wait for the LM: handled in the reader task. Returns 1 if handled.
+static int run_urgent_command(const char *line) {
+  if (!strcmp(line, "!stop") || !strcmp(line, "!servo off")) {
+    servo_stop(line + 1, 1);
+  } else if (!strcmp(line, "!relax")) {
+    servo_stop("relax", 0);
+  } else if (!strcmp(line, "!servo")) {
+    servo_status();
+  } else {
+    return 0;
+  }
+  return 1;
 }
 
 // Reads one line (without CR/LF) from the console, blocking; empty lines are skipped.
@@ -397,9 +528,47 @@ static size_t read_line(char *buf, size_t cap) {
   return n;
 }
 
+// Console reader: urgent commands run here at once; every other line goes to the LM task.
+static void reader_task(void *arg) {
+  static line_t line;
+  for (;;) {
+    line.len = read_line(line.text, sizeof(line.text));
+    if (line.len >= 3 && !memcmp(line.text, "\xef\xbb\xbf", 3)) {
+      memmove(line.text, line.text + 3, line.len - 2);  // with the terminating NUL
+      line.len -= 3;
+    }
+    if (line.text[0] == '!' && run_urgent_command(line.text)) continue;
+    if (xQueueSend(g_lines, &line, 0) != pdTRUE) {
+      out_lock();
+      emit_error("busy: line dropped");
+      out_unlock();
+    }
+  }
+}
+
+static void boot_board(void) {
+  board_info_t b;
+  int err = board_init(&b);
+  face_info_t f = {0};
+  int face_err = err ? -1 : board_face(EXPR_NEUTRAL, &f);
+  printf(
+      "JTALM {\"t\":\"board\",\"ok\":%d,\"board\":%d,\"begin_ms\":%" PRIu32
+      ",\"py32\":%d,\"py32_version\":%d,\"vm_mode\":[%d,%d],\"vm_out\":[%d,%d]"
+      ",\"servo\":\"dry\"}\n",
+      err == 0, b.board, b.begin_ms, b.py32, b.py32_version, b.vm_mode_before,
+      b.vm_mode_after, b.vm_out_before, b.vm_out_after
+  );
+  printf(
+      "JTALM {\"t\":\"face\",\"seq\":0,\"expr\":\"neutral\",\"ok\":%d,\"crc\":\"%08" PRIx32
+      "\",\"draw_us\":%" PRIu32 ",\"push_us\":%" PRIu32 "}\n",
+      face_err == 0, f.crc, f.draw_us, f.push_us
+  );
+  if (servo_start() != 0) emit_error("dispatcher start failed");
+}
+
 static void lm_task(void *arg) {
   lm_t *lm = arg;
-  static char line[LINE_MAX_BYTES];
+  static line_t line;
   g_lm_task = xTaskGetCurrentTaskHandle();
   emit_heap("task_start");
   if (lm_init(lm) != 0) {
@@ -407,15 +576,19 @@ static void lm_task(void *arg) {
   }
   emit_info(lm);
   emit_heap("model_ready");
+  // After the LM state, so that its internal SRAM arena is placed exactly as before.
+  boot_board();
+  emit_heap("board_ready");
+  xTaskCreatePinnedToCore(reader_task, "reader", READER_TASK_STACK, NULL, 6, NULL,
+                          READER_TASK_CORE);
   printf("JTALM {\"t\":\"ready\"}\n");
+  fflush(stdout);
   for (;;) {
-    size_t len = read_line(line, sizeof(line));
-    char *text = line;
-    if (len >= 3 && !memcmp(text, "\xef\xbb\xbf", 3)) text += 3, len -= 3;
-    if (text[0] == '!') {
-      run_command(lm, text);
-    } else if (len) {
-      run_prompt(lm, text, len);
+    xQueueReceive(g_lines, &line, portMAX_DELAY);
+    if (line.text[0] == '!') {
+      run_command(lm, line.text);
+    } else if (line.len) {
+      run_prompt(lm, line.text, line.len);
     }
     fflush(stdout);
   }
@@ -427,6 +600,8 @@ void app_main(void) {
   cfg.tx_buffer_size = 4096;
   ESP_ERROR_CHECK(usb_serial_jtag_driver_install(&cfg));
   usb_serial_jtag_vfs_use_driver();
+  out_init();
+  g_lines = xQueueCreateWithCaps(LINE_QUEUE_LEN, sizeof(line_t), MALLOC_CAP_SPIRAM);
   emit_heap("boot");
   xTaskCreatePinnedToCore(worker_task, "lm_worker", WORKER_TASK_STACK, NULL, 5, &g_worker,
                           WORKER_TASK_CORE);
