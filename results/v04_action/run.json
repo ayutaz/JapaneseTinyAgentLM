@@ -1,0 +1,95 @@
+{
+  "job": {
+    "name": "train_action_v04",
+    "description": "Train 3M / 5M / 20M on data v0.4 in parallel; evaluate on the v0 eval set",
+    "query": "gpu_ram>=24 compute_cap>=800 compute_cap<=900 num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=120 rentable=true direct_port_count>=1 verified=true",
+    "image": "vllm/vllm-openai:v0.30.0",
+    "disk_gb": 80,
+    "max_hours": 4.0,
+    "steps": [
+      "nvidia-smi > artifacts/nvidia_smi.txt",
+      "for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 3m --lr 1e-3 --epochs 15 --out artifacts/v04/3m > artifacts/v04-3m.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 3m --lr 1e-3 --epochs 15 --seed 1 --out artifacts/v04/3m-s1 > artifacts/v04-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 5m --lr 1e-3 --epochs 15 --out artifacts/v04/5m > artifacts/v04-5m.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 5m --lr 1e-3 --epochs 15 --seed 1 --out artifacts/v04/5m-s1 > artifacts/v04-5m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 20m --lr 6e-4 --epochs 15 --out artifacts/v04/20m > artifacts/v04-20m.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v04/3m/best.pt artifacts/v04/3m-s1/best.pt artifacts/v04/5m/best.pt artifacts/v04/5m-s1/best.pt artifacts/v04/20m/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model --cases datasets/action/v0/eval.jsonl --out artifacts/v04/eval"
+    ],
+    "fetch": [
+      "artifacts"
+    ],
+    "uploads": [
+      "datasets/action/v0.4/train.jsonl",
+      "datasets/action/v0.4/val.jsonl",
+      "datasets/action/v0/eval.jsonl",
+      "tokenizer/out/action_v0_sp2048.model"
+    ]
+  },
+  "started_utc": "20260929T095441Z",
+  "uploads": {
+    "datasets/action/v0.4/train.jsonl": "3f4f87301da029472268e8dbb2eb7ae45f19b033ed6639e70de5e4552b3d7ed7",
+    "datasets/action/v0.4/val.jsonl": "2ea7a05a685730d260ce2d57acc74f7226a5e7770d34f00f425c9659c94a8a30",
+    "datasets/action/v0/eval.jsonl": "24120eb2711b75a2f09c2a4df0c0d2b0a9f4673477372104b7cb071dcb991927",
+    "tokenizer/out/action_v0_sp2048.model": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4"
+  },
+  "commit": "c6c4c07bdc0a1bcb6de6c416a2dac4c97391abd5",
+  "offer": {
+    "id": 50213705,
+    "gpu_name": "RTX 3090",
+    "gpu_ram": 24576,
+    "dph_total": 0.2685185185185185,
+    "geolocation": "Utah, US"
+  },
+  "instance_id": 53343989,
+  "driver_version": "595.71.05",
+  "cuda_max_good": 13.2,
+  "steps": [
+    {
+      "cmd": "curl -LsSf https://astral.sh/uv/0.12.20/install.sh | sh",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "mkdir -p /root/work && tar -xf /root/code.tar -C /root/work",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "mkdir -p /root/work/artifacts",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "cd /root/work && nvidia-smi > artifacts/nvidia_smi.txt",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "cd /root/work && for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "cd /root/work && pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 3m --lr 1e-3 --epochs 15 --out artifacts/v04/3m > artifacts/v04-3m.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 3m --lr 1e-3 --epochs 15 --seed 1 --out artifacts/v04/3m-s1 > artifacts/v04-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 5m --lr 1e-3 --epochs 15 --out artifacts/v04/5m > artifacts/v04-5m.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 5m --lr 1e-3 --epochs 15 --seed 1 --out artifacts/v04/5m-s1 > artifacts/v04-5m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.4 --size 20m --lr 6e-4 --epochs 15 --out artifacts/v04/20m > artifacts/v04-20m.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "exit": 0,
+      "sec": 912
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v04/3m/best.pt artifacts/v04/3m-s1/best.pt artifacts/v04/5m/best.pt artifacts/v04/5m-s1/best.pt artifacts/v04/20m/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model --cases datasets/action/v0/eval.jsonl --out artifacts/v04/eval",
+      "exit": 0,
+      "sec": 28
+    }
+  ],
+  "status": "succeeded",
+  "destroyed": true,
+  "hours": 0.358,
+  "failed_starts": [
+    {
+      "instance_id": 53339985,
+      "offer_id": 50443907,
+      "gpu_name": "RTX 3090",
+      "error": "instance 53339985 not running after 1800s: Error response from daemon: Get \"https://registry-1.docker.io/v2/\": net/http: TLS handshake timeout\n",
+      "destroyed": true,
+      "hours": 0.506,
+      "cost_usd_estimate": 0.077
+    }
+  ],
+  "cost_usd_estimate": 0.173
+}
