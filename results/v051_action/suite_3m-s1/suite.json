@@ -1,0 +1,108 @@
+{
+  "ckpt": "runs\\vast\\train_action_v051-20260930T152254Z\\artifacts\\v051\\3m-s1\\best_q4_g64.pt",
+  "gate": {
+    "threshold": 0.88558,
+    "val_exact_no_gate": 0.9812233285917497,
+    "val_exact_gated": 0.9763869132290185
+  },
+  "sets": {
+    "v0 eval (LLM)": {
+      "n": 1189,
+      "exact": 0.9335576114381834,
+      "requests_exact": 0.8694158075601375,
+      "false_action_rate": 0.004942339373970346,
+      "critical_error_rate": 0.002523128679562658
+    },
+    "human v1": {
+      "n": 1159,
+      "exact": 0.9861949956859362,
+      "requests_exact": 0.7580645161290323,
+      "false_action_rate": 0.0009115770282588879,
+      "critical_error_rate": 0.0008628127696289905
+    },
+    "v2/amount_words": {
+      "n": 278,
+      "exact": 0.9460431654676259,
+      "requests_exact": 0.9460431654676259,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/center_phrasing": {
+      "n": 223,
+      "exact": 0.9147982062780269,
+      "requests_exact": 0.9147982062780269,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/correction": {
+      "n": 44,
+      "exact": 0.8181818181818182,
+      "requests_exact": 0.8181818181818182,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/english": {
+      "n": 70,
+      "exact": 0.4857142857142857,
+      "requests_exact": 0.05263157894736842,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/fragments": {
+      "n": 182,
+      "exact": 1.0,
+      "requests_exact": null,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/long_preface": {
+      "n": 247,
+      "exact": 0.9271255060728745,
+      "requests_exact": 0.9271255060728745,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/negation_forms": {
+      "n": 168,
+      "exact": 0.9940476190476191,
+      "requests_exact": null,
+      "false_action_rate": 0.005952380952380952,
+      "critical_error_rate": 0.005952380952380952
+    },
+    "v2/numbers": {
+      "n": 167,
+      "exact": 0.9341317365269461,
+      "requests_exact": 0.8412698412698413,
+      "false_action_rate": 0.009615384615384616,
+      "critical_error_rate": 0.005988023952095809
+    },
+    "v2/order_words": {
+      "n": 296,
+      "exact": 0.9628378378378378,
+      "requests_exact": 0.9628378378378378,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/orthography": {
+      "n": 282,
+      "exact": 0.8333333333333334,
+      "requests_exact": 0.8156862745098039,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/question_forms": {
+      "n": 203,
+      "exact": 0.8866995073891626,
+      "requests_exact": 0.8866995073891626,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/unexecutable": {
+      "n": 286,
+      "exact": 0.993006993006993,
+      "requests_exact": null,
+      "false_action_rate": 0.006993006993006993,
+      "critical_error_rate": 0.006993006993006993
+    }
+  }
+}
