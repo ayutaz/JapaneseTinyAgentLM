@@ -36,7 +36,7 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
 
 ### jtalm_action（B4、A1〜A3）
 
-**実機の現在の状態（2026-09-29）:** A1〜A3 の `jtalm_action`（app の SHA-256 `0aff3e1a…abcdba01`。うなずきを 14°、900°/s² にした版）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** 首を動かす確認は、うなずきを変える前の版で済ませました（[`docs/hardware.md`](../docs/hardware.md) §12）。変更後のうなずきの目視は、`servo_test.py --servo --only うなずき` で、ユーザーの立ち会いのもとで行います。
+**実機の現在の状態（2026-10-01）:** 採用モデルを v0.5.1 の 3M INT4（model の SHA-256 の先頭 `b90d0066075d92a2`）、gate の既定値を 0.868 に更新した（`docs/hardware.md` §11）。以下は 2026-09-29 時点の記録: A1〜A3 の `jtalm_action`（app の SHA-256 `0aff3e1a…abcdba01`。うなずきを 14°、900°/s² にした版）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** 首を動かす確認は、うなずきを変える前の版で済ませました（[`docs/hardware.md`](../docs/hardware.md) §12）。変更後のうなずきの目視は、`servo_test.py --servo --only うなずき` で、ユーザーの立ち会いのもとで行います。
 
 `runtime/host/` を参照するので、repository の root を mount します。画面には M5Unified と M5GFX を使い、`third_party/stackchan-idf` の submodule（下の stackchan-idf の手順で取得したもの）をそのまま build します（`CMakeLists.txt` の `M5UNIFIED_DIR` / `M5GFX_DIR`）。
 
@@ -44,7 +44,7 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
 # Build（Git Bash、repository の root で）
 MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$(pwd -W):/w"   -w /w/firmware/jtalm_action espressif/idf:v5.5.5 idf.py build
 
-# model の書き出し（採用した v0.4 の 3M。runs/local/b4_v04/ に 3m_q4_g64 / 3m_q8_g64 .jtlm ができる）
+# model の書き出し（採用モデル。2026-10-01 からは v0.5.1 の 3M: runs/vast/train_action_v051-20260930T152254Z/artifacts/v051/3m/best.pt → runs/local/v051_3m/3m_q4_g64.jtlm。以前は v0.4 の 3M）
 uv run --group train python -m jtalm.model.export   --ckpt runs/vast/train_action_v04-20260929T095441Z/artifacts/v04/3m/best.pt   --tokenizer tokenizer/out/action_v0_sp2048.model --bits 4 8 --out runs/local/b4_v04
 
 # 書き込み（app と model。model を替えるときは 0x200000 だけを書けばよい）

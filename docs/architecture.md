@@ -389,6 +389,7 @@ TinyLM-Bench でも、Needle 2 は schema 妥当率が 16/16 でしたが、厳�
 - `min_prob` が閾値を下回ったら、action 単位ではなく**出力全体**を no-action（`[]`）にする。
 - 確信度の低い出力は、ロボットの誤作動につながるので、実行しないほうを安全側とする。
 - 閾値は **validation** で決め、評価セットでは選ばない（`jtalm.model.evaluate --modes gate`。validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値）。
+- **現在の設定（2026-10-01）:** データ v0.5.1 の 3M では、v0.5.1 の validation（3,515件）で選んだ **0.868** を実機の標準にした（[`roadmap.md`](roadmap.md) §12）。閾値はモデルごとに validation で選び直す。
 - **採用した設定（2026-09-29）:** 書き手7つの validation（v0.4、2,497件）で選んだ **0.970**。3M INT4 + grammar で、評価セットの完全一致は 94.3% → 94.4% のまま、致命的な誤りは 2.0% → 0.6% に減った。実機（`firmware/jtalm_action/`）では標準で有効で、閾値は build 時の `CONFIG_JTALM_GATE_PERMILLE`（千分率、既定 970）と、実行中の serial command `!gate <閾値>`（0 で無効）で変えられる。
 - M4（validation の書き手が1つ）では、閾値がほぼ 1 に選ばれて gate は逆効果だった。validation の書き手の多様さが、閾値の選び方に効く。
 - 曖昧な入力に対して「確認を求める」出力は、Chat と組み合わせる必要があるため v1 以降で検討する。

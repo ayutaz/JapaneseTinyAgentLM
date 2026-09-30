@@ -552,6 +552,15 @@ M6 の C runtime（`runtime/host/`）を、firmware `firmware/jtalm_action/`（A
 - 最も効いたのは prefill のまとめ処理で、prefill は 166 → 88 ms/token、2 core と合わせて 49 ms/token（約 1/3.4）になった。発話が長いほど効果が大きい。
 - 生 log と JSONL は `runs/device/b4/`（Git の管理外）。`full_*.jsonl` が各 model の 200件、`abl_*.jsonl` が上の段階ごとの計測。
 
+### 採用モデルの更新（v0.5.1、2026-10-01、実測）
+
+実機の標準のモデルを、データ v0.5.1 で学習した 3M（`runs/vast/train_action_v051-20260930T152254Z/artifacts/v051/3m/best.pt`、INT4、`.jtlm` 1,971,456 B、model の SHA-256 の先頭 `b90d0066075d92a2`）に置き換えた。confidence gate の既定値は、v0.5.1 の validation で選んだ **0.868**（`CONFIG_JTALM_GATE_PERMILLE=868`）。構成と tokenizer は v0.4 と同じなので、firmware は gate の既定値の変更だけ。
+
+| 確認 | 結果 | 確度 |
+|---|---|---|
+| 実機と Python（`jtalm.model.eval_suite`、gate 0.868）の出力（評価セットの先頭 300件） | gate の前の出力、gate の後の出力とも 300 / 300 一致 | 実測 |
+| 1件の応答時間 | 中央値 1,276ms、p90 1,860ms（decode 105 ms/token、prefill 46 ms/token） | 実測 |
+
 ## 12. Action の実行: dispatcher と表情（A1〜A3、2026-09-29）
 
 `firmware/jtalm_action/` に、LM の出力を実行する dispatcher（A1）と、画面の顔（A2）を加え、実機で確かめました（A3）。LM の処理と `gen` の行は B4（§11）と同じです。**servo の出力は起動時に off（dry-run）**で、今回の作業では servo の電源（VM_EN）を一度も入れていません。首を実際に動かす確認は、下の「Servo の動作確認の手順」で、ユーザーの立ち会いのもとで行います。作業は 14:47〜15:35 UTC。
