@@ -28,6 +28,14 @@ from jtalm.infra.vast import Ssh, VastClient, VastError
 
 REMOTE_WORK = "/root/work"
 UV_VERSION = "0.12.20"
+# Hosts in these countries failed to download torch from PyPI / download.pytorch.org three times
+# in a row (Jiangsu, CN, 2026-10-01), so they are skipped.
+EXCLUDED_COUNTRIES = ("CN",)
+
+
+def _allowed_location(offer: dict) -> bool:
+    country = str(offer.get("geolocation") or "").rsplit(",", 1)[-1].strip()
+    return country not in EXCLUDED_COUNTRIES
 
 
 def remote_bootstrap() -> list[str]:
@@ -137,7 +145,11 @@ def _start(
 def run_job(spec: JobSpec, approve_dph: float, pick: int = 0) -> dict:
     digests = local_uploads(spec)
     client = VastClient()
-    offers = [o for o in client.search_offers(spec.query) if o["dph_total"] <= approve_dph]
+    offers = [
+        o
+        for o in client.search_offers(spec.query)
+        if o["dph_total"] <= approve_dph and _allowed_location(o)
+    ]
     if not offers:
         raise VastError(f"no offer under ${approve_dph}/h for: {spec.query}")
     offers = offers[pick:]

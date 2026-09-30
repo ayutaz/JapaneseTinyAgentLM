@@ -278,6 +278,14 @@ M5Stack 公式資料による CoreS3 の主要仕様:
 
 **調べきれていないこと:** X / YouTube / Discord など検索に出にくい投稿（日本語の llama2.c を ESP32 で動かした個人の投稿があり得る）、非公開の商用製品（日本語の NLU を MCU に載せた製品）、有料・非索引の論文（IEICE / IPSJ の国内発表、J-STAGE）、中国語圏の事例、特許。Needle 3 は対応言語を増やす予定なので、公開の直前に調べ直す。
 
+**公開の直前の再調査（2026-10-01）:** 主張 1 はそのまま成り立つ。
+
+- Needle 3 の対応言語に日本語はなく、予定にも書かれていない。言語追加の issue（#141、#147）にも日本語はない。コミュニティの fine-tune はトルコ語とブラジルのポルトガル語だけだった。
+- 新しい ESP32 への移植（needle-on-cyd、MicroNeedle など）は、どれも英語だけだった。
+- 9月に新しく出たスタックチャンの LLM の repository は、どれも LLM をサーバーや PC で動かしている。
+- MCU の新しい LM（MCXN947 の 289M、esp32-s3-tinystories など）は英語か、ESP32 ではなかった。
+- `JapaneseTinyAgentLM` と `JapaneseTinyAgentLM-Action-3M` の名前は、HF、GitHub、PyPI で空いていた。名前が似ているものとして、UC Berkeley の TinyAgent（2024、同じく edge の tool calling）、dria の Tiny-Agent、PyPI の tinyagent がある。「Japanese」と「LM」が付くので、名前そのものは重ならない。
+
 ## 7. GitHub / Hugging Face 公開方針
 
 ### GitHub
