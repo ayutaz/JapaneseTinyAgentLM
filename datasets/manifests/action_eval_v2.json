@@ -1,0 +1,154 @@
+{
+  "counts": {
+    "amount_words": 278,
+    "center_phrasing": 223,
+    "correction": 44,
+    "english": 70,
+    "fragments": 182,
+    "long_preface": 247,
+    "negation_forms": 168,
+    "numbers": 167,
+    "order_words": 296,
+    "orthography": 282,
+    "question_forms": 203,
+    "unexecutable": 286
+  },
+  "by_category": {
+    "amount_words": {
+      "single": 278
+    },
+    "center_phrasing": {
+      "single": 223
+    },
+    "correction": {
+      "correction": 44
+    },
+    "english": {
+      "single": 38,
+      "negation": 30,
+      "no_action": 2
+    },
+    "fragments": {
+      "no_action": 182
+    },
+    "long_preface": {
+      "multi_action": 138,
+      "single": 109
+    },
+    "negation_forms": {
+      "negation": 168
+    },
+    "numbers": {
+      "single": 63,
+      "no_action": 104
+    },
+    "order_words": {
+      "multi_action": 296
+    },
+    "orthography": {
+      "single": 255,
+      "no_action": 27
+    },
+    "question_forms": {
+      "single": 203
+    },
+    "unexecutable": {
+      "no_action": 286
+    }
+  },
+  "filter_stats": {
+    "amount_words": {
+      "kept": 278,
+      "verifier_disagrees": 25,
+      "duplicate_or_leak": 17
+    },
+    "center_phrasing": {
+      "duplicate_or_leak": 40,
+      "kept": 223,
+      "verifier_disagrees": 53,
+      "negation_mismatch": 3,
+      "malformed": 1
+    },
+    "correction": {
+      "negation_mismatch": 251,
+      "verifier_disagrees": 24,
+      "kept": 44,
+      "duplicate_or_leak": 1
+    },
+    "english": {
+      "verifier_disagrees": 50,
+      "kept": 70,
+      "negation_mismatch": 51,
+      "malformed": 1
+    },
+    "fragments": {
+      "kept": 182,
+      "verifier_disagrees": 24,
+      "duplicate_or_leak": 114
+    },
+    "long_preface": {
+      "kept": 247,
+      "verifier_disagrees": 60,
+      "duplicate_or_leak": 10,
+      "negation_mismatch": 3
+    },
+    "negation_forms": {
+      "duplicate_or_leak": 22,
+      "verifier_disagrees": 15,
+      "kept": 168,
+      "negation_mismatch": 115
+    },
+    "numbers": {
+      "verifier_disagrees": 130,
+      "kept": 167,
+      "negation_mismatch": 1,
+      "duplicate_or_leak": 14
+    },
+    "order_words": {
+      "kept": 296,
+      "duplicate_or_leak": 8,
+      "verifier_disagrees": 12,
+      "negation_mismatch": 2,
+      "malformed": 2
+    },
+    "orthography": {
+      "verifier_disagrees": 140,
+      "kept": 282,
+      "negation_mismatch": 7,
+      "duplicate_or_leak": 51
+    },
+    "question_forms": {
+      "verifier_disagrees": 76,
+      "kept": 203,
+      "duplicate_or_leak": 39,
+      "negation_mismatch": 2
+    },
+    "unexecutable": {
+      "kept": 286,
+      "verifier_disagrees": 28,
+      "duplicate_or_leak": 6
+    }
+  },
+  "files": {
+    "amount_words.jsonl": "f0648aeb6ee57d24fd68c39ce83a79b6e1c1648f5d5dbf6f0603282905e5db87",
+    "center_phrasing.jsonl": "83a3b1d448ebf1223c7f431dd3a5431ad658397c5bf011723fdfa1119fba3002",
+    "correction.jsonl": "ab73812c70632ed5fbde70bde073e26a5901abda29c92f422c07dfc0e54dd003",
+    "english.jsonl": "ff8b6ec627f25ec6c034456065ecb6d4bb12dbc98ab3720a53f5fa5f2babc2aa",
+    "fragments.jsonl": "dbf963749998ce15c5e2b599b89058789750d98fdf08a592fe0bd2faa4b298ed",
+    "long_preface.jsonl": "b7c3d79210a2f77e3234ba620ff4345dc96ee79ff71a670d5680d418aa277cd7",
+    "negation_forms.jsonl": "d023406fa58176759e1dd7df4e39c9a917196f4f1b49ac7c459e22943645c61e",
+    "numbers.jsonl": "2adf343dad909c6bdd23b8b527db201df5d1bbe5c7c6fa10220b239f5b537bc8",
+    "order_words.jsonl": "9b2f5a9d1f6b2fb35c0c8707151411c4fc49296901dc7c07365858546992569f",
+    "orthography.jsonl": "b2eec766140c17ee52832f782aacd60b03bfe56da2f530af53314e051a85d9e6",
+    "question_forms.jsonl": "3f2111c5278f3c5294f1a88b4e1cb2cbc67dd56f35036f50f36776591b4616fd",
+    "unexecutable.jsonl": "138657690b7b995c7817c8e44338a7c72ce8f8fbe77aabd294ec71d3c84d51a5"
+  },
+  "excluded_against": [
+    "datasets/action/v0.4/train.jsonl",
+    "datasets/action/v0.4/val.jsonl",
+    "datasets/action/v0.5/train.jsonl",
+    "datasets/action/v0.5/val.jsonl",
+    "datasets/action/v0/eval.jsonl",
+    "datasets/action/human_v1/eval.jsonl"
+  ]
+}
