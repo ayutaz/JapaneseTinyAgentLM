@@ -157,7 +157,9 @@ def build(raw_dirs: list[Path], out_dir: Path, config: dict, massive_dir: Path) 
     }
 
 
-def extend(base_dir: Path, raw_dirs: list[Path], out_dir: Path, seed: int) -> dict[str, Any]:
+def extend(
+    base_dir: Path, raw_dirs: list[Path], out_dir: Path, seed: int, exclude: list[Path] = ()
+) -> dict[str, Any]:
     """Add newly generated train sentences to an existing dataset (v0.3 on top of v0).
 
     The base train / val / eval files are kept as they are, so the evaluation set stays identical
@@ -167,6 +169,8 @@ def extend(base_dir: Path, raw_dirs: list[Path], out_dir: Path, seed: int) -> di
     rng = random.Random(seed)
     base = {n: load_cases(base_dir / f"{n}.jsonl") for n in ("train", "val", "eval")}
     seen = {dedup_key(c.prompt) for cases in base.values() for c in cases}
+    for path in exclude:  # other evaluation sets (human-written, v2 slices) must not leak
+        seen |= {dedup_key(c.prompt) for c in load_cases(path)}
     stats: Counter = Counter()
     new_rows = _filter(_load(raw_dirs, "train_raw.jsonl"), seen, stats)
 
@@ -227,10 +231,14 @@ def main() -> None:
     parser.add_argument(
         "--base", type=Path, default=None, help="extend this dataset instead of building anew"
     )
+    parser.add_argument(
+        "--exclude", type=Path, nargs="*", default=[], help="eval files that must not leak (extend)"
+    )
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
     if args.base is not None:
-        report = extend(args.base, args.raw, args.out, config["seed"])
+        report = extend(args.base, args.raw, args.out, config["seed"], args.exclude)
+        report["excluded_against"] = [str(p.as_posix()) for p in args.exclude]
         report["configs"] = {
             str(p.as_posix()): json.loads(p.read_text(encoding="utf-8"))
             for p in [args.config, *args.extra_config]

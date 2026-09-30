@@ -438,6 +438,29 @@ TRAIN_ACTION_V04 = JobSpec(
     ],
 )
 
+# Retrain on v0.5 (v0.4 plus focused slices and mined hard negatives, about 65k examples).
+ACTION_DATA_V05 = "datasets/action/v0.5"
+V05_RUNS = [
+    ("3m", "3m", "--lr 1e-3 --epochs 12"),
+    ("3m-s1", "3m", "--lr 1e-3 --epochs 12 --seed 1"),
+    ("5m", "5m", "--lr 1e-3 --epochs 12"),
+]
+TRAIN_ACTION_V05 = JobSpec(
+    name="train_action_v05",
+    description="Train 3M (x2) and 5M on data v0.5 in parallel; evaluate on the v0 eval set",
+    query=f"gpu_ram>=24 compute_cap>=800 compute_cap<=900 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=4.0,
+    steps=train_action_steps(V05_RUNS, "v05", ACTION_DATA_V05, parallel=True),
+    uploads=[
+        f"{ACTION_DATA_V05}/train.jsonl",
+        f"{ACTION_DATA_V05}/val.jsonl",
+        f"{ACTION_DATA}/eval.jsonl",
+        TOKENIZER,
+    ],
+)
+
 # Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
 # number of optimizer steps as M4 (5,680), so only the amount of data changes.
 SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
@@ -475,5 +498,6 @@ JOBS: dict[str, JobSpec] = {
         VERIFY_HUMAN_V1,
         GEN_EVAL_V2,
         GEN_ACTION_V05,
+        TRAIN_ACTION_V05,
     )
 }
