@@ -34,6 +34,8 @@ SLICES = (
     "question_forms",
     "long_preface",
     "english",
+    "imperative_forms",
+    "kanji_kudasai",
 )
 
 
@@ -180,12 +182,31 @@ def long_preface() -> list[Spec]:
     return [_spec("long_preface", s.id, s.category, s.label, s.meaning, hint) for s in pool]
 
 
+def imperative_forms() -> list[Spec]:
+    """Plain / rough imperatives (見ろ, 向け, 笑え, うなずけ); v0.5 gated these (low confidence)."""
+    hint = (
+        "ぶっきらぼうな命令形で頼む（「見ろ」「向け」「向きなさい」「笑え」「うなずけ」「〜しろ」"
+        "「〜してくれ」など）。「ください」「てね」のような丁寧な言い方は使わない"
+    )
+    return [_spec("imperative_forms", s.id.removeprefix("single."), "single", s.label, s.meaning,
+                  hint) for s in single_specs()]  # fmt: skip
+
+
+def kanji_kudasai() -> list[Spec]:
+    """Requests ending in 下さい (kanji): v0.5 read the 下 of 下さい as the direction 'down'."""
+    hint = "文末を漢字の「下さい」にする（例: 「〜して下さい」「〜を見て下さい」）"
+    return [_spec("kanji_kudasai", s.id.removeprefix("single."), "single", s.label, s.meaning,
+                  hint) for s in single_specs()]  # fmt: skip
+
+
 def focus_specs() -> list[Spec]:
     """All focused specs except English (English uses the existing English prompt)."""
     return (
         center_phrasing() + amount_words() + numbers() + negation_forms() + correction()
         + order_words() + fragments() + unexecutable() + orthography() + question_forms()
         + long_preface()
+        + imperative_forms()
+        + kanji_kudasai()
     )  # fmt: skip
 
 

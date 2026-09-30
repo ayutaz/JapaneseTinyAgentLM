@@ -461,6 +461,59 @@ TRAIN_ACTION_V05 = JobSpec(
     ],
 )
 
+# Data v0.5.1: a small top-up after v0.5 (rough imperatives, 下さい in kanji, corrections)
+# written by three writers; then retrain 3M on v0.5 + the top-up.
+V051_WRITERS = [w for w in V04_WRITERS if w[0] in ("abeja", "calm3")]
+
+
+def _v051_steps() -> list[str]:
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", sync()]
+    for name, hf_id, mem in V051_WRITERS:
+        cfg = f"configs/action_v051_{name}.json"
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", cfg, f"artifacts/raw051_{name}")
+        steps += [
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v051_qwen.json", "artifacts/raw051_qwen"),
+    ]
+    for name in [n for n, _, _ in V051_WRITERS] + ["qwen"]:
+        out = f"artifacts/raw051_{name}"
+        verify = generate("train-verify", f"configs/action_v051_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    return steps
+
+
+GEN_ACTION_V051 = JobSpec(
+    name="gen_action_v051",
+    description="Data v0.5.1 top-up: imperatives, 下さい, corrections (3 writers, Qwen3 checks)",
+    query=f"gpu_ram>=79 {BASE_QUERY}".replace("disk_space>=120", "disk_space>=200"),
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=2.0,
+    steps=_v051_steps(),
+)
+
+ACTION_DATA_V051 = "datasets/action/v0.5.1"
+TRAIN_ACTION_V051 = JobSpec(
+    name="train_action_v051",
+    description="Train 3M (x2) on data v0.5.1 in parallel; evaluate on the v0 eval set",
+    query=f"gpu_ram>=24 compute_cap>=800 compute_cap<=900 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=4.0,
+    steps=train_action_steps(V05_RUNS[:2], "v051", ACTION_DATA_V051, parallel=True),
+    uploads=[
+        f"{ACTION_DATA_V051}/train.jsonl",
+        f"{ACTION_DATA_V051}/val.jsonl",
+        f"{ACTION_DATA}/eval.jsonl",
+        TOKENIZER,
+    ],
+)
+
 # Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
 # number of optimizer steps as M4 (5,680), so only the amount of data changes.
 SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
@@ -499,5 +552,7 @@ JOBS: dict[str, JobSpec] = {
         GEN_EVAL_V2,
         GEN_ACTION_V05,
         TRAIN_ACTION_V05,
+        GEN_ACTION_V051,
+        TRAIN_ACTION_V051,
     )
 }
