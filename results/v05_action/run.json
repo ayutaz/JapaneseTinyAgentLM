@@ -1,0 +1,85 @@
+{
+  "job": {
+    "name": "train_action_v05",
+    "description": "Train 3M (x2) and 5M on data v0.5 in parallel; evaluate on the v0 eval set",
+    "query": "gpu_ram>=24 compute_cap>=800 compute_cap<=900 num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=120 rentable=true direct_port_count>=1 verified=true",
+    "image": "vllm/vllm-openai:v0.30.0",
+    "disk_gb": 80,
+    "max_hours": 4.0,
+    "steps": [
+      "nvidia-smi > artifacts/nvidia_smi.txt",
+      "for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.5 --size 3m --lr 1e-3 --epochs 12 --out artifacts/v05/3m > artifacts/v05-3m.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.5 --size 3m --lr 1e-3 --epochs 12 --seed 1 --out artifacts/v05/3m-s1 > artifacts/v05-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.5 --size 5m --lr 1e-3 --epochs 12 --out artifacts/v05/5m > artifacts/v05-5m.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v05/3m/best.pt artifacts/v05/3m-s1/best.pt artifacts/v05/5m/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model --cases datasets/action/v0/eval.jsonl --out artifacts/v05/eval"
+    ],
+    "fetch": [
+      "artifacts"
+    ],
+    "uploads": [
+      "datasets/action/v0.5/train.jsonl",
+      "datasets/action/v0.5/val.jsonl",
+      "datasets/action/v0/eval.jsonl",
+      "tokenizer/out/action_v0_sp2048.model"
+    ]
+  },
+  "started_utc": "20260930T015031Z",
+  "uploads": {
+    "datasets/action/v0.5/train.jsonl": "0abec2b1655736f2bd5e4b29d27a8649b7d3cbd82bff14fc804861182c99ad45",
+    "datasets/action/v0.5/val.jsonl": "be20c70836b92f148751e80b96d3281fa7ef1fa80189957326130be0f99ca4cb",
+    "datasets/action/v0/eval.jsonl": "24120eb2711b75a2f09c2a4df0c0d2b0a9f4673477372104b7cb071dcb991927",
+    "tokenizer/out/action_v0_sp2048.model": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4"
+  },
+  "commit": "b0e9ce06366d8e062a3a77abd624cf1e20149462",
+  "offer": {
+    "id": 53404141,
+    "gpu_name": "RTX 3090",
+    "gpu_ram": 24576,
+    "dph_total": 0.18805555555555556,
+    "geolocation": "Poland, PL"
+  },
+  "instance_id": 53449118,
+  "driver_version": "580.173.02",
+  "cuda_max_good": 13.0,
+  "steps": [
+    {
+      "cmd": "curl -LsSf https://astral.sh/uv/0.12.20/install.sh | sh",
+      "exit": 0,
+      "sec": 29
+    },
+    {
+      "cmd": "mkdir -p /root/work && tar -xf /root/code.tar -C /root/work",
+      "exit": 0,
+      "sec": 29
+    },
+    {
+      "cmd": "mkdir -p /root/work/artifacts",
+      "exit": 0,
+      "sec": 29
+    },
+    {
+      "cmd": "cd /root/work && nvidia-smi > artifacts/nvidia_smi.txt",
+      "exit": 0,
+      "sec": 29
+    },
+    {
+      "cmd": "cd /root/work && for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "exit": 0,
+      "sec": 52
+    },
+    {
+      "cmd": "cd /root/work && pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.5 --size 3m --lr 1e-3 --epochs 12 --out artifacts/v05/3m > artifacts/v05-3m.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.5 --size 3m --lr 1e-3 --epochs 12 --seed 1 --out artifacts/v05/3m-s1 > artifacts/v05-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v0_sp2048.model --data datasets/action/v0.5 --size 5m --lr 1e-3 --epochs 12 --out artifacts/v05/5m > artifacts/v05-5m.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "exit": 0,
+      "sec": 534
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v05/3m/best.pt artifacts/v05/3m-s1/best.pt artifacts/v05/5m/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model --cases datasets/action/v0/eval.jsonl --out artifacts/v05/eval",
+      "exit": 0,
+      "sec": 29
+    }
+  ],
+  "status": "succeeded",
+  "destroyed": true,
+  "hours": 0.305,
+  "failed_starts": [],
+  "cost_usd_estimate": 0.057
+}

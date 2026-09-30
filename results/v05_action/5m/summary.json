@@ -1,0 +1,51 @@
+{
+  "size": "5m",
+  "params": 5049600,
+  "config": {
+    "vocab_size": 2048,
+    "d_model": 256,
+    "n_layers": 6,
+    "n_heads": 8,
+    "n_kv_heads": 2,
+    "d_ff": 768,
+    "max_seq_len": 128,
+    "dropout": 0.1,
+    "rope_theta": 10000.0,
+    "norm_eps": 1e-05
+  },
+  "tokenizer": {
+    "file": "action_v0_sp2048.model",
+    "sha256": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4"
+  },
+  "train_examples": 64136,
+  "val_examples": 3375,
+  "steps": 12036,
+  "epochs": 12,
+  "best": {
+    "val_exact": 0.9792592592592593,
+    "val_loss": 0.016193900326818077,
+    "epoch": 12,
+    "step": 12036
+  },
+  "train_seconds": 386.6,
+  "device": "cuda",
+  "torch": "2.14.0+cu126",
+  "args": {
+    "size": "5m",
+    "tokenizer": "tokenizer/out/action_v0_sp2048.model",
+    "data": "datasets/action/v0.5",
+    "out": "artifacts/v05/5m",
+    "epochs": 12,
+    "max_steps": 0,
+    "batch_size": 64,
+    "lr": 0.001,
+    "min_lr_ratio": 0.1,
+    "warmup": 200,
+    "weight_decay": 0.1,
+    "dropout": 0.1,
+    "eval_every": 2,
+    "seed": 0,
+    "train_fraction": 1.0,
+    "device": "auto"
+  }
+}
