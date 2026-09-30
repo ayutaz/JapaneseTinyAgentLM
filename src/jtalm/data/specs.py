@@ -80,6 +80,10 @@ class Spec:
     category: str  # single | multi_action | negation | correction | no_action
     label: tuple[Call, ...]
     meaning: str  # Japanese instruction describing what the sentence must ask for
+    # Extra instruction for focused data (jtalm.data.focus). With ``hint_only`` the hint replaces
+    # the default per-call wording rules (e.g. which amount or negation words to use).
+    hint: str = ""
+    hint_only: bool = False
 
 
 def single_calls() -> list[Call]:

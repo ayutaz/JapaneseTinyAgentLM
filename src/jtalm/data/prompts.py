@@ -57,6 +57,18 @@ def sentence_schema(n: int) -> dict:
 
 def requirements(spec: Spec) -> list[str]:
     """Spec-specific constraints so every sentence carries all parts of the label (v0.2)."""
+    if spec.hint_only:
+        reqs = [spec.hint]
+        if spec.category == "no_action":
+            reqs.append("首を動かす、表情を変える、うなずく、を頼む文にはしない")
+        return reqs
+    reqs = _default_requirements(spec)
+    if spec.hint:
+        reqs.append(spec.hint)
+    return reqs
+
+
+def _default_requirements(spec: Spec) -> list[str]:
     reqs: list[str] = []
     for call in spec.label:
         args = call["arguments"]
@@ -98,7 +110,7 @@ def generation_messages(spec: Spec, n: int, split: str, styles: str | None = Non
         f"意味: {spec.meaning}\n\n"
         "条件:\n"
         f"- 文ごとに言い方を変える（例: {styles}）\n"
-        "- 1文は40文字以内\n"
+        f"- 1文は{60 if spec.id.startswith('focus.long_preface') else 40}文字以内\n"
         f"{extra}"
         "- 意味に含まれない動作や指示を足さない\n"
         "- 同じ言い回しを繰り返さない\n"

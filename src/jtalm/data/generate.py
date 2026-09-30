@@ -22,6 +22,7 @@ from typing import Any
 from openai import OpenAI
 
 from jtalm.data import prompts
+from jtalm.data.focus import english_pool, focus_specs, sample_by_slice, slice_of
 from jtalm.data.specs import Spec, all_specs, sample_requests
 
 PHASES = ("eval-gen", "train-gen", "eval-verify", "train-verify")
@@ -75,6 +76,8 @@ def _parallel(fn: Callable[[Any], list[dict]], items: list, workers: int) -> tup
 
 def _row(spec: Spec, text: str, split: str, generator: str, **extra: Any) -> dict:
     extra.setdefault("prompt_version", prompts.PROMPT_VERSION)
+    if slice_of(spec.id):
+        extra.setdefault("slice", slice_of(spec.id))
     return {
         "split": split,
         "spec_id": spec.id,
@@ -98,7 +101,11 @@ def _read(path: Path) -> list[dict]:
 def generate_sentences(gen: Generator, name: str, split: str, quota: dict, cfg: dict, seed0: int):
     n = cfg["per_request"]
     rng = random.Random(seed0)
-    requests = list(enumerate(sample_requests(all_specs(), quota, n, rng)))
+    if cfg.get("spec_set") == "focus":
+        specs = sample_by_slice(focus_specs(), cfg["slice_quota"], n, rng)
+    else:
+        specs = sample_requests(all_specs(), quota, n, rng)
+    requests = list(enumerate(specs))
 
     style_set = cfg.get("train_styles", "v0.2") if split == "train" else "v0.2"
     version = cfg.get("prompt_version", prompts.PROMPT_VERSION)
@@ -153,7 +160,10 @@ def phase_eval_gen(gen: Generator, cfg: dict, workers: int) -> tuple[list[dict],
         gen_pairs, list(enumerate(pair_specs)), workers
     )
 
-    en_pool = [s for s in all_specs() if s.category in ("single", "negation", "no_action")]
+    if cfg.get("spec_set") == "focus":
+        en_pool = english_pool()
+    else:
+        en_pool = [s for s in all_specs() if s.category in ("single", "negation", "no_action")]
 
     def gen_english(item: tuple[int, Spec]) -> list[dict]:
         i, spec = item
@@ -163,7 +173,8 @@ def phase_eval_gen(gen: Generator, cfg: dict, workers: int) -> tuple[list[dict],
             seed=seed0 + 20_000 + i,
             temperature=cfg["temperature"],
         )
-        return [_row(spec, t, "eval", name, language="en") for t in data["sentences"]]
+        extra = {"slice": "english"} if cfg.get("spec_set") == "focus" else {}
+        return [_row(spec, t, "eval", name, language="en", **extra) for t in data["sentences"]]
 
     rng = random.Random(seed0)
     en_specs = rng.sample(en_pool, k=min(len(en_pool), -(-cfg["eval_english"] // EN_N)))

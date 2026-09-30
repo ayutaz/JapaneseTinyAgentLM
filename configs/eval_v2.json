@@ -1,0 +1,42 @@
+{
+  "dataset_version": "action-eval-v2",
+  "seed": 20261201,
+  "per_request": 8,
+  "temperature": 0.9,
+  "top_p": 0.95,
+  "max_tokens": 900,
+  "prompt_version": "action-eval-v2",
+  "spec_set": "focus",
+  "slice_quota": {
+    "center_phrasing": 320,
+    "amount_words": 320,
+    "numbers": 320,
+    "negation_forms": 320,
+    "correction": 320,
+    "order_words": 320,
+    "fragments": 320,
+    "unexecutable": 320,
+    "orthography": 480,
+    "question_forms": 320,
+    "long_preface": 320
+  },
+  "train_generator": {
+    "served_name": "qwen",
+    "hf_id": "Qwen/Qwen3-30B-A3B-Instruct-2507",
+    "license": "Apache-2.0"
+  },
+  "eval_generator": {
+    "served_name": "llmjp",
+    "hf_id": "llm-jp/llm-jp-3.1-13b-instruct4",
+    "license": "Apache-2.0"
+  },
+  "train_verifier": "train_generator",
+  "train_quota": {},
+  "eval_quota": {},
+  "eval_pairs": 0,
+  "eval_english": 240,
+  "massive": {
+    "train_negatives": 0,
+    "eval_negatives": 0
+  }
+}

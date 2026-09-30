@@ -322,6 +322,26 @@ VERIFY_HUMAN_V1 = JobSpec(
     uploads=[f"{HUMAN_RAW}/train_gen.jsonl"],
 )
 
+# Evaluation set v2: llm-jp-3.1 (the eval-only writer) writes one slice per phrasing pattern
+# (jtalm.data.focus), Qwen3 verifies at temperature 0. Never used for training.
+GEN_EVAL_V2 = JobSpec(
+    name="gen_eval_v2",
+    description="Eval set v2: llm-jp writes focused slices (12 patterns), Qwen3 verifies",
+    query=f"gpu_ram>=79 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=160,
+    max_hours=1.5,
+    steps=[
+        "nvidia-smi > artifacts/nvidia_smi.txt",
+        sync(),
+        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
+        generate("eval-gen", "configs/eval_v2.json", "artifacts/raw_eval_v2"),
+        f"{STOP_VLLM}; {_drop_weights(EVAL_MODEL)}",
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("eval-verify", "configs/eval_v2.json", "artifacts/raw_eval_v2"),
+    ],
+)
+
 # Retrain on v0.3 (v0 plus the new writers) and compare with M4 on the same evaluation set.
 ACTION_DATA_V03 = "datasets/action/v0.3"
 V03_RUNS = [
@@ -408,5 +428,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V04B,
         TRAIN_ACTION_V04,
         VERIFY_HUMAN_V1,
+        GEN_EVAL_V2,
     )
 }

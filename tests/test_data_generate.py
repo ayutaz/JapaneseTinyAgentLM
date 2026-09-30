@@ -108,3 +108,26 @@ def test_v03_writer_config_uses_style_subsets_and_the_separate_verifier(
     assert {r["prompt_version"] for r in rows} == {"action-v0.3"}
     gen_prompts = [p for p in seen if "意味:" in p]
     assert len({p.split("例: ")[1].split("）")[0] for p in gen_prompts}) > 1  # styles vary
+
+
+def test_focus_eval_generation_tags_slices(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from jtalm.data.focus import SLICES
+
+    cfg = {
+        **CFG,
+        "spec_set": "focus",
+        "slice_quota": {s: 2 for s in SLICES if s != "english"},
+        "eval_pairs": 0,
+        "eval_english": 4,
+    }
+    cfg_path = tmp_path / "cfg.json"
+    cfg_path.write_text(json.dumps(cfg), encoding="utf-8")
+    monkeypatch.setattr(generate, "Generator", FakeGenerator)
+    generate.run(
+        Namespace(
+            phase="eval-gen", config=str(cfg_path), base_url="x", workers=2, out=str(tmp_path)
+        )
+    )
+    rows = [json.loads(x) for x in (tmp_path / "eval_gen.jsonl").read_text("utf-8").splitlines()]
+    assert {r["slice"] for r in rows} == set(SLICES)
+    assert all(r["language"] == "en" for r in rows if r["slice"] == "english")
