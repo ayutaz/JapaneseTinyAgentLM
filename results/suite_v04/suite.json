@@ -1,0 +1,106 @@
+{
+  "ckpt": "runs\\vast\\train_action_v04-20260929T095441Z\\artifacts\\v04\\3m\\best_q4_g64.pt",
+  "gate": {
+    "threshold": 0.97004
+  },
+  "sets": {
+    "v0 eval (LLM)": {
+      "n": 1189,
+      "exact": 0.9444911690496215,
+      "requests_exact": 0.8986254295532646,
+      "false_action_rate": 0.011532125205930808,
+      "critical_error_rate": 0.005887300252312868
+    },
+    "human v1": {
+      "n": 1159,
+      "exact": 0.9836065573770492,
+      "requests_exact": 0.8870967741935484,
+      "false_action_rate": 0.010938924339106655,
+      "critical_error_rate": 0.010353753235547885
+    },
+    "v2/amount_words": {
+      "n": 278,
+      "exact": 0.8201438848920863,
+      "requests_exact": 0.8201438848920863,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/center_phrasing": {
+      "n": 223,
+      "exact": 0.8699551569506726,
+      "requests_exact": 0.8699551569506726,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/correction": {
+      "n": 44,
+      "exact": 0.8409090909090909,
+      "requests_exact": 0.8409090909090909,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/english": {
+      "n": 70,
+      "exact": 0.4714285714285714,
+      "requests_exact": 0.02631578947368421,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/fragments": {
+      "n": 182,
+      "exact": 1.0,
+      "requests_exact": null,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/long_preface": {
+      "n": 247,
+      "exact": 0.8947368421052632,
+      "requests_exact": 0.8947368421052632,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/negation_forms": {
+      "n": 168,
+      "exact": 1.0,
+      "requests_exact": null,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/numbers": {
+      "n": 167,
+      "exact": 0.9221556886227545,
+      "requests_exact": 0.8571428571428571,
+      "false_action_rate": 0.038461538461538464,
+      "critical_error_rate": 0.023952095808383235
+    },
+    "v2/order_words": {
+      "n": 296,
+      "exact": 0.956081081081081,
+      "requests_exact": 0.956081081081081,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/orthography": {
+      "n": 282,
+      "exact": 0.8120567375886525,
+      "requests_exact": 0.792156862745098,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0
+    },
+    "v2/question_forms": {
+      "n": 203,
+      "exact": 0.916256157635468,
+      "requests_exact": 0.916256157635468,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0
+    },
+    "v2/unexecutable": {
+      "n": 286,
+      "exact": 0.8181818181818182,
+      "requests_exact": null,
+      "false_action_rate": 0.18181818181818182,
+      "critical_error_rate": 0.18181818181818182
+    }
+  }
+}
