@@ -1,4 +1,4 @@
-95% bootstrap intervals (2000 resamples) for suite_v051_3m_q4
+Released model (seed 0): rate and 95% bootstrap interval (%, 2,000 resamples)
 
 | set | exact | requests exact | false actions |
 |---|---|---|---|

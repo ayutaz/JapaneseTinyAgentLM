@@ -91,6 +91,13 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 ### 誤差の範囲
 
+数値のぶれには2つの原因があります。
+
+- **評価セットの大きさ:** 下の1つ目の表は、公開したモデルについて、評価の文を復元抽出し直して求めた 95% の区間です（2,000回）。人が書いた依頼文は 62件しかないので、区間が広くなります。
+- **学習の seed:** 同じデータと設定で seed だけを変えて5回学習し、それぞれを同じ方法（INT4、文法、validation で決めた gate）で評価しました。下の2つ目の表は、5回の平均 ± 標準偏差です。
+
+**公開したのは seed 0 です。** seed 0 は、ほかの seed を学習する前に実機への搭載と実機での検証（300文で PC と完全一致）を済ませていたモデルです。人が書いた依頼文では、5つの seed の中で最も高い値でした（seed ごとに 91.9 / 75.8 / 83.9 / 90.3 / 83.9%）。そのため、この評価セットでの実力は、5回の平均（約 85%）で見るのが妥当です。LLM が書いた評価セット（v0 eval）の依頼文は 88.1 ± 1.2% で、seed による差は小さいです。
+
 {{EXTRA}}
 
 ## 学習
@@ -117,7 +124,7 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 - **英語は扱えません。** 英語の依頼の正解率は約5%です。
 - **ひらがなだけの文や、言い直しの文は弱めです**（表記 約83%、言い直し 約84%）。
-- **学習の乱数（seed）による差が大きいです。** 同じデータと設定でも、seed によって人が書いた依頼文の正解率が大きく変わります（上の「誤差の範囲」）。
+- **学習の乱数（seed）による差があります。** 同じデータと設定でも、人が書いた依頼文の正解率は seed によって 75.8〜91.9% と変わりました（上の「誤差の範囲」）。
 - 決まった3種類の動作しか選べません。会話や質問への答えはしません。
 - 文字の入力を前提にしています。音声認識の誤りへの強さは評価していません。
 - **用途:** 小型ロボットや玩具で、日本語の短い指示から安全な範囲の動作を選ぶこと。人の安全にかかわる機械の制御、医療、監視などには使わないでください。出力は必ず schema と角度の上限で検証してから動かしてください（firmware はそうしています）。
@@ -134,4 +141,4 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 ## English summary
 
-A {{PARAMS}}-parameter decoder-only Transformer, trained from scratch, that maps short Japanese requests to robot action calls (JSON: `look`, `set_expression`, `nod`; up to two per request) or `[]` for non-requests, negated requests and requests the robot cannot perform. It runs entirely on an ESP32-S3 (M5Stack Stack-chan, CoreS3) in INT4 with a median latency of about 1.3 s, bit-exact with the PyTorch reference on 300 prompts. Decoding uses a schema grammar plus a confidence gate ({{GATE}}); the reported numbers use both. Japanese only (English requests are about 5% correct). Results vary noticeably across training seeds; see the error-bar tables above. Weights are CC BY-SA 4.0; training data includes Tatoeba (CC BY 2.0 FR), JESC (CC BY-SA 4.0) and MASSIVE (CC BY 4.0) plus sentences written by Apache-2.0/MIT open models. Built by Claude Code.
+A {{PARAMS}}-parameter decoder-only Transformer, trained from scratch, that maps short Japanese requests to robot action calls (JSON: `look`, `set_expression`, `nod`; up to two per request) or `[]` for non-requests, negated requests and requests the robot cannot perform. It runs entirely on an ESP32-S3 (M5Stack Stack-chan, CoreS3) in INT4 with a median latency of about 1.3 s, bit-exact with the PyTorch reference on 300 prompts. Decoding uses a schema grammar plus a confidence gate ({{GATE}}); the reported numbers use both. Japanese only (English requests are about 5% correct). Results vary across training seeds: on the 62 human-written requests the five seeds scored 75.8–91.9% (mean 85.2%); the released seed 0 was deployed and verified on the device before the other seeds were trained, and is the highest of the five on that set. See the error-bar tables above. Weights are CC BY-SA 4.0; training data includes Tatoeba (CC BY 2.0 FR), JESC (CC BY-SA 4.0) and MASSIVE (CC BY 4.0) plus sentences written by Apache-2.0/MIT open models. Built by Claude Code.
