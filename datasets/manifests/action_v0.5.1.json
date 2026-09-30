@@ -1,15 +1,15 @@
 {
   "base": "datasets/action/v0.5",
-  "created_utc": "2026-09-30T14:46:25Z",
+  "created_utc": "2026-09-30T15:14:31Z",
   "counts": {
     "train": {
-      "total": 65045,
+      "total": 66809,
       "by_category": {
-        "correction": 4473,
+        "correction": 4923,
         "multi_action": 13231,
         "negation": 9502,
         "no_action": 19717,
-        "single": 18122
+        "single": 19436
       },
       "by_source": {
         "massive:train:1003": 1,
@@ -1160,10 +1160,10 @@
         "massive:train:9929": 1,
         "massive:train:9974": 1,
         "massive:train:9975": 1,
-        "synthetic:Qwen/Qwen3-30B-A3B-Instruct-2507": 16797,
-        "synthetic:abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0": 8878,
+        "synthetic:Qwen/Qwen3-30B-A3B-Instruct-2507": 16775,
+        "synthetic:abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0": 10092,
         "synthetic:cyberagent/Mistral-Nemo-Japanese-Instruct-2408": 7500,
-        "synthetic:cyberagent/calm3-22b-chat": 9965,
+        "synthetic:cyberagent/calm3-22b-chat": 10537,
         "synthetic:elyza/ELYZA-Shortcut-1.0-Qwen-32B": 6702,
         "synthetic:human:jesc": 3518,
         "synthetic:human:massive": 21,
@@ -1171,16 +1171,16 @@
         "synthetic:ibm-granite/granite-3.3-8b-instruct": 3227,
         "synthetic:sbintuitions/sarashina2.2-3b-instruct-v0.1": 5765
       },
-      "empty_label_share": 0.4492
+      "empty_label_share": 0.4374
     },
     "val": {
-      "total": 3423,
+      "total": 3515,
       "by_category": {
-        "correction": 235,
+        "correction": 258,
         "multi_action": 697,
         "negation": 500,
         "no_action": 1038,
-        "single": 953
+        "single": 1022
       },
       "by_source": {
         "massive:train:10057": 1,
@@ -1235,10 +1235,10 @@
         "massive:train:8401": 1,
         "massive:train:9586": 1,
         "massive:train:9893": 1,
-        "synthetic:Qwen/Qwen3-30B-A3B-Instruct-2507": 923,
-        "synthetic:abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0": 458,
+        "synthetic:Qwen/Qwen3-30B-A3B-Instruct-2507": 921,
+        "synthetic:abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0": 526,
         "synthetic:cyberagent/Mistral-Nemo-Japanese-Instruct-2408": 407,
-        "synthetic:cyberagent/calm3-22b-chat": 526,
+        "synthetic:cyberagent/calm3-22b-chat": 552,
         "synthetic:elyza/ELYZA-Shortcut-1.0-Qwen-32B": 354,
         "synthetic:human:jesc": 166,
         "synthetic:human:massive": 3,
@@ -1246,7 +1246,7 @@
         "synthetic:ibm-granite/granite-3.3-8b-instruct": 165,
         "synthetic:sbintuitions/sarashina2.2-3b-instruct-v0.1": 284
       },
-      "empty_label_share": 0.4493
+      "empty_label_share": 0.4376
     },
     "eval": {
       "total": 1189,
@@ -1414,25 +1414,28 @@
     }
   },
   "added": {
-    "train": 909,
-    "val": 48
+    "train": 2673,
+    "val": 140
   },
   "keep_rate_by_generator": {
-    "Qwen/Qwen3-30B-A3B-Instruct-2507": 0.6329
+    "Qwen/Qwen3-30B-A3B-Instruct-2507": 0.6171,
+    "abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0": 0.641,
+    "cyberagent/calm3-22b-chat": 0.3955
   },
   "filter_stats": {
-    "correction:duplicate": 80,
-    "correction:kept": 297,
-    "correction:negation_mismatch": 22,
-    "correction:verifier_disagrees": 57,
-    "single:duplicate": 227,
-    "single:kept": 660,
-    "single:negation_mismatch": 6,
-    "single:verifier_disagrees": 163
+    "correction:duplicate": 116,
+    "correction:kept": 770,
+    "correction:negation_mismatch": 453,
+    "correction:verifier_disagrees": 173,
+    "single:duplicate": 772,
+    "single:kept": 2043,
+    "single:malformed": 8,
+    "single:negation_mismatch": 24,
+    "single:verifier_disagrees": 665
   },
   "files": {
-    "train.jsonl": "6a0b9413ddb1ebdbd1e6741f30c6384f7c0f5854db16fdf467aa3c758de4cf58",
-    "val.jsonl": "e78bc6f80ec3644a39dd08d5a519826ee7b91a84033e4c85c80e1289ce9e414a",
+    "train.jsonl": "c38b7f477325e8805e9f157f3d0a1310eb6cda7b92ca585371165cc207f2a47b",
+    "val.jsonl": "26295fe0429b2f2dad0b9d24f9ab5b671ad64854cca96f7dd18d49f55a6d448e",
     "eval.jsonl": "24120eb2711b75a2f09c2a4df0c0d2b0a9f4673477372104b7cb071dcb991927"
   },
   "excluded_against": [
@@ -1573,6 +1576,34 @@
     }
   },
   "generation_runs": {
+    "gen_action_v051b-20260930T144740Z/raw051_abeja/summary_train-gen.json": {
+      "phase": "train-gen",
+      "prompt_version": "action-v0.5.1",
+      "rows": 2000,
+      "sec": 81,
+      "train_gen_failures": 0
+    },
+    "gen_action_v051b-20260930T144740Z/raw051_abeja/summary_train-verify.json": {
+      "phase": "train-verify",
+      "prompt_version": "action-v0.5.1",
+      "rows": 2000,
+      "sec": 11,
+      "train_verify_failures": 0
+    },
+    "gen_action_v051b-20260930T144740Z/raw051_calm3/summary_train-gen.json": {
+      "phase": "train-gen",
+      "prompt_version": "action-v0.5.1",
+      "rows": 1512,
+      "sec": 55,
+      "train_gen_failures": 0
+    },
+    "gen_action_v051b-20260930T144740Z/raw051_calm3/summary_train-verify.json": {
+      "phase": "train-verify",
+      "prompt_version": "action-v0.5.1",
+      "rows": 1512,
+      "sec": 8,
+      "train_verify_failures": 0
+    },
     "gen_action_v051-20260930T135559Z/raw051_qwen/summary_train-gen.json": {
       "phase": "train-gen",
       "prompt_version": "action-v0.5.1",
