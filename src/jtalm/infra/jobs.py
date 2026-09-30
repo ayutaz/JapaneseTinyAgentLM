@@ -550,6 +550,20 @@ TRAIN_ACTION_V051 = JobSpec(
     ],
 )
 
+# Seed spread on v0.5.1: three more 3M seeds (with seeds 0 and 1 from train_action_v051, five
+# in total) so that model comparisons can report a mean and a spread instead of one run.
+V051_SEED_RUNS = [(f"3m-s{i}", "3m", f"--lr 1e-3 --epochs 12 --seed {i}") for i in (2, 3, 4)]
+TRAIN_ACTION_V051_SEEDS = JobSpec(
+    name="train_action_v051_seeds",
+    description="Three more 3M seeds on data v0.5.1 (seed spread for error bars)",
+    query=f"gpu_ram>=24 compute_cap>=800 compute_cap<=900 {BASE_QUERY}",
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=3.0,
+    steps=train_action_steps(V051_SEED_RUNS, "v051s", ACTION_DATA_V051, parallel=True),
+    uploads=TRAIN_ACTION_V051.uploads,
+)
+
 # Data-scaling check (after M4): 3M on 25 / 50 / 100% of the v0 training data with the same
 # number of optimizer steps as M4 (5,680), so only the amount of data changes.
 SCALING_STEPS = "--lr 1e-3 --max-steps 5680"
@@ -591,5 +605,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V051,
         GEN_ACTION_V051B,
         TRAIN_ACTION_V051,
+        TRAIN_ACTION_V051_SEEDS,
     )
 }
