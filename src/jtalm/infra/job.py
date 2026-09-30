@@ -62,15 +62,27 @@ def local_uploads(spec: JobSpec) -> dict[str, str]:
     return digests
 
 
+def _run_retry(ssh: Ssh, command: str, log: Path, timeout_s: int, attempts: int = 5) -> int:
+    """Run a short idempotent command; retry while SSH itself fails (exit 255)."""
+    code = 255
+    for attempt in range(attempts):
+        code = ssh.run(command, log=log, timeout_s=timeout_s)
+        if code != 255:
+            return code
+        time.sleep(10 * (attempt + 1))
+    return code
+
+
 def upload_files(ssh: Ssh, digests: dict[str, str], log: Path) -> None:
     for rel, digest in digests.items():
         remote = f"{REMOTE_WORK}/{rel}"
-        if ssh.run(f"mkdir -p {Path(remote).parent.as_posix()}", log=log, timeout_s=60) != 0:
+        if _run_retry(ssh, f"mkdir -p {Path(remote).parent.as_posix()}", log, 60) != 0:
             raise VastError(f"mkdir failed for {rel}")
         ssh.upload(PROJECT_ROOT / rel, remote)
-        check = f"echo '{digest}  {remote}' | sha256sum -c -"
-        if ssh.run(check, log=log, timeout_s=300) != 0:
-            raise VastError(f"sha256 mismatch after upload: {rel}")
+        # 255 means the SSH connection dropped, not a mismatch (train_action_v051, 2026-09-30).
+        code = _run_retry(ssh, f"echo '{digest}  {remote}' | sha256sum -c -", log, 300)
+        if code != 0:
+            raise VastError(f"sha256 check failed ({code}) after upload: {rel}")
 
 
 STARTUP_ATTEMPTS = 3
