@@ -19,12 +19,16 @@ BASE_QUERY = (
 
 
 def start_vllm(model: str, gpu_mem: float, max_len: int, extra: str = "", port: int = 8000) -> str:
-    """Start an OpenAI-compatible vLLM server in the background and wait until it is healthy."""
+    """Start an OpenAI-compatible vLLM server in the background and wait until it is healthy.
+
+    The wait covers the weight download: up to 30 minutes (360 x 5 s). A 15-minute limit was too
+    short for 45-65GB writers on a slow host (gen_action_v051, 2026-09-30).
+    """
     return (
         'VLLM="$(command -v vllm || echo "python3 -m vllm.entrypoints.cli.main")"; '
         f"setsid nohup $VLLM serve {model} --port {port} --gpu-memory-utilization {gpu_mem} "
         f"--max-model-len {max_len} {extra} > artifacts/vllm-{port}.log 2>&1 < /dev/null & "
-        "for i in $(seq 1 180); do "
+        "for i in $(seq 1 360); do "
         f"curl -sf localhost:{port}/health > /dev/null && break; sleep 5; done; "
         f"curl -sf localhost:{port}/health > /dev/null"
     )
@@ -497,6 +501,38 @@ GEN_ACTION_V051 = JobSpec(
     steps=_v051_steps(),
 )
 
+
+# v0.5.1b: rerun the two writers that timed out (ABEJA, calm3), then let Qwen3 verify them.
+def _v051b_steps() -> list[str]:
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", sync()]
+    for name, hf_id, mem in V051_WRITERS:
+        cfg = f"configs/action_v051_{name}.json"
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", cfg, f"artifacts/raw051_{name}")
+        steps += [
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps.append(
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen")
+    )
+    for name, _, _ in V051_WRITERS:
+        out = f"artifacts/raw051_{name}"
+        verify = generate("train-verify", f"configs/action_v051_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    return steps
+
+
+GEN_ACTION_V051B = JobSpec(
+    name="gen_action_v051b",
+    description="Data v0.5.1 (rerun): ABEJA and calm3 write the top-up slices, Qwen3 verifies",
+    query=f"gpu_ram>=79 {BASE_QUERY}".replace("disk_space>=120", "disk_space>=200"),
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=2.5,
+    steps=_v051b_steps(),
+)
+
 ACTION_DATA_V051 = "datasets/action/v0.5.1"
 TRAIN_ACTION_V051 = JobSpec(
     name="train_action_v051",
@@ -553,6 +589,7 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V05,
         TRAIN_ACTION_V05,
         GEN_ACTION_V051,
+        GEN_ACTION_V051B,
         TRAIN_ACTION_V051,
     )
 }
