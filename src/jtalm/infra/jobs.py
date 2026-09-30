@@ -342,6 +342,51 @@ GEN_EVAL_V2 = JobSpec(
     ],
 )
 
+# Data v0.5 (after the human-written evaluation): the seven training writers write the focused
+# slices (jtalm.data.focus), and the v0.4 3M model mines hard negatives from human-written text
+# outside the evaluation pool; Qwen3 verifies everything at temperature 0.
+V04_CKPT = "runs/vast/train_action_v04-20260929T095441Z/artifacts/v04/3m/best.pt"
+MINE_POOL = "datasets/raw/mine_pool/pool.jsonl"
+
+
+def _v05_steps() -> list[str]:
+    steps = [
+        "nvidia-smi > artifacts/nvidia_smi.txt",
+        "df -h /",
+        sync("--group train"),
+        f"{UV} run --no-dev --group train python -m jtalm.model.mine --ckpt {V04_CKPT} "
+        f"--tokenizer {TOKENIZER} --pool {MINE_POOL} --out artifacts/raw05_mined",
+    ]
+    for name, hf_id, mem in V04_WRITERS:
+        cfg = f"configs/action_v05_{name}.json"
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", cfg, f"artifacts/raw05_{name}")
+        steps += [
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v05_qwen.json", "artifacts/raw05_qwen"),
+    ]
+    for name in [n for n, _, _ in V04_WRITERS] + ["qwen", "mined"]:
+        out = f"artifacts/raw05_{name}"
+        verify = generate("train-verify", f"configs/action_v05_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    return steps
+
+
+GEN_ACTION_V05 = JobSpec(
+    name="gen_action_v05",
+    description="Data v0.5: focused slices by seven writers + mined hard negatives, Qwen3 verifies",
+    query=f"gpu_ram>=79 {BASE_QUERY}".replace("disk_space>=120", "disk_space>=320"),
+    image=VLLM_IMAGE,
+    disk_gb=300,
+    max_hours=3.0,
+    steps=_v05_steps(),
+    uploads=[V04_CKPT, MINE_POOL, TOKENIZER],
+)
+
 # Retrain on v0.3 (v0 plus the new writers) and compare with M4 on the same evaluation set.
 ACTION_DATA_V03 = "datasets/action/v0.3"
 V03_RUNS = [
@@ -429,5 +474,6 @@ JOBS: dict[str, JobSpec] = {
         TRAIN_ACTION_V04,
         VERIFY_HUMAN_V1,
         GEN_EVAL_V2,
+        GEN_ACTION_V05,
     )
 }

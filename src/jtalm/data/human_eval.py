@@ -32,6 +32,7 @@ from jtalm.eval.cases import EvalCase, load_cases, write_cases
 from jtalm.infra.env import PROJECT_ROOT
 
 DOWNLOADS = PROJECT_ROOT / "datasets/downloads/human_eval"
+DEFAULT_HUMAN_EVAL = PROJECT_ROOT / "datasets/action/human_v1/eval.jsonl"
 MAX_CHARS = 30
 
 SOURCES = {
@@ -297,6 +298,38 @@ def build(raw_dirs: list[Path], out_dir: Path) -> dict[str, Any]:
     }
 
 
+def in_eval_pool(text: str, eval_keys: set[str]) -> bool:
+    """Tatoeba / JESC sentences reserved for evaluation: human v1 items and a fixed 20% by hash.
+
+    Training (hard-negative mining for v0.5) may use only sentences outside this pool, so the
+    human-written evaluation keeps sources that the model has not seen.
+    """
+    key = dedup_key(text)
+    return key in eval_keys or int(hashlib.sha1(key.encode()).hexdigest()[:8], 16) % 5 == 0
+
+
+def mining_pool(root: Path, eval_keys: set[str], seed: int, n_jesc: int) -> list[dict[str, str]]:
+    """Human-written sentences for hard-negative mining (training side of the split only)."""
+    rng = random.Random(seed)
+    out: list[dict[str, str]] = []
+
+    def usable(text: str) -> bool:
+        return 3 <= len(text) <= 40 and parse_request(text) is None and not is_negated_request(text)
+
+    tatoeba = [t for t in tatoeba_sentences(root) if usable(t) and not in_eval_pool(t, eval_keys)]
+    jesc = [t for t in jesc_sentences(root) if usable(t) and not in_eval_pool(t, eval_keys)]
+    rng.shuffle(jesc)
+    rows = massive.load(massive.download(PROJECT_ROOT / "datasets/downloads/massive"))
+    train_massive = [r["utt"] for r in rows if r["partition"] == "train"]
+    for source, texts in (
+        ("tatoeba", tatoeba),
+        ("jesc", jesc[:n_jesc]),
+        ("massive", train_massive),
+    ):
+        out += [{"text": normalize(t), "source": source} for t in texts]
+    return out
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -304,6 +337,11 @@ def main() -> None:
     c.add_argument("--root", type=Path, default=DOWNLOADS)
     c.add_argument("--out", type=Path, default=PROJECT_ROOT / "datasets/raw/human_v1")
     c.add_argument("--seed", type=int, default=20260930)
+    m = sub.add_parser("pool")
+    m.add_argument("--root", type=Path, default=DOWNLOADS)
+    m.add_argument("--out", type=Path, default=PROJECT_ROOT / "datasets/raw/mine_pool/pool.jsonl")
+    m.add_argument("--n-jesc", type=int, default=250_000)
+    m.add_argument("--seed", type=int, default=20261202)
     b = sub.add_parser("build")
     b.add_argument("--raw", type=Path, nargs="+", required=True)
     b.add_argument("--out", type=Path, default=PROJECT_ROOT / "datasets/action/human_v1")
@@ -323,6 +361,14 @@ def main() -> None:
             for r in rows:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
         print(json.dumps(Counter(f"{r['category']}:{r['generator']}" for r in rows), indent=1))
+    elif args.cmd == "pool":
+        eval_keys = {dedup_key(c.prompt) for c in load_cases(DEFAULT_HUMAN_EVAL)}
+        rows = mining_pool(args.root, eval_keys, args.seed, args.n_jesc)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        with args.out.open("w", encoding="utf-8") as f:
+            for r in rows:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        print(json.dumps(Counter(r["source"] for r in rows)))
     else:
         report = build(args.raw, args.out)
         args.manifest.write_text(json.dumps(report, ensure_ascii=False, indent=2), "utf-8")
