@@ -11,6 +11,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdio.h>
 #include <stdint.h>
 
 #define ACT_MAX_CALLS 2
@@ -90,3 +91,7 @@ uint16_t act_yaw_raw(double deg);
 uint16_t act_pitch_raw(double deg);
 double act_yaw_deg(int raw);
 double act_pitch_deg(int raw);
+
+// Writes "calls":[..],"from":[yaw,pitch],"steps":[..],"to":[yaw,pitch],"total_ms":N for the
+// "act" record (firmware/tools/dispatch_check.py reads it).
+void act_print_body(FILE *f, const act_plan_t *p);

@@ -9,6 +9,7 @@
 
 #include "action.h"
 
+#include <inttypes.h>
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -422,4 +423,44 @@ void act_plan(act_plan_t *p, int yaw, int pitch) {
   }
   p->yaw1 = yaw;
   p->pitch1 = pitch;
+}
+
+// ---------------------------------------------------------------------------------------
+// The "act" record
+
+static void print_call(FILE *f, const act_call_t *c) {
+  if (c->kind == ACT_LOOK) {
+    fprintf(f, "{\"name\":\"look\",\"arguments\":{\"direction\":\"%s\",\"amount\":\"%s\"}}",
+            act_dir_names[c->dir], act_amount_names[c->amount]);
+  } else if (c->kind == ACT_EXPR) {
+    fprintf(f, "{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"%s\"}}",
+            act_expr_names[c->expr]);
+  } else {
+    fprintf(f, "{\"name\":\"nod\",\"arguments\":{\"count\":%d}}", c->count);
+  }
+}
+
+static void print_step(FILE *f, const act_step_t *s) {
+  if (s->kind == STEP_EXPR) {
+    fprintf(f, "{\"c\":%d,\"k\":\"expr\",\"expr\":\"%s\"}", s->call, act_expr_names[s->expr]);
+  } else {
+    fprintf(f,
+            "{\"c\":%d,\"k\":\"move\",\"yaw\":%d,\"pitch\":%d,\"yaw_raw\":%d,\"pitch_raw\":%d"
+            ",\"ms\":%d,\"clamped\":%d}",
+            s->call, s->yaw, s->pitch, s->yaw_raw, s->pitch_raw, s->ms, s->clamped);
+  }
+}
+
+void act_print_body(FILE *f, const act_plan_t *p) {
+  fputs("\"calls\":[", f);
+  for (int i = 0; i < p->n_calls; i++) {
+    if (i) fputc(',', f);
+    print_call(f, &p->calls[i]);
+  }
+  fprintf(f, "],\"from\":[%d,%d],\"steps\":[", p->yaw0, p->pitch0);
+  for (int i = 0; i < p->n_steps; i++) {
+    if (i) fputc(',', f);
+    print_step(f, &p->steps[i]);
+  }
+  fprintf(f, "],\"to\":[%d,%d],\"total_ms\":%" PRIu32, p->yaw1, p->pitch1, p->total_ms);
 }

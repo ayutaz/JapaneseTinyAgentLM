@@ -20,6 +20,15 @@ On the device, validator fuzzing with `!act <json>` (needs pyserial):
 
     uv run --with pyserial python firmware/tools/dispatch_check.py \
         --port COM3 --fuzz 400 --out runs/device/a1/fuzz.jsonl
+
+On the host, the same validator and planner built from action.c (firmware/tools/act_host.c;
+Windows: the gcc of the ESP-IDF Docker image):
+
+    uv run python firmware/tools/dispatch_check.py --write-cases runs/fw/cases.txt --seed 1
+    # cc ... -o runs/fw/act_host firmware/tools/act_host.c firmware/jtalm_action/main/action.c -lm
+    runs/fw/act_host < runs/fw/cases.txt > runs/fw/host.jsonl
+    uv run python firmware/tools/dispatch_check.py --host-results runs/fw/host.jsonl \
+        --cases runs/fw/cases.txt
 """
 
 import argparse
@@ -32,11 +41,16 @@ import time
 from pathlib import Path
 
 from jtalm.action import mapping
-from jtalm.action.schema import AMOUNTS, DIRECTIONS, EXPRESSIONS, parse_output
+from jtalm.action.schema import parse_output, uses_v1_only
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTION_H = ROOT / "firmware" / "jtalm_action" / "main" / "action.h"
 PREFIX = "JTALM "
+
+# The firmware's vocabulary is still schema v0 (Task 4 moves it to v1 and these to schema.py's).
+DIRECTIONS = ("left", "right", "up", "down", "center")
+AMOUNTS = ("slight", "normal", "large")
+EXPRESSIONS = ("happy", "sad", "surprised", "neutral")
 
 
 def load_defines(path: Path = ACTION_H) -> dict[str, float]:
@@ -135,7 +149,7 @@ def check_act(pol: Policy, act: dict, output: str, pose: list[int]) -> list[str]
     """Differences between a device plan and the reference for `output` from `pose`."""
     errs = []
     parsed = parse_output(output)
-    valid = parsed.schema_valid
+    valid = parsed.schema_valid and not uses_v1_only(parsed.calls)  # the device is v0
     if bool(act["valid"]) != valid:
         errs.append(f"valid: device {act['valid']} python {valid} {parsed.errors}")
     calls = parsed.calls if valid else []
@@ -207,6 +221,18 @@ def check_log(recs: list[dict], acts: list[dict], tol_ms: float) -> dict:
         "problems": problems[:20],
         "n_problems": len(problems),
     }
+
+
+def compare_host(pol: Policy, cases: list[str], recs: list[dict]) -> dict:
+    """Checks act_host records (one per case, pose carried over) against the reference."""
+    pose = [0, 0]
+    mism = []
+    for i, (text, act) in enumerate(zip(cases, recs, strict=True)):
+        errs = check_act(pol, act, text, pose)
+        if errs:
+            mism.append({"i": i, "json": text, "errs": errs})
+        pose = next_pose(act, pose)
+    return {"n": len(cases), "match": len(cases) - len(mism), "mismatches": mism[:20]}
 
 
 def offline(args: argparse.Namespace, pol: Policy) -> dict:
@@ -318,6 +344,12 @@ def fuzz_cases(n: int, seed: int) -> list[str]:
         '{"name":"look","arguments":{"direction":"left","amount":"large"}}]',
         '[{"name":"look","arguments":{"direction":"left","amount":"large"}},'
         '{"name":"look","arguments":{"direction":"right","amount":"large"}}]',
+        # valid in schema v1, so the v0 device must refuse them
+        '[{"name":"look","arguments":{"direction":"up_left","amount":"slight"}}]',
+        '[{"name":"set_expression","arguments":{"expression":"angry"}}]',
+        '[{"name":"nod","arguments":{"count":4}}]',
+        '[{"name":"look","arguments":{"direction":"left","degrees":20}}]',
+        '[{"name":"set_volume","arguments":{"level":5}}]',
         '{"name":"nod","arguments":{"count":1}}',
         "[[[[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]]]]",
         '["look"]',
@@ -397,9 +429,26 @@ def main() -> int:
     ap.add_argument("--fuzz", type=int, default=0, help="number of !act cases to send")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, help="fuzz records (.jsonl) / summary path")
+    ap.add_argument("--write-cases", type=Path, help="write --n fuzz cases (one per line)")
+    ap.add_argument("--n", type=int, default=3000, help="number of cases for --write-cases")
+    ap.add_argument("--host-results", type=Path, help="act_host output for --cases")
+    ap.add_argument("--cases", type=Path, help="the cases given to act_host")
     args = ap.parse_args()
 
     pol = Policy(load_defines())
+    if args.write_cases:
+        cases = fuzz_cases(args.n, args.seed)
+        args.write_cases.write_text("\n".join(cases) + "\n", encoding="utf-8", newline="\n")
+        print(f"{len(cases)} cases -> {args.write_cases}")
+        return 0
+    if args.host_results:
+        if not args.cases:
+            ap.error("--host-results needs --cases")
+        cases = args.cases.read_text("utf-8").splitlines()
+        recs = [json.loads(x) for x in args.host_results.read_text("utf-8").splitlines()]
+        summary = compare_host(pol, cases, recs)
+        print(json.dumps(summary, ensure_ascii=False, indent=1))
+        return 1 if summary["mismatches"] else 0
     if args.fuzz:
         if not args.port or not args.out:
             ap.error("--fuzz needs --port and --out")

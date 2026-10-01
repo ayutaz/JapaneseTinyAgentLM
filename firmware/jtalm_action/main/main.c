@@ -299,22 +299,6 @@ static void reset_state(lm_t *lm) {
   }
 }
 
-static void print_call(const act_call_t *c) {
-  if (c->kind == ACT_LOOK) {
-    printf(
-        "{\"name\":\"look\",\"arguments\":{\"direction\":\"%s\",\"amount\":\"%s\"}}",
-        act_dir_names[c->dir], act_amount_names[c->amount]
-    );
-  } else if (c->kind == ACT_EXPR) {
-    printf(
-        "{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"%s\"}}",
-        act_expr_names[c->expr]
-    );
-  } else {
-    printf("{\"name\":\"nod\",\"arguments\":{\"count\":%d}}", c->count);
-  }
-}
-
 // Validates an Action JSON string, plans it from the current pose, queues it and prints
 //   JTALM {"t":"act","seq":..,"valid":..,"calls":[..],"from":[yaw,pitch],"steps":[..],...}
 // Only "output" (after the gate) is dispatched; "[]" and invalid outputs do nothing.
@@ -338,33 +322,13 @@ static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
   int64_t t1 = now_us();
   out_lock();
   printf(
-      "JTALM {\"t\":\"act\",\"seq\":%" PRIu32 ",\"src\":\"%s\",\"valid\":%d,\"err\":%s%s%s"
-      ",\"calls\":[",
+      "JTALM {\"t\":\"act\",\"seq\":%" PRIu32 ",\"src\":\"%s\",\"valid\":%d,\"err\":%s%s%s,",
       seq, src, valid, err ? "\"" : "", err ? err : "null", err ? "\"" : ""
   );
-  for (int i = 0; i < plan.n_calls; i++) {
-    if (i) putchar(',');
-    print_call(&plan.calls[i]);
-  }
-  printf("],\"from\":[%d,%d],\"steps\":[", plan.yaw0, plan.pitch0);
-  for (int i = 0; i < plan.n_steps; i++) {
-    const act_step_t *s = &plan.steps[i];
-    if (i) putchar(',');
-    if (s->kind == STEP_EXPR) {
-      printf("{\"c\":%d,\"k\":\"expr\",\"expr\":\"%s\"}", s->call, act_expr_names[s->expr]);
-    } else {
-      printf(
-          "{\"c\":%d,\"k\":\"move\",\"yaw\":%d,\"pitch\":%d,\"yaw_raw\":%d,\"pitch_raw\":%d"
-          ",\"ms\":%d,\"clamped\":%d}",
-          s->call, s->yaw, s->pitch, s->yaw_raw, s->pitch_raw, s->ms, s->clamped
-      );
-    }
-  }
+  act_print_body(stdout, &plan);
   printf(
-      "],\"to\":[%d,%d],\"total_ms\":%" PRIu32 ",\"queued\":%d,\"dropped\":%d"
-      ",\"servo\":\"%s\",\"plan_us\":%" PRId64 "}\n",
-      plan.yaw1, plan.pitch1, plan.total_ms, queued, dropped,
-      servo_output_on() ? "on" : "dry", t1 - t0
+      ",\"queued\":%d,\"dropped\":%d,\"servo\":\"%s\",\"plan_us\":%" PRId64 "}\n", queued,
+      dropped, servo_output_on() ? "on" : "dry", t1 - t0
   );
   out_unlock();
 }
