@@ -1,0 +1,169 @@
+{
+  "conditions": {
+    "decoding": "greedy; modes: plain, grammar, gate",
+    "gate_rule": "largest threshold within 0.005 of val exact (no gate)",
+    "prompt_format": "<s> <act> prompt <out>",
+    "eval_cases": "eval.jsonl",
+    "eval_sha256": "24120eb2711b75a2f09c2a4df0c0d2b0a9f4673477372104b7cb071dcb991927",
+    "tokenizer_sha256": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4",
+    "device": "cpu"
+  },
+  "models": {
+    "3m-q4_g64 (3.15M)": {
+      "ckpt": "runs\\vast\\train_action_v051-20260930T152254Z\\artifacts\\v051\\3m\\best_q4_g64.pt",
+      "epoch": 10,
+      "gate": {
+        "threshold": 0.86808,
+        "val_exact_no_gate": 0.9823613086770981,
+        "val_exact_gated": 0.977524893314367
+      }
+    }
+  },
+  "eval": {
+    "rule baseline": {
+      "exact_rate": 0.7636669470142977,
+      "single": 0.608955223880597,
+      "multi_action": 0.46875,
+      "negation": 0.8814814814814815,
+      "no_action": 0.9910979228486647,
+      "correction": 0.7636363636363637,
+      "en": 0.7714285714285715,
+      "no_action_precision": 0.797768479776848,
+      "no_action_recall": 0.942339373970346,
+      "critical_error_rate": 0.02943650126156434,
+      "pair_accuracy": 0.8375
+    },
+    "3m-q4_g64 (3.15M)": {
+      "exact_rate": 0.9461732548359967,
+      "single": 0.8955223880597015,
+      "multi_action": 0.9583333333333334,
+      "negation": 0.9703703703703703,
+      "no_action": 0.9762611275964391,
+      "correction": 0.9090909090909091,
+      "en": 0.5714285714285714,
+      "no_action_precision": 0.9704433497536946,
+      "no_action_recall": 0.9736408566721582,
+      "critical_error_rate": 0.015138772077375946,
+      "pair_accuracy": 0.975
+    },
+    "3m-q4_g64 (3.15M) +grammar": {
+      "exact_rate": 0.9461732548359967,
+      "single": 0.8955223880597015,
+      "multi_action": 0.9583333333333334,
+      "negation": 0.9703703703703703,
+      "no_action": 0.9762611275964391,
+      "correction": 0.9090909090909091,
+      "en": 0.5714285714285714,
+      "no_action_precision": 0.9704433497536946,
+      "no_action_recall": 0.9736408566721582,
+      "critical_error_rate": 0.01345668629100084,
+      "pair_accuracy": 0.975
+    },
+    "3m-q4_g64 (3.15M) +gate": {
+      "exact_rate": 0.9377628259041211,
+      "single": 0.8626865671641791,
+      "multi_action": 0.9270833333333334,
+      "negation": 1.0,
+      "no_action": 0.9910979228486647,
+      "correction": 0.8,
+      "en": 0.5714285714285714,
+      "no_action_precision": 0.9151515151515152,
+      "no_action_recall": 0.9950576606260296,
+      "critical_error_rate": 0.002523128679562658,
+      "pair_accuracy": 0.9875
+    }
+  },
+  "bench16": {
+    "rule baseline": {
+      "exact_rate": 1.0,
+      "single": 1.0,
+      "multi_action": 1.0,
+      "negation": 1.0,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 1.0,
+      "no_action_precision": 1.0,
+      "no_action_recall": 1.0,
+      "critical_error_rate": 0.0,
+      "pair_accuracy": null
+    },
+    "Needle 2 official": {
+      "exact_rate": 0.1875,
+      "single": 0.3333333333333333,
+      "multi_action": 0.0,
+      "negation": 0.0,
+      "no_action": 0.25,
+      "correction": null,
+      "en": 0.25,
+      "no_action_precision": 0.3333333333333333,
+      "no_action_recall": 0.16666666666666666,
+      "critical_error_rate": 0.5,
+      "pair_accuracy": null
+    },
+    "FunctionGemma 270M": {
+      "exact_rate": 0.375,
+      "single": 0.6666666666666666,
+      "multi_action": 0.0,
+      "negation": 0.0,
+      "no_action": 0.5,
+      "correction": null,
+      "en": 0.25,
+      "no_action_precision": 1.0,
+      "no_action_recall": 0.3333333333333333,
+      "critical_error_rate": 0.5,
+      "pair_accuracy": null
+    },
+    "MimiModel C": {
+      "exact_rate": 0.0625,
+      "single": 0.0,
+      "multi_action": 0.0,
+      "negation": 0.0,
+      "no_action": 0.25,
+      "correction": null,
+      "en": 0.125,
+      "no_action_precision": 1.0,
+      "no_action_recall": 0.16666666666666666,
+      "critical_error_rate": 0.6875,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M)": {
+      "exact_rate": 0.75,
+      "single": 0.8333333333333334,
+      "multi_action": 0.5,
+      "negation": 0.5,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 0.5,
+      "no_action_precision": 0.8333333333333334,
+      "no_action_recall": 0.8333333333333334,
+      "critical_error_rate": 0.0625,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M) +grammar": {
+      "exact_rate": 0.75,
+      "single": 0.8333333333333334,
+      "multi_action": 0.5,
+      "negation": 0.5,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 0.5,
+      "no_action_precision": 0.8333333333333334,
+      "no_action_recall": 0.8333333333333334,
+      "critical_error_rate": 0.0625,
+      "pair_accuracy": null
+    },
+    "3m-q4_g64 (3.15M) +gate": {
+      "exact_rate": 0.625,
+      "single": 0.5,
+      "multi_action": 0.5,
+      "negation": 0.5,
+      "no_action": 1.0,
+      "correction": null,
+      "en": 0.25,
+      "no_action_precision": 0.5555555555555556,
+      "no_action_recall": 0.8333333333333334,
+      "critical_error_rate": 0.0625,
+      "pair_accuracy": null
+    }
+  }
+}

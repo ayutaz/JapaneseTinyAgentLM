@@ -1,156 +1,269 @@
 # firmware
 
-M5Stack CoreS3（StackChan K151）向けの firmware です。実機の構成と計測結果は [`docs/hardware.md`](../docs/hardware.md) を参照してください。
+M5Stack のスタックチャン（K151。CoreS3 と SCS0009 の servo × 2）で Action LM を動かす firmware です。実機の構成、座標の規約、dispatcher の設計、速度とメモリは [`../docs/hardware.md`](../docs/hardware.md) にあります。
 
-| Directory | 内容 | License |
+## この firmware がすること
+
+`jtalm_action` は次のことを本体だけで行います。Wi-Fi、NPU、外付けのモジュールは使いません。
+
+1. Flash の `model` partition（`0x200000`）にある `.jtlm`（モデルと tokenizer）を mmap で読む。
+2. USB serial から受けた1行の日本語の依頼を、grammar 付きの greedy と confidence gate で Action JSON にする。LM の本体は [`../runtime/host/`](../runtime/host/) の C のコードをそのまま build したもので、PC の PyTorch と同じ出力になる。
+3. 出力をもう一度検査し、角度に変換して制限してから、首（servo）と画面の顔（M5GFX、4種類）を動かす。
+4. 結果を `JTALM {json}` の1行ずつで serial に返す。
+
+**Servo の出力は起動時に off（dry-run）です。** 首が動くのは `!servo on` を送った後だけです。
+
+| Directory / ファイル | 内容 | License |
 |---|---|---|
-| `jtalm_eval/` | LM 評価用の最小 firmware（B3）。heap、Flash map、PSRAM / Flash mmap の帯域を `JTALM {json}` 形式で出力する。Servo と Wi-Fi は使わない | Apache-2.0 |
-| `jtalm_action/` | Action LM の firmware（B4、A1〜A3）。`model` partition の `.jtlm` を mmap し、serial から受けた1行の発話を grammar 付きの greedy と confidence gate で Action JSON にして、時間と一緒に `JTALM {json}` で返す。LM の本体は `runtime/host/` の source をそのまま build する。出力を実機側でもう一度検査し、servo の目標値と表情に変換して実行する（dispatcher）。**servo の出力は起動時に off（dry-run）**で、`!servo on` を送ったときだけ首が動く。画面に顔を出す（M5Unified / M5GFX）。Wi-Fi は使わない | Apache-2.0（M5Unified / M5GFX は MIT。下の「第三者のコード」） |
-| `baselines/esp32_llm/` | [doryiii/esp32-llm](https://github.com/doryiii/esp32-llm) を CoreS3 で動かすための sdkconfig の overlay と patch（B2.5） | Apache-2.0（patch の対象は上流の MIT のコード） |
-| `baselines/stackchan_idf/` | [ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf) を Docker で build するための Node.js の shim（B2。servo の確認は 2026-09-29 に実施済み） | Apache-2.0 |
-| `tools/serial_capture.py` | Serial log の取得。reset、prompt への自動応答、終了条件を指定できる | Apache-2.0 |
-| `tools/lm_serial.py` | `jtalm_action` に prompt を1件ずつ送り、応答を JSONL に保存する。host の runtime の出力と比べ、latency をまとめる。`--act` で dispatcher の計画（`act` の行）も保存する | Apache-2.0 |
-| `tools/dispatch_check.py` | dispatcher の計画を、Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz` で `!act` を使った validator の検査 | Apache-2.0 |
-| `tools/servo_test.py` | servo の動作確認の手順を流す（[`docs/hardware.md`](../docs/hardware.md) §12）。`--servo` を付けないと dry-run。`--only <文字列>` で一部の項目だけを流す。**`--servo` は首が動くので、ユーザーが立ち会うときだけ使う** | Apache-2.0 |
-| `tools/stackchan_chat.py` | `jtalm_action` と対話する。1行入力するごとに Action JSON を表示する。`--servo` で首も動かす。Hugging Face のモデルにも `firmware/stackchan_chat.py` として同梱する | Apache-2.0 |
-| `jtalm_action/licenses/` | 配布する firmware の binary に含まれる第三者のコード（ESP-IDF、newlib、FreeRTOS、M5Unified、M5GFX、Adafruit GFX の font）のライセンス | 各 upstream |
-| `third_party/` | 第三者の repository の clone。Git の管理外 | 各 upstream |
+| `jtalm_action/` | Action LM の firmware | Apache-2.0（第三者のコードは下の「第三者のコードとライセンス」） |
+| `jtalm_action/licenses/` | 配布する firmware の binary に含まれる第三者のコードのライセンス | 各 upstream |
+| `jtalm_eval/` | heap、flash map、PSRAM / flash mmap の帯域を測る最小の firmware | Apache-2.0 |
+| `tools/` | 実機と話す、計測する、照合するための Python のスクリプト | Apache-2.0 |
+| `baselines/` | 既存の runtime（esp32-llm）と stackchan-idf を CoreS3 で動かすための差分（[`baselines/README.md`](baselines/README.md)） | Apache-2.0 |
 
-## Build と書き込み
+## すぐに試す（ビルド済みのイメージ）
 
-Build は ESP-IDF v5.5.5 の Docker image で行い、書き込みは Windows から esptool で行います。書き込みの前に、Flash のバックアップの SHA-256 を確認してください（[`docs/development.md`](../docs/development.md) §5）。
+Hugging Face の [ayousanz/JapaneseTinyAgentLM-Action-3M](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) に、firmware とモデルを1つにした書き込み用のイメージ（`firmware/stackchan_k151_jtalm_action.bin`）と、対話用の `firmware/stackchan_chat.py` があります。
 
-```sh
-# jtalm_eval の build（Git Bash）
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W)/firmware:/fw" -w /fw/jtalm_eval \
+> **書き込むと、今入っている firmware（公式のスタックチャンの firmware など）は消えます。** 元に戻したい場合は、先に手順 1 でバックアップを取ってください。
+
+**0. 準備**
+
+```bash
+pip install esptool pyserial huggingface_hub
+hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgentLM-Action-3M
+```
+
+USB-C で PC につなぎ、port の名前を確かめます。以下の `<PORT>` は自分の port に置き換えてください（例: Windows は `COM3`、Linux は `/dev/ttyACM0`、macOS は `/dev/cu.usbmodem…`）。
+
+**1. バックアップ（任意。16MB、数分かかります）**
+
+```bash
+esptool --chip esp32s3 -p <PORT> -b 921600 read-flash 0 0x1000000 backup_k151.bin
+# 元に戻すとき: esptool --chip esp32s3 -p <PORT> -b 921600 write-flash 0x0 backup_k151.bin
+```
+
+**2. 書き込み**（bootloader、partition table、app、モデルを1つにしたイメージを `0x0` に書きます）
+
+```bash
+esptool --chip esp32s3 -p <PORT> -b 921600 write-flash 0x0 \
+  JapaneseTinyAgentLM-Action-3M/firmware/stackchan_k151_jtalm_action.bin
+```
+
+つながらないときは、本体の横のリセットボタンを緑の LED が点くまで約3秒押し続けて書き込みモードにしてから、やり直してください。書き込んだ後は、リセットボタンを1回押します。
+
+**3. 話しかける**
+
+```bash
+python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT>
+```
+
+```text
+準備ができました。依頼を入力してください（終了は Ctrl+C）。
+右を向いて
+→ [{"name":"look","arguments":{"direction":"right","amount":"normal"}}]  963 ms
+笑わないでね
+→ []  384 ms
+```
+
+画面に顔が出て、表情の依頼で顔が変わります。この段階では servo は off で、首は動きません（動きの計画だけを作ります）。
+
+**4. 首を動かす**
+
+```bash
+python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo
+```
+
+Servo の電源が入り、首がゆっくり正面に戻ってから、依頼に合わせて首が動きます。
+
+- **首のまわりに指やケーブルを近づけないでください。** 本体は平らな机に置いてください。
+- **画面に触れる、Ctrl+C を押す、`!stop` を送る、のどれかで、すぐに止まり servo の電源が切れます。** それでも止まらないときは、電源ボタンを長押しして電源を切ってください（USB を抜いてもバッテリーで動き続けます）。
+- 角度は firmware が制限します（左右 ±30°、上下 −10〜+15°）。
+
+## ソースから build する
+
+### 必要なもの
+
+- Docker と ESP-IDF v5.5.5 の公式 image（`espressif/idf:v5.5.5`）。PC に ESP-IDF を直接入れる必要はありません。
+- esptool 5 系（`pip install esptool`、または `uvx --from esptool esptool`）。
+- M5Unified 0.2.17 と M5GFX 0.2.23（MIT）。画面、タッチ、電源の初期化に使います。
+
+### M5Unified と M5GFX の取得
+
+`jtalm_action/CMakeLists.txt` は、`firmware/third_party/stackchan-idf/` の submodule にある M5Unified と M5GFX を、copy せずにそのまま build します。Repository の root で次を実行してください（`firmware/third_party/` は Git の管理外です）。
+
+```bash
+git clone https://github.com/ciniml/stackchan-idf.git firmware/third_party/stackchan-idf
+cd firmware/third_party/stackchan-idf
+git checkout 419385ef1b875137140085bd50d34dee331f30c2
+git submodule update --init --recursive   # M5Unified 0.2.17、M5GFX 0.2.23 など
+bash tools/apply-m5-patches.sh            # stackchan-idf の M5Unified 向けの小さな patch
+cd ../../..
+```
+
+- 配布しているイメージは、patch（M5Unified の Speaker と RTC の2か所）を当てた checkout で build しました。この firmware は speaker と RTC を使わないので、動作には影響しません（patch なしの build は確かめていません）。
+- 同じ version の別の checkout を使う場合は、`idf.py -DM5UNIFIED_DIR=<path> -DM5GFX_DIR=<path> build` で場所を指定します（M5GFX の directory 名は `m5gfx` にしてください）。
+
+### Build
+
+`jtalm_action` は `runtime/host/` のコードを参照するので、repository の root を container に mount します。
+
+```bash
+# Linux / macOS（repository の root で）
+docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$PWD:/w" -w /w/firmware/jtalm_action \
   espressif/idf:v5.5.5 idf.py build
 
-# 書き込み
+# Windows の Git Bash では、path の変換を止めて Windows 形式の path を渡します
+MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$(pwd -W):/w" \
+  -w /w/firmware/jtalm_action espressif/idf:v5.5.5 idf.py build
+```
+
+`firmware/jtalm_action/build/` に `bootloader/bootloader.bin`、`partition_table/partition-table.bin`、`jtalm_action.bin` ができます。
+
+### モデル（`.jtlm`）の入手
+
+Firmware が読むのは `.jtlm` 形式のファイル（モデルと tokenizer を1つにまとめたもの。形式は [`../docs/architecture.md`](../docs/architecture.md)）です。
+
+- **公開モデルを使う:** Hugging Face のモデルの repository にある `jtalm_action_3m_q4_g64.jtlm`（3M、INT4、1,971,456 B）。
+
+  ```bash
+  hf download ayousanz/JapaneseTinyAgentLM-Action-3M jtalm_action_3m_q4_g64.jtlm --local-dir .
+  ```
+
+- **自分で学習したモデルを使う:** checkpoint から書き出します（学習の手順は [`../docs/training.md`](../docs/training.md)）。`--out` の下に `<checkpoint の親 directory 名>_q4_g64.jtlm` ができます。
+
+  ```bash
+  uv run --group train python -m jtalm.model.export \
+    --ckpt <best.pt> --tokenizer <tokenizer.model> --bits 4 --out <出力先>
+  ```
+
+`model` partition は 14MB なので、3M なら FP32（12.9MB）まで入ります。5M の FP32（20.5MB）は入りません。
+
+### 書き込み
+
+App とモデルを、それぞれの offset に書きます（flash の配置は [`../docs/hardware.md`](../docs/hardware.md) の「Flash の配置」）。
+
+```bash
+cd firmware/jtalm_action/build
+esptool --chip esp32s3 -p <PORT> -b 921600 write-flash \
+  --flash-mode dio --flash-size 16MB --flash-freq 80m \
+  0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin \
+  0x10000 jtalm_action.bin 0x200000 <path>/jtalm_action_3m_q4_g64.jtlm
+
+# モデルだけを替えるときは 0x200000 だけを書けば足ります
+esptool --chip esp32s3 -p <PORT> -b 921600 write-flash 0x200000 <model>.jtlm
+```
+
+- `--flash-mode dio` は image header の値です。2nd stage bootloader が起動時に QIO へ切り替えます。
+- ESP-IDF の image に入っている esptool（4 系）ではなく、5 系を使ってください（`write-flash` のような hyphen の付いた subcommand は 5 系の書き方です）。
+- 起動時にモデルの SHA-256 の先頭 16 桁を `info` の行に出すので、どのモデルが動いているかを serial で確かめられます。
+
+## Serial の protocol
+
+USB-Serial/JTAG の console を使います。PC 側は 115200 bps で開いてください（USB なので実際の速度は baud rate によりません）。
+
+- **入力:** UTF-8 の1行が1件の依頼です（CR と LF のどちらも行末。空行は無視。先頭の BOM は取り除く。最大 1,023 byte）。`!` で始まる行は command です。待ち行列（4行）があふれると、`error`（`busy: line dropped`）を返して捨てます。
+- **出力:** 機械が読む行は、すべて `JTALM ` に続く1行の JSON です。`t` が種類を表します。それ以外の行（ESP-IDF の log など）は無視してください。
+
+起動すると `heap`、`load`（mmap した partition）、`info`（firmware、モデルの設定と SHA-256、arena の置き場所、gate）、`board`（画面と IO expander の初期化、servo は `dry`）、`face`（neutral）を出し、`ready` の後に入力を待ちます。
+
+| `t` | いつ | 主な項目 |
+|---|---|---|
+| `gen` | 依頼を1件処理した後 | `output`（gate の後の出力。dispatcher が実行するのはこれ）、`raw`（gate の前の出力）、`gated`、`gate`、`min_prob`、`ids`、`prompt_ids`、`n_prompt`、`n_gen`、`tok_ms`、`prefill_ms`、`decode_ms`、`total_ms`、`tok_s` |
+| `act` | `gen` の直後と `!act` / `!center` / `!servo on` の後 | `seq`、`src`（`lm` / `cmd` / `center` / `servo_on`）、`valid`、`err`、`calls`、`from` と `to`（[yaw, pitch] の度。右と上が正）、`steps`（move は目標の角度、raw、時間 ms、`clamped`。expr は表情）、`total_ms`、`queued`、`servo`（`dry` / `on`） |
+| `face` | 表情を変えたとき | `seq`、`expr`、`crc`（画面 320×240 の CRC-32）、`draw_us`、`push_us` |
+| `act_done` | 計画の実行が終わったとき | `seq`、`planned_ms`、`ms`、`sync_ms`（始点への移動）、`aborted`、`err`、`pose`、`present`（servo から読んだ raw。dry-run では −1） |
+| `stop` | 止めたとき | `src`（`stop` / `servo off` / `relax` / `touch` / `watchdog` など）、`power_off`、`torque_off`、`vm_off` |
+| `fault` | watchdog、servo の通信の error | `why`。続けて `stop` を出す |
+| `servo` | `!servo on` の後、`!servo` | 状態（`on` / `off`）、ping の応答時間、`vm_en`（IO expander から読み返した servo の電源）、`pose` |
+| `heap` | 起動の各段階、最初の依頼の後、`!heap` | 内部 SRAM と PSRAM の空き、最大連続ブロック、最小空き |
+| `ok` / `error` | 設定の command の後 / 失敗したとき | 変えた値 / `msg` |
+
+`gen` の行の形（値は省略）:
+
+```text
+JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"normal\"}}]","raw":"…","gated":0,"gate":0.868,"min_prob":…,"ids":[…],"prompt_ids":[…],"n_prompt":…,"n_gen":…,…,"total_ms":…}
+```
+
+### Command
+
+| Command | 内容 |
+|---|---|
+| `!servo on` | Servo の電源を入れ、両方が ping に答えるまで待ち（約 0.85 秒）、今の位置から正面へゆっくり戻す。**首が動く** |
+| `!stop`、`!servo off` | 実行中と待ち行列の計画を捨て、torque を切り、servo の電源を切って dry-run に戻る。**LM の処理中でもすぐに効く** |
+| `!relax` | torque だけを切る（すぐに効く） |
+| `!servo` | servo の状態を出す（すぐに効く） |
+| `!center` | 正面を向く |
+| `!act <json>` | LM を通さずに Action JSON を検査して実行する（例: `!act [{"name":"nod","arguments":{"count":2}}]`） |
+| `!gate <閾値>` | confidence gate の閾値を変える（例: `!gate 0.9`。0 で off） |
+| `!grammar 0\|1` | grammar による制約の off / on（既定 on） |
+| `!info`、`!heap` | firmware とモデルの情報、メモリ |
+| `!par 0\|1`、`!batch 0\|1` | 行列積を2つの core に分ける / prompt をまとめて処理する（どちらも既定 on。計測用） |
+| `!bench` | `expf` と1 step の forward の時間 |
+| `!autoload <trigger> <size>` | DCache の autoload の実験（既定 off。`-1` で off） |
+| `!servo probe` | dry-run のときだけ。電源を入れて ping し、位置を読んで電源を切る（goal も torque も送らない） |
+| `!wdtest` | dry-run のときだけ。期限を過ぎる計画を流して watchdog を確かめる |
+
+**画面に触れても `!stop` と同じになります。**
+
+## Confidence gate
+
+生成した token の確率の最小値（`min_prob`。grammar で制約する前の確率）が閾値より小さいと、`output` を `[]` にします（`jtalm.model.evaluate` の `gate` と同じ比較）。`raw` には gate の前の出力が残ります。
+
+- 既定値は `CONFIG_JTALM_GATE_PERMILLE=868`（千分率。0.868）です。採用モデル（データ v0.5.1 の 3M INT4）の validation だけで選んだ閾値 0.86808 に合わせています。
+- 定義は `jtalm_action/main/Kconfig.projbuild`（menu「JapaneseTinyAgentLM」）、既定値は `jtalm_action/sdkconfig.defaults` にあります。`idf.py menuconfig` で変えるか、`sdkconfig.defaults` を変えて生成済みの `sdkconfig` を消してから build し直します。
+- 実行中は `!gate <閾値>` で変えられます（再起動で既定値に戻ります）。
+- 別のモデルを書き込むときは、そのモデルの validation で選んだ閾値にしてください。
+
+## ツール
+
+`firmware/tools/` のスクリプトです。pyserial だけが必要なものは、`uv run --no-project --with pyserial python …` で project の依存を足さずに動きます（`pip install pyserial` でも構いません）。
+
+| ファイル | 内容 |
+|---|---|
+| `stackchan_chat.py` | 対話。1行入力するごとに Action JSON と時間を表示する。`--servo` で首も動かす。終了時に `!stop` を送る。Hugging Face のモデルにも同梱 |
+| `lm_serial.py` | 依頼を1件ずつ送り、応答を JSONL に保存し、latency をまとめる。`--ref` で host の runtime（`runtime/host/build/jtalm --grammar`）の出力と比べる。`--act` で dispatcher の計画（`act` の行）も保存する |
+| `dispatch_check.py` | dispatcher の計画を Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。Serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz N` で `!act` を使った validator の検査 |
+| `servo_test.py` | 首の動作確認の手順（`!act` の 16項目と、LM を通す 12項目。否定や雑談で動かないことを含む）を流す。`--servo` を付けないと dry-run。`--only <文字列>` で一部だけ |
+| `serial_capture.py` | Serial log の取得。`--reset`、prompt への自動応答（`--send-on`）、終了条件（`--until`）を指定できる |
+
+```bash
+# 依頼を送って保存する（prompts.txt は1行1件。.jsonl なら "prompt" の項目を使う）
+uv run --no-project --with pyserial python firmware/tools/lm_serial.py --port <PORT> --reset --act \
+  --cases prompts.txt --out out/device.jsonl
+# 計画を Python の参照と照合する（jtalm を import するので project の環境で動かす）
+uv run python firmware/tools/dispatch_check.py --results out/device.jsonl --log out/device.log
+# validator の検査（!act で 400件）
+uv run --with pyserial python firmware/tools/dispatch_check.py --port <PORT> --fuzz 400 --out out/fuzz.jsonl
+# 動作確認の手順を dry-run で流す（--servo を付けると首が動く）
+uv run --no-project --with pyserial python firmware/tools/servo_test.py --port <PORT> --out out/servo_test.jsonl
+# Serial log を 30 秒取る
+uv run --no-project --with pyserial python firmware/tools/serial_capture.py --port <PORT> --reset --seconds 30 --out out/boot.log
+```
+
+- 首を動かす前に、同じ手順を `--servo` なしで流して、計画（角度、raw、時間）を確かめてください。
+- `servo_test.py --servo` は、1項目ごとに計画を表示し、動き終わってから `--pause` 秒待ちます。`stop` や `fault` の行が出るか Ctrl+C で `!stop` を送って終わり、最後は正面に戻して `!servo off` にします。
+
+## jtalm_eval（計測用）
+
+LM を含まない最小の firmware です。Wi-Fi、画面、servo は使わず、GPIO も操作しません。起動時に device の情報、partition table、段階ごとの heap、PSRAM と flash mmap の読み出し帯域を `JTALM {json}` で出します。Serial から `b` を送ると帯域を測り直し、`h` で heap を出します。Partition table は `jtalm_action` と同じです。
+
+```bash
+docker run --rm -v "$PWD/firmware:/fw" -w /fw/jtalm_eval espressif/idf:v5.5.5 idf.py build
 cd firmware/jtalm_eval/build
-uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
+esptool --chip esp32s3 -p <PORT> -b 921600 write-flash \
   --flash-mode dio --flash-size 16MB --flash-freq 80m \
   0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin 0x10000 jtalm_eval.bin
-
-# Serial log（reset して30秒）
-uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
-  --port COM3 --reset --seconds 30 --out runs/device/jtalm_eval.log
 ```
 
-### jtalm_action（B4、A1〜A3）
+## 第三者のコードとライセンス
 
-**実機の現在の状態（2026-10-01）:** 採用モデルを v0.5.1 の 3M INT4（model の SHA-256 の先頭 `b90d0066075d92a2`）、gate の既定値を 0.868 に更新した（`docs/hardware.md` §11）。以下は 2026-09-29 時点の記録: A1〜A3 の `jtalm_action`（app の SHA-256 `0aff3e1a…abcdba01`。うなずきを 14°、900°/s² にした版）と v0.4 の 3M INT4（`runs/local/b4_v04/3m_q4_g64.jtlm`）を書き込み、confidence gate 0.970 を有効にしてあります。**servo の出力は off（dry-run）で、servo の電源（VM_EN）も切ってあります。** 首を動かす確認は、うなずきを変える前の版で済ませました（[`docs/hardware.md`](../docs/hardware.md) §12）。変更後のうなずきの目視は、`servo_test.py --servo --only うなずき` で、ユーザーの立ち会いのもとで行います。
-
-`runtime/host/` を参照するので、repository の root を mount します。画面には M5Unified と M5GFX を使い、`third_party/stackchan-idf` の submodule（下の stackchan-idf の手順で取得したもの）をそのまま build します（`CMakeLists.txt` の `M5UNIFIED_DIR` / `M5GFX_DIR`）。
-
-```sh
-# Build（Git Bash、repository の root で）
-MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$(pwd -W):/w"   -w /w/firmware/jtalm_action espressif/idf:v5.5.5 idf.py build
-
-# model の書き出し（採用モデル。2026-10-01 からは v0.5.1 の 3M: runs/vast/train_action_v051-20260930T152254Z/artifacts/v051/3m/best.pt → runs/local/v051_3m/3m_q4_g64.jtlm。以前は v0.4 の 3M）
-uv run --group train python -m jtalm.model.export   --ckpt runs/vast/train_action_v04-20260929T095441Z/artifacts/v04/3m/best.pt   --tokenizer tokenizer/out/action_v0_sp2048.model --bits 4 8 --out runs/local/b4_v04
-
-# 書き込み（app と model。model を替えるときは 0x200000 だけを書けばよい）
-cd firmware/jtalm_action/build
-uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash   --flash-mode dio --flash-size 16MB --flash-freq 80m   0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin   0x10000 jtalm_action.bin 0x200000 ../../../runs/local/b4_v04/3m_q4_g64.jtlm
-cd ../../..
-
-# 評価セットの先頭 200件を送り、host の出力（runtime/host/build/jtalm --grammar）と比べる
-# （host 側: prompts200.txt に同じ 200件を1行ずつ書き、
-#   runtime/host/build/jtalm -m <model>.jtlm -i prompts200.txt --grammar > host_d_v04_3m_q4_g64.jsonl）
-uv run --no-project --with pyserial python firmware/tools/lm_serial.py --port COM3 --reset   --cases datasets/action/v0/eval.jsonl --limit 200   --ref runs/device/b4/host_d_v04_3m_q4_g64.jsonl --out runs/device/b4/v04_3m_q4.jsonl
-# --limit を省くと評価セットの全 1,189件を送る（結果の例: results/b4_device/v04_3m_q4_g64_all.summary.json）
-```
-
-- `model` partition は 14MB なので、5M の FP32（20.5MB）は載りません。3M の FP32（12.9MB）は載ります。
-- 起動すると `load`（mmap）、`info`（model の設定、image の SHA-256 の先頭 16 桁、arena の置き場所）、`heap` を出し、`ready` の後に入力を待ちます。
-- 1行が1件の発話です（UTF-8、CR / LF の両方を行末とみなす）。応答は `JTALM {"t":"gen","output":...,"raw":...,"gated":0|1,"gate":0.970,"min_prob":...,"ids":[...],"prompt_ids":[...],"n_prompt":...,"n_gen":...,"tok_ms":...,"prefill_ms":...,"decode_ms":...,"total_ms":...,"ms_per_fwd":...,"tok_s":...}` の1行です。最初の要求の後に `heap`（`first_request`）を出します。
-- **Confidence gate:** 生成した token の確率の最小値（`min_prob`。grammar で制約する前の確率）が閾値より小さいと、`output` を `[]` にします（`jtalm.model.evaluate` の `gate` と同じ）。`raw` は gate をかける前の出力です。閾値は `sdkconfig.defaults` の `CONFIG_JTALM_GATE_PERMILLE`（千分率、既定 970 = 0.970。`main/Kconfig.projbuild`）で決め、実行中は `!gate 0.97` で変えられます（0 で off）。`lm_serial.py` は、host の出力に同じ gate をかけたものとも比べます。
-- `!` で始まる行は command です: `!info`、`!heap`、`!grammar 0|1`、`!gate <閾値>`、`!par 0|1`（行列積を2つの core に分ける。既定は 1）、`!batch 0|1`（prompt のまとめ処理。0 は1 token ずつ）、`!bench`（`expf` と1 step の forward の時間）、`!autoload T S`（DCache の autoload の実験用。既定は off）。
-- **Dispatcher（A1〜A3）:** `gen` の行の後に、gate の後の `output` を実機で検査して計画した結果を `JTALM {"t":"act","seq":..,"valid":..,"err":..,"calls":[..],"from":[yaw,pitch],"steps":[..],"to":[..],"total_ms":..,"queued":..,"servo":"dry"|"on"}` の1行で出します（角度は度、右と上が正。`steps` の各 move は目標の角度、raw、時間 ms、soft limit で制限したか）。計画は dispatcher の task が順に実行し、表情を変えるたびに `face`（表情、画面 320×240 の CRC-32、描画と転送の時間）、終わると `act_done`（実際の時間、中断したか、servo の実際の位置）を出します。`gen` の行の中身と LM の処理は B4 と同じです。
-- **Servo の command:** `!servo on`（servo の電源を入れて ping し、今の位置から正面へゆっくり戻す。**首が動く**）、`!center`（正面へ）、`!act <json>`（LM を通さずに Action JSON を実行する）。次の3つは LM の処理中でもすぐに効きます: `!stop` と `!servo off`（実行中と待ち行列の計画を捨て、torque を切り、servo の電源を切って dry-run に戻る）、`!relax`（torque だけを切る）、`!servo`（状態。`vm_en` は IO expander から読み返した servo 電源の状態）。**画面に触れても `!stop` と同じになります。** `!wdtest` は dry-run のときだけ、期限を過ぎる計画を流して watchdog を確かめます。`!servo probe` は servo の出力が off のときだけ、電源を入れて ping し、位置を読んで電源を切ります（goal も torque も送らない。IO expander の register も出す）。
-- 設計（角度、制限、動きの滑らかさ、うなずき、watchdog）と計測結果は [`docs/hardware.md`](../docs/hardware.md) §12 にあります。
-
-```sh
-# 評価セットの先頭 200件: LM の出力の一致（--ref）と、dispatcher の計画（--act）を保存する
-uv run --no-project --with pyserial python firmware/tools/lm_serial.py --port COM3 --reset --act \
-  --cases datasets/action/v0/eval.jsonl --limit 200 \
-  --ref runs/device/b4/host_d_v04_3m_q4_g64.jsonl --out runs/device/a1/eval200.jsonl
-# 計画を Python の参照と照合する（log の act_done / face / fault も確かめる）
-uv run python firmware/tools/dispatch_check.py --results runs/device/a1/eval200.jsonl \
-  --log runs/device/a1/eval200.log --out runs/device/a1/eval200_dispatch
-# validator の検査（!act で 400件。valid / invalid と計画を Python と比べる）
-uv run --with pyserial python firmware/tools/dispatch_check.py --port COM3 --fuzz 400 \
-  --out runs/device/a1/fuzz.jsonl
-# servo の動作確認の手順を dry-run で流す（--servo を付けると首が動く。docs/hardware.md §12）
-uv run --no-project --with pyserial python firmware/tools/servo_test.py --port COM3 \
-  --out runs/device/a1/servo_test_dry.jsonl
-```
-
-#### 第三者のコード（jtalm_action）
+この directory のコードは Apache-2.0 です。配布する firmware の binary には次の第三者のコードが含まれ、ライセンスの全文は [`jtalm_action/licenses/`](jtalm_action/licenses/README.md) にあります。Binary を配布するときは、このフォルダを添えてください。`0x200000` に書くモデルのデータは CC BY-SA 4.0 です。
 
 | 対象 | 使い方 | License |
 |---|---|---|
-| M5Unified 0.2.17（`8108bfad`）、M5GFX 0.2.23（`27e1ef0f`） | `firmware/third_party/stackchan-idf/` の submodule を、copy せずにそのまま build する（画面、touch、電源の初期化と顔の描画） | MIT（© 2021 M5Stack）。firmware の binary を配布するときは、両者の LICENSE の表示を添える |
-| stackchan-idf（`419385ef1b87`）の `components/scs_servo` と `components/board/io_expander_py32.cpp` | コードは copy していない。SCS0009 の register（torque 0x28、goal 0x2A、present 0x38、big-endian）と PY32L020 の register（version 0x02、GPIO mode 0x03、output 0x05、VM_EN は pin 0）を参考にした。SCS の driver（`main/servo.c`）は自前 | BSL-1.0（© Kenta IDA） |
+| ESP-IDF v5.5.5（newlib、FreeRTOS を含む） | bootloader、driver、C library、task | Apache-2.0 ほか（`licenses/README.md`） |
+| M5Unified 0.2.17、M5GFX 0.2.23（M5GFX が同梱する Adafruit GFX の font を含む） | 画面、タッチ、電源の初期化と顔の描画。stackchan-idf の submodule をそのまま build する | MIT（font は BSD-2-Clause） |
+| stackchan-idf の `components/scs_servo`、`components/board/io_expander_py32.cpp` | コードは copy していない。SCS0009 の register（torque `0x28`、goal `0x2A`、現在位置 `0x38`、big-endian）と PY32L020 の register（version `0x02`、GPIO mode `0x03`、output `0x05`、`VM_EN` は pin 0）を参考にした。SCS の driver（`main/servo.c`）は自前 | BSL-1.0 |
 
-- build に使った M5Unified の checkout には、stackchan-idf の `tools/apply-m5-patches.sh` の patch（Speaker と RTC の2か所）が当たっています。この firmware は speaker と RTC を使わないので影響しません（patch を当てない checkout での build は未確認）。
-- M5GFX の自動判別は、この個体を `board_M5StackChan`（CoreS3 と同じ扱い）と判定します。M5Unified は speaker、mic、IMU、RTC を使わない設定で初期化します。
-
-### esp32-llm（B2.5）
-
-```sh
-cd firmware/third_party
-git clone https://github.com/doryiii/esp32-llm.git
-cd esp32-llm && git checkout c6c647f7bfbb74efd2bbfd9a1725da4a903589f4
-git apply ../../baselines/esp32_llm/cores3.patch
-cd ../../..
-
-# INT8（stories3M）。追加の依存はないので component manager を止める
-MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 \
-  -v "$(pwd -W)/firmware:/fw" -w /fw/third_party/esp32-llm espressif/idf:v5.5.5 bash -c '
-  D="sdkconfig.defaults;/fw/baselines/esp32_llm/sdkconfig.cores3"
-  idf.py -B build_int8 -D SDKCONFIG=build_int8/sdkconfig -D SDKCONFIG_DEFAULTS="$D" set-target esp32s3 &&
-  idf.py -B build_int8 -D SDKCONFIG=build_int8/sdkconfig -D SDKCONFIG_DEFAULTS="$D" build'
-
-cd firmware/third_party/esp32-llm/build_int8
-uvx --from esptool esptool --chip esp32s3 -p COM3 -b 921600 write-flash \
-  --flash-mode dio --flash-size 16MB --flash-freq 80m \
-  0x0 bootloader/bootloader.bin 0x8000 partition_table/partition-table.bin \
-  0x10000 llm.bin 0x210000 storage.bin
-
-# 3回生成して log を取る（"Press Enter" に改行を返す）
-uv run --no-project --with pyserial python firmware/tools/serial_capture.py \
-  --port COM3 --reset --seconds 400 --send-on "Press Enter to" "" --max-sends 3 \
-  --until "forward-only" --until-count 3 --out runs/device/esp32_llm_int8.log
-```
-
-FP32（stories260K）は `sdkconfig.fp32` も `SDKCONFIG_DEFAULTS` に加え、build dir を `build_fp32` にします。FP32 は `espressif/esp-dsp` を Component Registry から取得するので、`IDF_COMPONENT_MANAGER=0` は付けません。SPIFFS の image（`storage.bin`）は INT8 と同じなので、INT8 の後なら app だけを書き込めば足ります。
-
-### stackchan-idf（B2。書き込むと servo が動く）
-
-**書き込みは、ユーザーが立ち会うときだけ行います。** 2026-09-29 にユーザーの立ち会いのもとで確認を終えました（中立は yaw 460 / pitch 620、ロボット自身の右へ回すと yaw の raw が減る）。手順と結果は [`docs/hardware.md`](../docs/hardware.md) §10 を参照してください。確認の後は Flash 全体を消して `jtalm_action` に戻しました。
-
-```sh
-cd firmware/third_party
-git clone https://github.com/ciniml/stackchan-idf.git
-cd stackchan-idf && git checkout 419385ef1b875137140085bd50d34dee331f30c2
-git submodule update --init --recursive
-bash tools/apply-m5-patches.sh
-
-# Build 中の Node.js の2工程を Windows 側で先に実行し、container 用の shim を置く
-mkdir -p .hostnode
-node tools/avatar_dsl/cli.mjs assets/default_face.avdsl .hostnode/default_face.avbc
-node tools/avatar_dsl/inject.mjs components/wifi_config_service/web/settings_wifi.html \
-  .hostnode/settings_wifi.html default=assets/default_face.avdsl \
-  omega=assets/omega_mouth.avdsl aokko=assets/aokko_face.avdsl
-cp ../../baselines/stackchan_idf/node .hostnode/node
-cd ../../..
-
-MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W)/firmware:/fw" \
-  -w /fw/third_party/stackchan-idf espressif/idf:v5.5.5 bash -c '
-  export PATH=/fw/third_party/stackchan-idf/.hostnode:$PATH
-  git config --global --add safe.directory "*"
-  D="sdkconfig.defaults;sdkconfig.defaults.esp32s3;sdkconfig.defaults.cores3"
-  idf.py -B build-cores3 -DSDKCONFIG=build-cores3/sdkconfig -DSDKCONFIG_DEFAULTS="$D" set-target esp32s3 &&
-  idf.py -B build-cores3 -DSDKCONFIG=build-cores3/sdkconfig -DSDKCONFIG_DEFAULTS="$D" build'
-```
+既存の runtime（esp32-llm）と stackchan-idf を CoreS3 で動かした手順は [`baselines/README.md`](baselines/README.md) にあります。

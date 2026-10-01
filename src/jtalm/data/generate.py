@@ -7,7 +7,7 @@ Runs in phases so only one model needs to be on the GPU at a time:
 1. ``eval-gen``      eval generator (llm-jp) writes eval sentences, contrastive pairs, English
 2. ``train-gen``     train generator (Qwen3) writes train sentences
 3. ``eval-verify``   train generator (Qwen3) parses the eval sentences
-4. ``train-verify``  eval generator (llm-jp) parses the train sentences
+4. ``train-verify``  the config's ``train_verifier`` (Qwen3 since v0.2) parses the train sentences
 
 ``jtalm.data.build`` later keeps a sentence only if the parse equals the spec label.
 """

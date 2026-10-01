@@ -35,5 +35,5 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
 CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=n
 
-# Confidence gate: outputs whose min token probability is below 0.970 become [] (x 1/1000)
+# Confidence gate: outputs whose min token probability is below 0.868 become [] (x 1/1000; chosen on validation)
 CONFIG_JTALM_GATE_PERMILLE=868
