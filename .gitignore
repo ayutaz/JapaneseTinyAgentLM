@@ -94,3 +94,6 @@ datasets/action/
 # ==== Firmware: third-party clones and generated sdkconfig (sdkconfig.defaults is the source) ====
 firmware/third_party/
 firmware/*/sdkconfig
+
+# ==== WebAssembly build (runtime/web/build.sh) ====
+runtime/web/jtalm.js

@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JapaneseTinyAgentLM Action 3M</title>
+<style>
+:root {
+  --bg: #fafaf7; --fg: #1d1d1b; --muted: #6b6b66; --card: #ffffff; --line: #e2e1db;
+  --accent: #c2410c; --ok: #15803d; --ng: #b91c1c; --code: #f3f2ee;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --fg: #ecebe6; --muted: #a3a29b; --card: #1f1f1c; --line: #34332f;
+    --accent: #fb923c; --ok: #4ade80; --ng: #f87171; --code: #2a2a26;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --fg: #ecebe6; --muted: #a3a29b; --card: #1f1f1c; --line: #34332f;
+  --accent: #fb923c; --ok: #4ade80; --ng: #f87171; --code: #2a2a26;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.7 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif;
+}
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 1.5rem; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 16px 0; }
+.note { font-size: 0.92rem; }
+.note ul { margin: 6px 0; padding-left: 1.2em; }
+code { background: var(--code); border-radius: 4px; padding: 0 4px; font-size: 0.9em; }
+form { display: flex; gap: 8px; flex-wrap: wrap; }
+input[type=text] {
+  flex: 1 1 260px; min-width: 0; font: inherit; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+}
+button {
+  font: inherit; border: 0; border-radius: 8px; padding: 10px 18px; cursor: pointer;
+  background: var(--accent); color: #fff; font-weight: 600;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.chip {
+  background: transparent; color: var(--fg); border: 1px solid var(--line); font-weight: 400;
+  padding: 3px 10px; border-radius: 999px; font-size: 0.88rem;
+}
+.gate { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 0.9rem; color: var(--muted); flex-wrap: wrap; }
+.gate input { flex: 1 1 160px; }
+.result .summary { font-size: 1.25rem; font-weight: 600; margin: 0 0 8px; }
+.grid { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; font-size: 0.92rem; }
+.grid dt { color: var(--muted); }
+.grid dd { margin: 0; overflow-wrap: anywhere; }
+pre { background: var(--code); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: 0.85rem; margin: 8px 0 0; }
+.pass { color: var(--ok); } .cut { color: var(--ng); }
+table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { color: var(--muted); font-weight: 500; }
+td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.status { color: var(--muted); font-size: 0.9rem; }
+a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>JapaneseTinyAgentLM Action 3M</h1>
+  <p class="sub">日本語の依頼文 → スタックチャンの動作（JSON）。約 300 万パラメータ、ブラウザの中だけで動きます。</p>
+
+  <div class="card note">
+    <ul>
+      <li><strong>会話のモデルではありません。</strong>返すのは次の3種類の動作を最大2個まで並べた JSON だけです:
+        <code>look</code>（首を向ける: 左右上下・正面、少し/普通/大きく）、<code>set_expression</code>（表情: 笑顔/悲しい/驚き/普通）、<code>nod</code>（うなずく: 1〜3回）。</li>
+      <li>動作の依頼でない文、否定された依頼、このロボットにできない依頼には <code>[]</code>（何もしない）を返すように学習しています。</li>
+      <li>生成した token の確率の最小値（確信度）が閾値より低いときは、出力を <code>[]</code> に取り消します（gate）。</li>
+      <li>計算は ESP32-S3 の firmware と同じ C の runtime を WebAssembly にしたもので、重みも実機と同じ INT4 の <code>.jtlm</code> です。入力した文はどこにも送られません。</li>
+    </ul>
+    モデル: <a href="https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M">ayousanz/JapaneseTinyAgentLM-Action-3M</a> ・
+    コード: <a href="https://github.com/ayutaz/JapaneseTinyAgentLM">GitHub</a>
+  </div>
+
+  <div class="card">
+    <form id="form">
+      <input id="text" type="text" placeholder="例: 少し右を向いてから、うなずいて" autocomplete="off" disabled>
+      <button id="run" type="submit" disabled>実行</button>
+    </form>
+    <div class="gate">
+      <label for="gate">確信度の閾値</label>
+      <input id="gate" type="range" min="0" max="1" step="0.001">
+      <span id="gateValue"></span>
+      <button id="gateReset" class="chip" type="button">既定に戻す</button>
+    </div>
+    <div class="chips" id="examples"></div>
+    <p class="status" id="status">モデルを読み込んでいます…</p>
+  </div>
+
+  <div class="card result" id="result" hidden>
+    <p class="summary" id="summary"></p>
+    <dl class="grid">
+      <dt>確信度</dt><dd id="confidence"></dd>
+      <dt>gate 前の出力</dt><dd><code id="raw"></code></dd>
+      <dt>時間</dt><dd id="time"></dd>
+    </dl>
+    <pre id="json"></pre>
+  </div>
+
+  <div class="card" id="historyCard" hidden>
+    <table>
+      <thead><tr><th>入力</th><th>動作</th><th>確信度</th></tr></thead>
+      <tbody id="history"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="jtalm.js"></script>
+<script>
+const REPO = "https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M/resolve/main/";
+const EXAMPLES = [
+  "右を向いて", "ほんの少し左を向いてくれる?", "少し上を向いてから、二回うなずいて",
+  "左を見て、真ん中に戻ってきて。", "いや、下は見なくて大丈夫。上を向いてみて!", "ほら 笑顔を見せて",
+  "笑わないでね", "右むかないで、ちょっとやめといてくれる?", "まっすぐ行って、右に曲がってください。",
+  "こんにちは", "今日の天気はどう?",
+];
+const DIRECTION = { left: "左", right: "右", up: "上", down: "下", center: "正面" };
+const AMOUNT = { slight: "少し", normal: "", large: "大きく" };
+const EXPRESSION = { happy: "笑顔", sad: "悲しい顔", surprised: "驚いた顔", neutral: "普通の顔" };
+const $ = (id) => document.getElementById(id);
+let predict, defaultGate = 0.868, last = null;
+
+function describe(call) {
+  const a = call.arguments;
+  if (call.name === "look") {
+    return a.direction === "center" ? "正面を向く" : `${AMOUNT[a.amount]}${DIRECTION[a.direction]}を向く`;
+  }
+  if (call.name === "set_expression") return `${EXPRESSION[a.expression]}にする`;
+  return `${a.count}回うなずく`;
+}
+
+function gated(r, gate) {
+  const pass = r.min_prob >= gate;
+  const actions = pass ? r.raw : [];
+  let summary = actions.length ? actions.map(describe).join(" → ") : "何もしない";
+  if (!pass && r.raw.length) summary += "（確信度が閾値より低いので取り消し）";
+  return { pass, actions, summary };
+}
+
+function show() {
+  if (!last) return;
+  const gate = Number($("gate").value);
+  const g = gated(last.r, gate);
+  $("result").hidden = false;
+  $("summary").textContent = g.summary;
+  $("confidence").innerHTML = `${last.r.min_prob.toFixed(4)}（閾値 ${gate.toFixed(3)}: ` +
+    `<span class="${g.pass ? "pass" : "cut"}">${g.pass ? "通過" : "取り消し"}</span>）`;
+  $("raw").textContent = JSON.stringify(last.r.raw);
+  $("time").textContent = `${last.ms.toFixed(0)} ms（入力 ${last.r.tokens} token）`;
+  $("json").textContent = JSON.stringify(g.actions, null, 1);
+}
+
+function run(text) {
+  text = text.trim();
+  if (!text || !predict) return;
+  const t0 = performance.now();
+  const r = JSON.parse(predict(text));
+  const ms = performance.now() - t0;
+  if (r.error) { $("status").textContent = `エラー: ${r.error}`; return; }
+  last = { text, r, ms };
+  show();
+  const g = gated(r, Number($("gate").value));
+  const tr = document.createElement("tr");
+  for (const [v, cls] of [[text, ""], [g.summary, ""], [r.min_prob.toFixed(4), "num"]]) {
+    const td = document.createElement("td");
+    td.textContent = v;
+    if (cls) td.className = cls;
+    tr.appendChild(td);
+  }
+  $("history").prepend(tr);
+  $("historyCard").hidden = false;
+}
+
+function setGate(v) { $("gate").value = v; $("gateValue").textContent = Number(v).toFixed(3); }
+
+for (const e of EXAMPLES) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chip"; b.textContent = e;
+  b.onclick = () => { $("text").value = e; run(e); };
+  $("examples").appendChild(b);
+}
+$("form").onsubmit = (ev) => { ev.preventDefault(); run($("text").value); };
+$("gate").oninput = () => { setGate($("gate").value); show(); };
+$("gateReset").onclick = () => { setGate(defaultGate); show(); };
+setGate(defaultGate);
+
+(async () => {
+  try {
+    const [M, model, config] = await Promise.all([
+      createJtalm(),
+      fetch(REPO + "jtalm_action_3m_q4_g64.jtlm").then((r) => {
+        if (!r.ok) throw new Error(`model: HTTP ${r.status}`);
+        return r.arrayBuffer();
+      }),
+      fetch(REPO + "config.json").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    if (config && typeof config.gate_threshold === "number") defaultGate = config.gate_threshold;
+    setGate(defaultGate);
+    const bytes = new Uint8Array(model);
+    const p = M._malloc(bytes.length);
+    M.HEAPU8.set(bytes, p);
+    const rc = M._web_init(p, bytes.length);
+    if (rc !== 0) throw new Error(`init failed (${rc})`);
+    predict = M.cwrap("web_predict", "string", ["string"]);
+    $("text").disabled = $("run").disabled = false;
+    $("text").focus();
+    $("status").textContent = `準備ができました（モデル ${(bytes.length / 1e6).toFixed(2)} MB）。`;
+  } catch (e) {
+    $("status").textContent = `読み込みに失敗しました: ${e.message}`;
+  }
+})();
+</script>
+</body>
+</html>
