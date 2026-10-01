@@ -21,7 +21,7 @@ import serial
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", default="COM3")
+    ap.add_argument("--port", required=True, help="serial port, e.g. COM3 or /dev/ttyACM0")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--seconds", type=float, default=30.0)
     ap.add_argument("--reset", action="store_true", help="hard reset via RTS first")

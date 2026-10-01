@@ -35,13 +35,11 @@
   },
   "commit": "6a93cc07334cdf3a8f88a4b7ef7d72c0293f2570",
   "offer": {
-    "id": 29555911,
     "gpu_name": "RTX 3090",
     "gpu_ram": 24576,
     "dph_total": 0.2009259259259259,
     "geolocation": "Bulgaria, BG"
   },
-  "instance_id": 53323853,
   "driver_version": "580.95.05",
   "cuda_max_good": 13.0,
   "steps": [

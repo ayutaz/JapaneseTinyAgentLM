@@ -139,7 +139,7 @@ def run_item(dev: Device, label: str, line: str, expect: str | None, f, keep: li
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", default="COM3")
+    ap.add_argument("--port", required=True, help="serial port, e.g. COM3 or /dev/ttyACM0")
     ap.add_argument("--servo", action="store_true", help="turn servo output ON (head moves)")
     ap.add_argument("--section", choices=["act", "lm", "all"], default="all")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between items")

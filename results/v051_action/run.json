@@ -31,13 +31,11 @@
   },
   "commit": "d6e05e3c0b51445a4f50b0e46b89ad0156a04e34",
   "offer": {
-    "id": 48366923,
     "gpu_name": "RTX 3090",
     "gpu_ram": 24576,
     "dph_total": 0.1613888888888889,
     "geolocation": "Shanghai, CN"
   },
-  "instance_id": 53545562,
   "driver_version": "580.142",
   "cuda_max_good": 13.0,
   "steps": [

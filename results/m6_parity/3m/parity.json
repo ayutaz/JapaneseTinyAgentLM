@@ -1,6 +1,6 @@
 {
   "ckpt": "runs\\vast\\train_action_v0-20260929T054319Z\\artifacts\\m4\\3m\\best.pt",
-  "cases": "C:\\Users\\yuta\\Desktop\\Private\\JapaneseTinyAgentLM\\datasets\\action\\v0\\eval.jsonl",
+  "cases": "datasets/action/v0/eval.jsonl",
   "tokenization": {
     "train.jsonl": {
       "n": 9067,

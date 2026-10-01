@@ -156,7 +156,7 @@ def summarize(results: list[dict], ref: list[dict] | None) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", default="COM3")
+    ap.add_argument("--port", required=True, help="serial port, e.g. COM3 or /dev/ttyACM0")
     ap.add_argument("--reset", action="store_true", help="reset the chip and wait for 'ready'")
     ap.add_argument("--cases", type=Path, required=True, help=".jsonl with 'prompt', or .txt")
     ap.add_argument("--limit", type=int, default=0)

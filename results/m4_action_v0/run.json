@@ -27,7 +27,6 @@
     ]
   },
   "offer": {
-    "id": 44696064,
     "gpu_name": "Tesla V100",
     "gpu_ram": 32768,
     "dph_total": 0.2188888888888889,
@@ -41,7 +40,6 @@
     "tokenizer/out/action_v0_sp2048.model": "61482f902f844f514ec443ed7e2496011adbf23cee26d44057385d495db2d3f4"
   },
   "commit": "f5edad375859fd88f58a6a3ed2a5a3eb8cc7e4c0",
-  "instance_id": 53311740,
   "driver_version": "580.173.02",
   "cuda_max_good": 13.0,
   "steps": [

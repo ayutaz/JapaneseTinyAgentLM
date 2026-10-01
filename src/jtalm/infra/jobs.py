@@ -349,6 +349,8 @@ GEN_EVAL_V2 = JobSpec(
 # Data v0.5 (after the human-written evaluation): the seven training writers write the focused
 # slices (jtalm.data.focus), and the v0.4 3M model mines hard negatives from human-written text
 # outside the evaluation pool; Qwen3 verifies everything at temperature 0.
+# The checkpoint is the output of the train_action_v04 job on the maintainer's machine (runs/ is
+# gitignored); to rerun this job, point it at your own train_action_v04 output.
 V04_CKPT = "runs/vast/train_action_v04-20260929T095441Z/artifacts/v04/3m/best.pt"
 MINE_POOL = "datasets/raw/mine_pool/pool.jsonl"
 
