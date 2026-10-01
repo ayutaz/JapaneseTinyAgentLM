@@ -589,6 +589,71 @@ TRAIN_ACTION_V0_SCALING = JobSpec(
     uploads=TRAIN_ACTION_V0.uploads,
 )
 
+# Data v1.0 (schema v1): llm-jp writes eval v3 and the Stack-chan paraphrases; five writers
+# write the new training sentences; Qwen3 verifies everything and re-parses the inherited
+# v0.5.1 data and the older evaluation sets under schema v1 (reverify).
+V1_WRITERS = [w for w in V04_WRITERS if w[0] in ("abeja", "calm3", "elyza", "nemoja")]
+V1_RAW = "artifacts/gen_action_v1"
+STACKCHAN_SOURCES = "datasets/action/stackchan_v1/sources.jsonl"
+V1_REVERIFY_INPUTS = [
+    "datasets/action/v0.5.1/train.jsonl", "datasets/action/v0.5.1/val.jsonl",
+    "datasets/action/v0/eval.jsonl", "datasets/action/human_v1/eval.jsonl",
+    *[f"datasets/action/eval_v2/{s}.jsonl" for s in (
+        "amount_words", "center_phrasing", "correction", "english", "fragments", "long_preface",
+        "negation_forms", "numbers", "order_words", "orthography", "question_forms",
+        "unexecutable")],
+]  # fmt: skip
+
+
+def _v1_steps() -> list[str]:
+    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", sync(), f"mkdir -p {V1_RAW}"]
+    steps += [
+        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
+        generate("eval-gen", "configs/eval_v3.json", f"{V1_RAW}/raw1_eval"),
+        generate("eval-gen", "configs/stackchan_v1_paraphrase.json", f"{V1_RAW}/raw1_paraphrase"),
+        f"{STOP_VLLM}; {_drop_weights(EVAL_MODEL)}",
+    ]
+    for name, hf_id, mem in V1_WRITERS:
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", f"configs/action_v1_{name}.json", f"{V1_RAW}/raw1_{name}")
+        steps += [
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v1_qwen.json", f"{V1_RAW}/raw1_qwen"),
+    ]
+    for name in [n for n, _, _ in V1_WRITERS] + ["qwen"]:
+        out = f"{V1_RAW}/raw1_{name}"
+        verify = generate("train-verify", f"configs/action_v1_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    steps += [
+        generate("eval-verify", "configs/eval_v3.json", f"{V1_RAW}/raw1_eval"),
+        generate(
+            "eval-verify", "configs/stackchan_v1_paraphrase.json", f"{V1_RAW}/raw1_paraphrase"
+        ),
+        generate("reverify", "configs/action_v1_qwen.json", f"{V1_RAW}/reverify1")
+        + " --input "
+        + " ".join([*V1_REVERIFY_INPUTS, STACKCHAN_SOURCES]),
+    ]
+    return steps
+
+
+GEN_ACTION_V1 = JobSpec(
+    name="gen_action_v1",
+    description=(
+        "Data v1.0: eval v3 + Stack-chan paraphrases (llm-jp), 5 writers, Qwen3 verifies and "
+        "re-parses v0.5.1 and the older eval sets under schema v1"
+    ),
+    query=f"gpu_ram>=79 {BASE_QUERY}".replace("disk_space>=120", "disk_space>=200"),
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=6.0,
+    steps=_v1_steps(),
+    uploads=[*V1_REVERIFY_INPUTS, STACKCHAN_SOURCES],
+)
+
 JOBS: dict[str, JobSpec] = {
     job.name: job
     for job in (
@@ -610,5 +675,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V051B,
         TRAIN_ACTION_V051,
         TRAIN_ACTION_V051_SEEDS,
+        GEN_ACTION_V1,
     )
 }
