@@ -1,0 +1,11 @@
+version: "0.1.0"
+description: "JapaneseTinyAgentLM runtime: loads a .jtlm model in place (flash mmap), SentencePiece-compatible tokenizer, greedy decoding with a KV cache and the Action schema v0 grammar. Portable C11, no dependencies."
+license: "Apache-2.0"
+url: "https://github.com/ayutaz/JapaneseTinyAgentLM"
+repository: "https://github.com/ayutaz/JapaneseTinyAgentLM.git"
+documentation: "https://github.com/ayutaz/JapaneseTinyAgentLM/blob/main/runtime/host/README.md"
+files:
+  exclude:
+    - "build/**/*"
+dependencies:
+  idf: ">=5.0"

@@ -76,7 +76,7 @@ Baseline:
 | OTA と recovery | OTA / rollback / recovery の partition を残した構成は未検討です |
 | データの公開 | v0.3 以降の学習データと eval v2 を公開するかは未定です |
 | 先行例の調査 | 特許、非公開の製品、索引されない国内発表は調べていません（[prior_art.md](prior_art.md)） |
-| Action の拡張 | ESP-IDF component としての runtime の切り出しと、tool を追加するための fine-tuning の手順は未整備です |
+| Action の拡張 | tool を追加するための fine-tuning の手順は未整備です（runtime は ESP-IDF の component として使えます。[runtime/host/README.md](../runtime/host/README.md)） |
 
 ## 貢献
 

@@ -31,6 +31,74 @@ docker run --rm -v "$PWD:/w" -w /w --entrypoint make espressif/idf:v5.5.5 -C run
 
 内積の累積は既定で `double` です（PyTorch との差を小さくするため）。単精度の FPU しかない ESP32-S3 では `-DJTLM_ACC=float` で build します。
 
+CMake のプロジェクトからは、`add_subdirectory(runtime/host)` で static library の `jtalm` として使えます（`main.c` は含みません）。
+
+## ESP-IDF の component として使う
+
+このディレクトリは ESP-IDF の component でもあります（`CMakeLists.txt`、`idf_component.yml`）。自分の ESP-IDF プロジェクトの `main/idf_component.yml` に次のように書くと、component manager がこのディレクトリだけを取り込みます。
+
+```yaml
+dependencies:
+  jtalm:
+    git: https://github.com/ayutaz/JapaneseTinyAgentLM.git
+    path: runtime/host
+    version: main  # 固定するときは commit の hash
+```
+
+`main/CMakeLists.txt` の `REQUIRES`（または `PRIV_REQUIRES`）に `jtalm` を加えると、`#include "jtalm.h"` で使えます。component としての build では、実機で PC との一致を確かめた設定（`-DJTLM_ACC=float -ffp-contract=off`）を自動で付けます。このリポジトリの firmware も、[`firmware/jtalm_action/components/jtalm/`](../../firmware/jtalm_action/components/jtalm/CMakeLists.txt) から同じ `CMakeLists.txt` を読み込んで build しています。
+
+`.jtlm` を data partition に書き込み、mmap してそのまま渡すのが基本の使い方です（firmware の `lm_init` と `run_prompt` を短くしたもの。エラー処理は省略）。
+
+```c
+#include <stdio.h>
+
+#include "esp_heap_caps.h"
+#include "esp_partition.h"
+#include "jtalm.h"
+
+#define WORK_BYTES (64 * 1024) /* tokenizer と grammar の作業領域 */
+#define GATE 0.868             /* 確信度の gate（採用モデルの値） */
+
+static jtlm_model model;
+static jtlm_state state;
+static jtlm_grammar grammar;
+static void *arena, *kv, *work;
+
+void lm_setup(void) {
+    /* partitions.csv: model, data, 0x40, <64KB 境界の offset>, <大きさ> */
+    const esp_partition_t *part =
+        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, 0x40, NULL);
+    const void *map;
+    esp_partition_mmap_handle_t handle;
+    esp_partition_mmap(part, 0, part->size, ESP_PARTITION_MMAP_DATA, &map, &handle);
+    jtlm_model_init(&model, map, part->size);
+
+    /* KV cache は PSRAM、残りは内部 SRAM */
+    const jtlm_config *c = &model.cfg;
+    size_t kv_bytes = jtlm_state_kv_bytes(c);
+    kv = heap_caps_aligned_alloc(8, kv_bytes, MALLOC_CAP_SPIRAM);
+    arena = heap_caps_aligned_alloc(8, jtlm_state_bytes(c) - kv_bytes,
+                                    MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    work = heap_caps_malloc(WORK_BYTES, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    jtlm_grammar_init(&grammar, &model.tok, work, WORK_BYTES);
+}
+
+/* UTF-8 の依頼を Action の JSON にする */
+void lm_run(const char *text, size_t len, char *out, size_t cap) {
+    int ids[128]; /* max_seq_len 個 */
+    int n = jtlm_prompt_ids(&model, text, len, ids, work, WORK_BYTES);
+    jtlm_state_init_split(&state, &model.cfg, arena, kv); /* 依頼ごとに初期化 */
+    jtlm_result r;
+    jtlm_generate(&model, &state, &grammar, ids, n, &r, NULL);
+    int n_text = r.n && r.ids[r.n - 1] == model.tok.eos ? r.n - 1 : r.n;
+    jtlm_decode(&model.tok, r.ids, n_text, out, cap);
+    if ((double)r.min_prob < GATE) snprintf(out, cap, "[]");
+}
+```
+
+- `.jtlm` は model partition の offset に書き込みます: `esptool --chip esp32s3 -p <PORT> write-flash <offset> jtalm_action_3m_q4_g64.jtlm`
+- 2つの core で行列積を分けるときは、`jtlm_set_parallel()` に関数を渡します（firmware の `run_parallel` が例です）。prompt をまとめて処理する `jtlm_prefill()` は `jtlm_generate()` の中でも使われます。
+
 ## モデルの入手
 
 採用モデルは、データ v0.5.1 で学習した 3M の INT4（group 64）です。`.jtlm` は Hugging Face のモデルのリポジトリから取得できます（1,971,456 B）。

@@ -246,7 +246,7 @@ gate の効果（誤って動く割合の変化など）は [`evaluation.md`](ev
 
 ## C の runtime（`runtime/host/`）
 
-外部ライブラリに依存しない C11 の推論コードです。同じ `model.c`、`tokenizer.c`、`grammar.c` を、PC の host 版と ESP32 の firmware（`firmware/jtalm_action/`）の両方が copy せずに build します。build と使い方は [`../runtime/host/README.md`](../runtime/host/README.md) にあります。
+外部ライブラリに依存しない C11 の推論コードです。同じ `model.c`、`tokenizer.c`、`grammar.c` を、PC の host 版と ESP32 の firmware（`firmware/jtalm_action/`）の両方が copy せずに build します。ESP-IDF の component（`runtime/host/idf_component.yml`）として、ほかの ESP-IDF プロジェクトからも使えます。build と使い方は [`../runtime/host/README.md`](../runtime/host/README.md) にあります。
 
 - `.jtlm` を読み、モデルの構造体はファイルの中を指すだけで、何も複製しません（ESP32 では flash を mmap した領域をそのまま渡す）。
 - Tokenizer は SentencePiece の処理（`nmt_nfkc` の正規化、user-defined symbol、unigram の Viterbi、byte fallback）を C に移したものです。

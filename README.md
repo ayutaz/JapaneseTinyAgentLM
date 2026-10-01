@@ -94,7 +94,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 ### source から build する
 
 - firmware: [`firmware/README.md`](firmware/README.md)（ESP-IDF v5.5.5）
-- C の runtime（PC 用、PyTorch と同じ出力）: [`runtime/host/README.md`](runtime/host/README.md)
+- C の runtime（PC 用、PyTorch と同じ出力。ESP-IDF の component としても使える）: [`runtime/host/README.md`](runtime/host/README.md)
 - データ生成と学習の再現: [`docs/training.md`](docs/training.md)
 
 ## 対応ハードウェアと安全
@@ -116,7 +116,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 | Directory | 内容 |
 |---|---|
 | [`src/jtalm/`](src/jtalm) | Python: データ生成（`data`）、学習・量子化・書き出し（`model`）、評価（`eval`）、Action の schema と servo への変換（`action`）、GPU を借りて実行する runner（`infra`、任意） |
-| [`runtime/host/`](runtime/host) | C の推論 runtime（PC 用。firmware と同じコード） |
+| [`runtime/host/`](runtime/host) | C の推論 runtime（PC 用。firmware と同じコードで、ESP-IDF の component としても使える） |
 | [`firmware/`](firmware) | ESP32-S3 の firmware（`jtalm_action`）と、実機用のツール |
 | [`configs/`](configs) | データ生成の設定 |
 | [`datasets/manifests/`](datasets/manifests) | 各データの出典、件数、hash（データ本体は git に入れない） |
