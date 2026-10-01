@@ -36,7 +36,7 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
 def fake_massive(dir_: Path) -> None:
     dir_.mkdir(parents=True)
     rows = [
-        {"id": str(i), "partition": p, "utt": f"アラームを{i}時にかけて"}
+        {"id": str(i), "partition": p, "intent": "alarm_set", "utt": f"アラームを{i}時にかけて"}
         for i, p in enumerate(["train", "train", "train", "test", "test"])
     ]
     write_jsonl(dir_ / "ja-JP.jsonl", rows)

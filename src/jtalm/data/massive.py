@@ -5,6 +5,7 @@
 MASSIVE is a virtual-assistant dataset (alarms, music, IoT, QA, chit-chat); none of its intents
 are robot head/face actions, so every utterance is a valid ``[]`` example. MASSIVE rows are used
 for training/evaluation but are not redistributed in our Hugging Face dataset.
+Volume intents are dropped: under schema v1 a volume request is an action, not a ``[]`` example.
 """
 
 import json
@@ -19,6 +20,7 @@ MASSIVE_URL = (
 )
 MASSIVE_LICENSE = "CC BY 4.0"
 # Skip the rare utterances that talk about heads/faces so they cannot be read as robot actions.
+VOLUME_INTENTS = ("audio_volume_up", "audio_volume_down", "audio_volume_mute", "audio_volume_other")
 ROBOT_WORDS = re.compile(r"(向いて|向け|うなず|頷|首を|顔を|表情)")
 
 
@@ -41,7 +43,9 @@ def download(dest_dir: Path) -> Path:
 
 def load(path: Path) -> list[dict]:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
-    return [r for r in rows if not ROBOT_WORDS.search(r["utt"])]
+    return [
+        r for r in rows if not ROBOT_WORDS.search(r["utt"]) and r["intent"] not in VOLUME_INTENTS
+    ]
 
 
 def sample(rows: list[dict], partition: str, k: int, rng: random.Random) -> list[dict]:
