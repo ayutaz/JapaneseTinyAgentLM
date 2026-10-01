@@ -112,11 +112,81 @@ uv を使う場合は、インストールせずに `uv run --with torch --with 
 - 出力は必ず [`action_schema_v0.json`](action_schema_v0.json) に合いますが、ロボットを動かす前に、角度の上限で必ず制限してください。
 - 文字の入力を前提にしています。音声で使う場合は、音声認識の結果を入力してください（音声認識の誤りへの強さは評価していません）。
 
+## スタックチャンで動かす
+
+ビルド済みの firmware で、M5Stack のスタックチャン（K151。CoreS3 と SCS0009 の servo ×2）の本体だけで動きます。Wi-Fi は使いません。
+
+> **書き込むと、今入っている firmware（公式のスタックチャンの firmware など）は消えます。** 元に戻したい場合は、先に手順 1 でバックアップを取ってください。
+
+**0. インストール**（上の「すぐに試す」でダウンロード済みのフォルダを使います）
+
+```bash
+pip install esptool pyserial
+```
+
+USB-C でパソコンにつなぎ、port の名前を確かめます（Windows は `COM3` など、Linux は `/dev/ttyACM0`、macOS は `/dev/cu.usbmodem…`）。以下の `COM3` は自分の port に置き換えてください。
+
+**1. バックアップ（任意。16MB、数分かかります）**
+
+```bash
+esptool --chip esp32s3 -p COM3 -b 921600 read-flash 0 0x1000000 backup_k151.bin
+# 元に戻すとき: esptool --chip esp32s3 -p COM3 -b 921600 write-flash 0x0 backup_k151.bin
+```
+
+**2. 書き込み**（firmware とモデルが1つのファイルになっています。{{FIRMWARE_BYTES}} bytes）
+
+```bash
+esptool --chip esp32s3 -p COM3 -b 921600 write-flash 0x0 JapaneseTinyAgentLM-Action-3M/{{FIRMWARE}}
+```
+
+つながらないときは、本体の横のリセットボタンを緑の LED が点くまで約3秒押し続けて、書き込みモードにしてからやり直してください。書き込んだ後は、リセットボタンを1回押します。
+
+**3. 話しかける**
+
+```bash
+python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py COM3
+```
+
+```text
+準備ができました。依頼を入力してください（終了は Ctrl+C）。
+右を向いて
+→ [{"name":"look","arguments":{"direction":"right","amount":"normal"}}]  963 ms
+にっこりして
+→ [{"name":"set_expression","arguments":{"expression":"happy"}}]  908 ms
+笑わないでね
+→ []  384 ms
+```
+
+画面に顔が出て、表情の依頼で顔が変わります。**起動したときは servo が off で、首は動きません**（動きの計画だけを作ります）。
+
+**4. 首を動かす**
+
+```bash
+python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py COM3 --servo
+```
+
+servo の電源が入り、首がゆっくり正面に戻ってから、依頼に合わせて首が動きます。首のまわりに指やケーブルを近づけないでください。**画面に触れる、Ctrl+C を押す、`!stop` を送る、のどれかで、すぐに止まり servo の電源が切れます。** 角度は firmware が制限します（左右 ±30°、上下 −10〜+15°）。
+
+| `!` で始まる command | 動き |
+|---|---|
+| `!servo on` / `!servo off` | servo の電源を入れる（首が動く）/ 切る |
+| `!stop` | 動きを止めて servo の電源を切る |
+| `!center` | 正面を向く |
+| `!gate 0.9` | 確信度の gate の閾値を変える（既定 0.868。0 で off） |
+| `!info` | モデルと firmware の情報 |
+
+- 1文の応答時間の中央値は約 1.3 秒でした（CoreS3、2コア）。300文で、PC の PyTorch と出力が完全に一致しました。
+- firmware は ESP-IDF v5.5.5 で build しました（app の sha256 `{{APP_SHA256}}`）。flash の配置は、bootloader 0x0、partition table 0x8000、app 0x10000、モデル（`{{JTLM}}`）0x200000 です。モデルだけを替えるときは、0x200000 に `.jtlm` を書き込みます。
+- firmware は Apache-2.0 です。同梱した第三者のコード（ESP-IDF、newlib、FreeRTOS、M5Unified、M5GFX など）のライセンスは [`firmware/licenses/`](firmware/licenses/README.md) にあります。firmware の source は後日 GitHub で公開する予定です。
+
 ## ファイル
 
 | ファイル | 内容 |
 |---|---|
 | `inference.py` | 単体の推論スクリプト（上の「すぐに試す」） |
+| `{{FIRMWARE}}` | スタックチャン用の firmware とモデルを1つにした書き込み用のイメージ（0x0 に書く） |
+| `firmware/stackchan_chat.py` | スタックチャンと USB serial で話すスクリプト |
+| `firmware/licenses/` | firmware に含まれる第三者のコードのライセンス |
 | `model.safetensors` | 評価した重み。INT4（group 64）で量子化した値を fp32 で保存したもので、ESP32 が計算する値と同じです |
 | `model_fp32.safetensors` | 量子化する前の fp32 の重み（追加学習用） |
 | `{{JTLM}}` | スタックチャンの firmware が読む形式（{{JTLM_BYTES}} bytes、sha256 `{{JTLM_SHA256}}`） |
@@ -133,11 +203,6 @@ uv を使う場合は、インストールせずに `uv run --with torch --with 
 1. **入力:** `<s>` `<act>` 文の token 列 `<out>`。文は `tokenizer.model` で分割します（`<act>` と `<out>` は tokenizer にある記号です）。
 2. **文法による制約:** `<out>` の後を `</s>` まで greedy に生成します（最大 24 token）。各 step で、schema に合う token だけから最も確率の高いものを選ぶので、出力は必ず schema に合う JSON になります。
 3. **確信度の gate:** 生成した token（`</s>` を含む）の、制約をかける前の確率の最小値が {{GATE}} 未満なら、出力を `[]` にします。閾値は validation だけで決めました。
-
-**スタックチャン（ESP32-S3）:** `{{JTLM}}` は、ESP32 用の firmware が flash の 0x200000 から読み込む形式です。firmware と C の推論コードは、後日 GitHub で公開する予定です。
-
-- 1文の応答時間の中央値は約 1.3 秒でした（CoreS3、2コア）。300文で、PC の PyTorch と出力が完全に一致しました。
-- servo は Feetech SCS0009 ×2（K151）です。首の角度は firmware 側で制限します（左右 ±30°、上下 −10〜+15°）。
 
 ## 評価
 
@@ -197,7 +262,7 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 ## ライセンスと帰属
 
-- 重み: **CC BY-SA 4.0**。コード: Apache-2.0（`inference.py`。学習と firmware のコードは後日 GitHub で公開予定）。
+- 重み: **CC BY-SA 4.0**。コード: Apache-2.0（`inference.py`、`firmware/`。firmware の第三者のコードは `firmware/licenses/`。学習と firmware の source は後日 GitHub で公開予定）。
 - 学習データに次のものを含みます: [Tatoeba](https://tatoeba.org/)（CC BY 2.0 FR）、[JESC](https://nlp.stanford.edu/projects/jesc/)（Pryzant et al., 2018、CC BY-SA 4.0）、[Amazon MASSIVE](https://github.com/alexa/massive)（FitzGerald et al., 2022、CC BY 4.0）。
 - 実装、データの生成と検査、学習、評価、firmware は Claude Code（Anthropic）が行いました。学習データと評価データの文章と正解は、上記のオープンモデル、人が書いた公開コーパス、プログラムによるもので、Claude の出力は含みません。
 

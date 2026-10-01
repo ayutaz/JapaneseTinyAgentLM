@@ -35,6 +35,15 @@ REPO_ID = "ayousanz/JapaneseTinyAgentLM-Action-3M"
 CARD_TEMPLATE = Path(__file__).with_name("model_card_action.md")
 SCHEMA = PROJECT_ROOT / "src/jtalm/action/action_schema_v0.json"
 JTLM_NAME = "jtalm_action_3m_q4_g64.jtlm"
+FIRMWARE_NAME = "stackchan_k151_jtalm_action.bin"
+FIRMWARE_DIR = PROJECT_ROOT / "firmware/jtalm_action"
+# Flash layout of firmware/jtalm_action (partitions.csv); the model partition starts at 0x200000.
+FLASH_LAYOUT = (
+    (0x0, "bootloader/bootloader.bin"),
+    (0x8000, "partition_table/partition-table.bin"),
+    (0x10000, "jtalm_action.bin"),
+)
+MODEL_OFFSET = 0x200000
 
 
 def _sha256(path: Path) -> str:
@@ -46,6 +55,20 @@ def _save_weights(ckpt: Path, out: Path) -> dict[str, Any]:
     tensors = {k: v.contiguous().float() for k, v in state["state_dict"].items()}
     save_file(tensors, out, metadata={"format": "pt"})
     return state
+
+
+def merge_firmware(build: Path, jtlm: Path, out: Path) -> None:
+    """One image to write at 0x0: bootloader, partition table, app and model, gaps filled 0xFF.
+
+    Same bytes as ``esptool merge-bin`` with the flash settings already in the bootloader header.
+    """
+    image = bytearray()
+    for offset, data in [*((o, (build / f).read_bytes()) for o, f in FLASH_LAYOUT),
+                         (MODEL_OFFSET, jtlm.read_bytes())]:  # fmt: skip
+        if len(image) > offset:
+            raise SystemExit(f"firmware part overlaps 0x{offset:x}")
+        image += bytes([0xFF]) * (offset - len(image)) + data
+    out.write_bytes(bytes(image))
 
 
 def prepare(args: argparse.Namespace) -> Path:
@@ -62,6 +85,11 @@ def prepare(args: argparse.Namespace) -> Path:
     shutil.copy(SCHEMA, out / "action_schema_v0.json")
     shutil.copy(args.jtlm, out / JTLM_NAME)
     shutil.copy(Path(__file__).with_name("hf_inference.py"), out / "inference.py")
+    fw = out / "firmware"
+    fw.mkdir()
+    merge_firmware(args.firmware_build, args.jtlm, fw / FIRMWARE_NAME)
+    shutil.copy(PROJECT_ROOT / "firmware/tools/stackchan_chat.py", fw / "stackchan_chat.py")
+    shutil.copytree(FIRMWARE_DIR / "licenses", fw / "licenses")
     config = {
         "architecture": "ActionLM (decoder-only Transformer: RMSNorm, RoPE, GQA, SwiGLU, tied "
         "embeddings)",
@@ -88,6 +116,9 @@ def prepare(args: argparse.Namespace) -> Path:
         "JTLM": JTLM_NAME,
         "JTLM_BYTES": f"{(out / JTLM_NAME).stat().st_size:,}",
         "JTLM_SHA256": _sha256(out / JTLM_NAME),
+        "FIRMWARE": f"firmware/{FIRMWARE_NAME}",
+        "FIRMWARE_BYTES": f"{(fw / FIRMWARE_NAME).stat().st_size:,}",
+        "APP_SHA256": _sha256(args.firmware_build / "jtalm_action.bin"),
         "SUITE": (args.suite / "suite.md").read_text(encoding="utf-8").strip(),
         "EXTRA": "\n\n".join(p.read_text(encoding="utf-8").strip() for p in args.eval_extra),
     }
@@ -99,7 +130,7 @@ def prepare(args: argparse.Namespace) -> Path:
     (out / "README.md").write_text(card, encoding="utf-8")
     files = sorted(p for p in out.rglob("*") if p.is_file() and p.name != "SHA256SUMS")
     for p in files:  # LF everywhere, so `sha256sum -c` works on Linux after a Windows build
-        if p.suffix in (".md", ".json", ".py"):
+        if p.suffix in (".md", ".json", ".py", ".txt", ".rst"):
             p.write_bytes(p.read_bytes().replace(b"\r\n", b"\n"))
     sums = [f"{_sha256(p)}  {p.relative_to(out).as_posix()}" for p in files]
     (out / "SHA256SUMS").write_bytes(("\n".join(sums) + "\n").encode())
@@ -163,6 +194,10 @@ def main(argv: list[str] | None = None) -> None:
         "--tokenizer", type=Path, default=PROJECT_ROOT / "tokenizer/out/action_v0_sp2048.model"
     )
     p.add_argument("--data-version", default="action v0.5.1")
+    p.add_argument(
+        "--firmware-build", type=Path, default=FIRMWARE_DIR / "build_release",
+        help="ESP-IDF build directory of firmware/jtalm_action",
+    )  # fmt: skip
     p.add_argument("--eval-extra", type=Path, nargs="*", default=[], help="more eval tables (.md)")
     p.add_argument("--out", type=Path, default=PROJECT_ROOT / "runs/release/action_3m")
     r = sub.add_parser("run")

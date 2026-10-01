@@ -12,6 +12,8 @@ M5Stack CoreS3（StackChan K151）向けの firmware です。実機の構成と
 | `tools/lm_serial.py` | `jtalm_action` に prompt を1件ずつ送り、応答を JSONL に保存する。host の runtime の出力と比べ、latency をまとめる。`--act` で dispatcher の計画（`act` の行）も保存する | Apache-2.0 |
 | `tools/dispatch_check.py` | dispatcher の計画を、Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz` で `!act` を使った validator の検査 | Apache-2.0 |
 | `tools/servo_test.py` | servo の動作確認の手順を流す（[`docs/hardware.md`](../docs/hardware.md) §12）。`--servo` を付けないと dry-run。`--only <文字列>` で一部の項目だけを流す。**`--servo` は首が動くので、ユーザーが立ち会うときだけ使う** | Apache-2.0 |
+| `tools/stackchan_chat.py` | `jtalm_action` と対話する。1行入力するごとに Action JSON を表示する。`--servo` で首も動かす。Hugging Face のモデルにも `firmware/stackchan_chat.py` として同梱する | Apache-2.0 |
+| `jtalm_action/licenses/` | 配布する firmware の binary に含まれる第三者のコード（ESP-IDF、newlib、FreeRTOS、M5Unified、M5GFX、Adafruit GFX の font）のライセンス | 各 upstream |
 | `third_party/` | 第三者の repository の clone。Git の管理外 | 各 upstream |
 
 ## Build と書き込み
