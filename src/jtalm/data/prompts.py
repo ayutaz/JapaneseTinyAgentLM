@@ -78,38 +78,45 @@ def requirements(spec: Spec) -> list[str]:
     return reqs
 
 
+NOTATION_NOTE = "（数字の書き方は下の指定に従う）"
+_AMOUNT_REQS = {
+    "slight": "「少し」「ちょっと」のように、動きや変化が小さいことが分かる言葉を必ず入れる",
+    "large": "「大きく」「思いっきり」のように、動きや変化が大きいことが分かる言葉を必ず入れる",
+    "normal": "「少し」「大きく」のような量の言葉は入れない",
+}
+
+
+def _amount_req(amount: str) -> str:
+    return _AMOUNT_REQS[amount]
+
+
 def _default_requirements(spec: Spec) -> list[str]:
     reqs: list[str] = []
     for call in spec.label:
         args = call["arguments"]
-        if call["name"] == "look" and "degrees" not in args:
-            if args["amount"] == "slight":
-                reqs.append(
-                    "「少し」「ちょっと」のように、動きが小さいことが分かる言葉を必ず入れる"
-                )
-            if args["amount"] == "large":
-                reqs.append(
-                    "「大きく」「思いっきり」のように、動きが大きいことが分かる言葉を必ず入れる"
-                )
-            if args["amount"] == "normal" and args["direction"] != "center":
-                reqs.append("「少し」「大きく」のような量の言葉は入れない")
+        if call["name"] in ("look", "turn", "adjust_volume", "adjust_brightness"):
+            if "degrees" not in args and "by" not in args:
+                if not (call["name"] == "look" and args["direction"] == "center"):
+                    reqs.append(_amount_req(args["amount"]))
         if call["name"] == "look" and "degrees" in args:
-            reqs.append(f"角度（{args['degrees']}度）を必ず入れる")
+            reqs.append(f"角度（{args['degrees']}度）を必ず入れる{NOTATION_NOTE}")
         if call["name"] == "look" and args.get("direction") != "center":
             reqs.append(
                 "「もう」「さらに」「もっと」「そこから」のような、今の向きを基準にする言葉は入れない"
             )
         if call["name"] == "turn":
             reqs.append(
-                "「もう少し」「さらに」「もっと」「そこから」のように、"
+                "「もう」「さらに」「もっと」「そこから」のように、"
                 "今の向きから動かすことが分かる言葉を必ず入れる"
             )
             if "degrees" in args:
-                reqs.append(f"角度（{args['degrees']}度）を必ず入れる")
+                reqs.append(f"角度（{args['degrees']}度）を必ず入れる{NOTATION_NOTE}")
         if call["name"] == "nod" and args["count"] >= 2:
             reqs.append(f"うなずく回数（{args['count']}回）が分かるようにする")
         if call["name"] == "shake":
-            reqs.append("首を横に振る動きだと分かる言い方にする（うなずく動きと混ぜない）")
+            reqs.append(
+                "首を横に振る動きだと分かる言い方にする（うなずく動きと取り違えない言い方）"
+            )
             if args["count"] >= 2:
                 reqs.append(f"首を振る回数（{args['count']}回）が分かるようにする")
         if call["name"] == "set_led":
@@ -125,7 +132,7 @@ def _default_requirements(spec: Spec) -> list[str]:
                 "「画面」「明るさ」「明るく」「暗く」のどれかを使う。部屋の明るさの話にはしない"
             )
         if call["name"] in ("set_volume", "set_brightness") and args["level"] not in (0, 100):
-            reqs.append(f"値（{args['level']}）が分かるように書く")
+            reqs.append(f"値（{args['level']}）が分かるように書く{NOTATION_NOTE}")
         if call["name"] in ("adjust_volume", "adjust_brightness") and "by" in args:
             reqs.append(f"変える量（{args['by']}）を必ず入れる")
     if spec.category == "multi_action":
@@ -236,6 +243,9 @@ VERIFY_SYSTEM = """あなたは、卓上ロボットへの日本語や英語の�
 - うなずく回数、首を振る回数の指定がなければ count は 1。
 - LED・ライトを消す → set_led の off。消音・ミュート → set_volume の 0。「半分」は 50、「最大」「いちばん大きく」は 100。100 を超える値は 100。
 - 「音量を上げて」「明るくして」のように値がなければ adjust_volume / adjust_brightness（量の言葉がなければ amount は normal）。
+- 「〜上げて」「〜下げて」「〜だけ」のように変える量なら adjust の by、「〜にして」のように値そのものなら set の level。
+- 「最小」「いちばん小さく」は 0。
+- 色の指定がなく LED・ライトを「つけて」なら set_led の white。
 - JSON の配列だけを出力する。"""
 
 

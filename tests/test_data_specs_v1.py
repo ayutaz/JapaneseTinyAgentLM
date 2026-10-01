@@ -50,3 +50,33 @@ def test_describe_adjust() -> None:
     assert describe(dim) == "画面を少しだけ暗くする"
     by = {"name": "adjust_brightness", "arguments": {"direction": "down", "by": 10}}
     assert describe(by) == "画面の明るさを10だけ下げる"
+
+
+def test_vertical_look_degrees_are_at_most_90() -> None:
+    for s in all_specs_v1():
+        call = s.label[0] if s.label else {}
+        args = call.get("arguments", {})
+        if call.get("name") == "look" and "degrees" in args:
+            if args["direction"] not in ("left", "right"):
+                assert args["degrees"] <= 90, s.id
+
+
+def test_turn_amount_requirements_have_no_mou_sukoshi_and_state_the_amount() -> None:
+    turns = {a: next(s for s in all_specs_v1() if s.id == f"v1.single.turn.left.{a}")
+             for a in ("slight", "normal", "large")}  # fmt: skip
+    for spec in turns.values():
+        assert not any("もう少し" in r for r in prompts.requirements(spec))
+    assert any("少し" in r and "必ず" in r for r in prompts.requirements(turns["slight"]))
+    assert any("大きく" in r and "必ず" in r for r in prompts.requirements(turns["large"]))
+    assert any("量の言葉は入れない" in r for r in prompts.requirements(turns["normal"]))
+
+
+def test_level_extremes_have_no_notation_hint() -> None:
+    for s in all_specs_v1():
+        if (
+            s.label
+            and s.label[0]["name"] == "set_volume"
+            and s.label[0]["arguments"]["level"] in (0, 100)
+        ):
+            if not s.id.startswith("v1.single.out_of_range"):
+                assert s.hint == "", s.id

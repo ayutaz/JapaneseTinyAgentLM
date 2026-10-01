@@ -129,3 +129,14 @@ def test_extend_keeps_base_and_eval_and_skips_anything_already_present(tmp_path:
     assert len(added) == len(base_all) + 1
     assert "右のほう見てくれる?" in {c.prompt for c in added}
     assert report["keep_rate_by_generator"] == {"gen/new": 0.25}
+
+
+def test_massive_load_drops_volume_intents(tmp_path: Path) -> None:
+    from jtalm.data import massive
+
+    rows = [
+        {"id": "1", "partition": "train", "intent": "audio_volume_up", "utt": "音量を上げて"},
+        {"id": "2", "partition": "train", "intent": "alarm_set", "utt": "アラームをかけて"},
+    ]
+    write_jsonl(tmp_path / "ja-JP.jsonl", rows)
+    assert [r["id"] for r in massive.load(tmp_path / "ja-JP.jsonl")] == ["2"]

@@ -26,29 +26,60 @@ NUMBER_STYLES = ("算用数字（例: 45）で書く", "漢数字（例: 四十�
                  "全角の数字（例: ４５）で書く")  # fmt: skip
 LEVEL_STYLES = (*NUMBER_STYLES, "「%」か「パーセント」を付けて書く")
 DEGREE_VALUES = (5, 10, 15, 20, 25, 30, 40, 45, 50, 60, 70, 80, 90, 100, 120, 135, 150, 180)
+MAX_VERTICAL_DEGREES = 90  # up / down / diagonals: look degrees stay within this
 TURN_DEGREE_VALUES = (5, 10, 15, 20, 30, 45, 90)
 LEVEL_VALUES = (0, 10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100)
 BY_VALUES = (5, 10, 15, 20, 25, 30, 50)
 CONFUSER_TOPICS = {
-    "other_devices": (
-        "ロボット以外の機器（部屋の照明、寝室のライト、エアコン、テレビ、スマホ、扇風機など）の"
-        "操作の依頼（例: ライトをつける、エアコンの温度を変える、テレビの音量を上げる）"
+    "other_devices.lighting": (
+        "部屋の照明や電気、寝室のライト、スタンドなど、ロボット以外の照明の操作の依頼"
+        "（部屋のライトをつける、明かりを暗くする、など）"
     ),
-    "numbers_not_actions": (
-        "数字や「度」「%」が入っているが、ロボットの動作の依頼ではない文（気温や室温の話、"
-        "タイマーや時間、計算、値段、確率など）"
+    "other_devices.climate": (
+        "エアコン、暖房、扇風機、加湿器など、ロボット以外の機器の温度や風の操作の依頼"
     ),
-    "direction_not_command": (
-        "左右や上下などの方向の言葉が入っているが、ロボットへの依頼ではない文（物を置いた場所の話、"
-        "道案内の話など）"
+    "other_devices.audio_video": (
+        "テレビ、スマホ、ステレオ、パソコンなど、ロボット以外の機器の音量や画面の操作の依頼"
     ),
-    "assistant_tasks": (
-        "時刻、天気、ニュース、タイマー、アラーム、メモ、音楽の再生、歌、踊り、写真など、"
-        "このロボットにはできない依頼"
+    "numbers_not_actions.temperature": (
+        "数字や「度」「%」が入っているが、ロボットの動作の依頼ではない文（気温、室温、体温、"
+        "湿度、天気の話など）"
     ),
-    "face_or_color_talk": (
-        "顔や表情、色、明るさについての話だが、ロボットへの依頼ではない文（絵や写真の顔の話、"
-        "好きな色の話、部屋が暗いという感想など）"
+    "numbers_not_actions.time": (
+        "数字が入っているが、ロボットの動作の依頼ではない文（時刻、日付、タイマー、"
+        "待ち合わせや予定の話など）"
+    ),
+    "numbers_not_actions.counting": (
+        "数字や「度」「%」が入っているが、ロボットの動作の依頼ではない文（計算、値段、確率、"
+        "点数、人数、割合の話など）"
+    ),
+    "direction_not_command.placement": (
+        "左右や上下などの方向の言葉が入っているが、ロボットへの依頼ではない文（物を置いた場所、"
+        "家具や物の位置の話など）"
+    ),
+    "direction_not_command.route": (
+        "左右や上下などの方向の言葉が入っているが、ロボットへの依頼ではない文（道案内、"
+        "電車や車の進む方向、人への指示の話など）"
+    ),
+    "assistant_tasks.info": (
+        "時刻、天気、ニュース、調べものなど、情報を答えてもらう依頼や質問"
+        "（このロボットにはできない依頼）"
+    ),
+    "assistant_tasks.schedule": (
+        "タイマー、アラーム、メモ、予定の登録など、ロボットにはできない依頼"
+    ),
+    "assistant_tasks.entertainment": (
+        "音楽の再生、歌、踊り、写真、ゲームなど、このロボットにはできない依頼"
+    ),
+    "face_or_color_talk.face": (
+        "顔や表情についての話だが、ロボットへの依頼ではない文（絵や写真の顔、人の表情の感想など）"
+    ),
+    "face_or_color_talk.color": (
+        "色についての話だが、ロボットへの依頼ではない文（好きな色、服や物の色の話など）"
+    ),
+    "face_or_color_talk.brightness": (
+        "明るさについての話だが、ロボットへの依頼ではない文（部屋が暗いという感想、"
+        "外が明るいという話など）"
     ),
 }
 
@@ -148,9 +179,11 @@ def single_specs(rng: random.Random) -> list[Spec]:
     specs: list[Spec] = []
     for d in ("up_left", "up_right", "down_left", "down_right"):
         specs += [_single(look(d, a)) for a in AMOUNT_JA]
-    extra = rng.sample([n for n in range(1, 181) if n not in DEGREE_VALUES], 3)
     for d in TURN_DIRECTIONS:
-        for i, n in enumerate((*DEGREE_VALUES, *extra)):
+        cap = 180 if d in ("left", "right") else MAX_VERTICAL_DEGREES
+        values = [n for n in DEGREE_VALUES if n <= cap]
+        extra = rng.sample([n for n in range(1, cap + 1) if n not in DEGREE_VALUES], 3)
+        for i, n in enumerate((*values, *extra)):
             specs.append(_single(look(d, degrees=n), NUMBER_STYLES[i % 3], f"s{i % 3}"))
         specs += [_single(turn(d, a)) for a in AMOUNT_JA]
         for i, n in enumerate(TURN_DEGREE_VALUES):
@@ -163,7 +196,9 @@ def single_specs(rng: random.Random) -> list[Spec]:
     extra_levels = rng.sample([n for n in range(1, 100) if n not in LEVEL_VALUES], 5)
     for target in ("volume", "brightness"):
         for i, n in enumerate((*LEVEL_VALUES, *extra_levels)):
-            specs.append(_single(level(target, n), LEVEL_STYLES[i % 4], f"s{i % 4}"))
+            free = n in (0, 100)  # 消音 / 最大 phrasings stay free of notation hints
+            specs.append(_single(level(target, n), "" if free else LEVEL_STYLES[i % 4],
+                                 "" if free else f"s{i % 4}"))  # fmt: skip
         for d in ("up", "down"):
             specs += [_single(adjust(target, d, a)) for a in AMOUNT_JA]
             specs += [_single(adjust(target, d, by=n)) for n in BY_VALUES]
@@ -193,12 +228,37 @@ def multi_specs() -> list[Spec]:
     return specs
 
 
+def _call_pool() -> list[Call]:
+    """Distinct calls of the single specs, in a fixed order."""
+    seen: dict[str, Call] = {}
+    for sp in single_specs(random.Random(20261004)):
+        seen.setdefault(_id(sp.label[0]), sp.label[0])
+    return list(seen.values())
+
+
+def _spread(pool: list[Call], k: int, rng: random.Random, skip: set[str]) -> list[Call]:
+    """Up to k calls from pool, round-robin over tools so that no tool dominates."""
+    groups: dict[str, list[Call]] = {}
+    for c in pool:
+        if _id(c) not in skip:
+            groups.setdefault(c["name"], []).append(c)
+    for g in groups.values():
+        rng.shuffle(g)
+    picked: list[Call] = []
+    while len(picked) < k and any(groups.values()):
+        for g in groups.values():
+            if g and len(picked) < k:
+                picked.append(g.pop())
+    return picked
+
+
 NEGATABLE_V1 = [
     turn("right", "slight"), look("right", degrees=45), _count("shake", 1), bow(),
     expression("angry"), expression("sleepy"), expression("doubt"), led("red"), led("off"),
     level("volume", 0), adjust("volume", "up"), adjust("brightness", "down"),
     level("brightness", 100),
 ]  # fmt: skip
+NEGATABLE_V1 += _spread(_call_pool(), 27, random.Random(20261005), {_id(c) for c in NEGATABLE_V1})
 
 
 def negation_specs() -> list[Spec]:
@@ -223,6 +283,22 @@ CORRECTIONS_V1 = [
     (expression("happy"), expression("angry")),
     (look("left", "normal"), turn("left", "slight")),
 ]
+
+
+def _more_corrections(k: int, rng: random.Random) -> list[tuple[Call, Call]]:
+    pool = _call_pool()
+    have = {(_id(w), _id(r)) for w, r in CORRECTIONS_V1}
+    pairs: list[tuple[Call, Call]] = []
+    for right in _spread(pool, k * 2, rng, set()):
+        same = [c for c in pool if c["name"] == right["name"] and _id(c) != _id(right)]
+        wrong = rng.choice(same or [c for c in pool if _id(c) != _id(right)])
+        if (_id(wrong), _id(right)) not in have and len(pairs) < k:
+            have.add((_id(wrong), _id(right)))
+            pairs.append((wrong, right))
+    return pairs
+
+
+CORRECTIONS_V1 += _more_corrections(14, random.Random(20261006))
 
 
 def correction_specs() -> list[Spec]:
