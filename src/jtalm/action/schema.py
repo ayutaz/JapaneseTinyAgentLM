@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Action schema v0: parsing, validation, and canonicalization of model outputs.
 
 An Action LM output is a JSON array of 0-2 calls such as

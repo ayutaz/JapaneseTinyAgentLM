@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 import random
 
 from jtalm.eval.bootstrap import ci, metric_values, paired_diff

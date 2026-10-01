@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Greedy decoding for the Action LM.
 
 Prompts are grouped by token length so a batch needs no padding (RoPE positions stay exact).

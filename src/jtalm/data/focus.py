@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Focused specs: one "slice" per phrasing pattern (evaluation set v2 and training data v0.5).
 
 The same label-first specs serve two purposes, always with different writers:

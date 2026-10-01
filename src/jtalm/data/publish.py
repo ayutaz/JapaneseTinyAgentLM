@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Prepare and publish the synthetic Action dataset to Hugging Face (public, manual gate).
 
 ``prepare`` writes the Hugging Face files (MASSIVE rows excluded: they are not redistributed).

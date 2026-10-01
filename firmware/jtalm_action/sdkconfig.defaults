@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 #
 # M5Stack CoreS3 (StackChan K151): ESP32-S3, 16MB quad flash, 8MB quad PSRAM.
 CONFIG_IDF_TARGET="esp32s3"

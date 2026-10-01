@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Board glue (see board.h). M5Unified and M5GFX (MIT, (c) M5Stack Technology / lovyan03)
 // are compiled from firmware/third_party; nothing of them is copied here. The PY32L020

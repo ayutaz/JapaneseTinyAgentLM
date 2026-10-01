@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Hard-negative mining for training data v0.5.
 
     uv run --group train python -m jtalm.model.mine --ckpt <best.pt> \

@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 """Capture the device's serial log, optionally resetting it and answering prompts.
 
 Run without adding a project dependency:

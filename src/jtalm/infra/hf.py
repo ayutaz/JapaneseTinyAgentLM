@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Hugging Face repository settings shared by every upload (datasets now, models later).
 
 Project rule: every repository we publish has Community contributions (Discussions and Pull

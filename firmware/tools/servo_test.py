@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 """Run the servo motion test sequence on jtalm_action (docs/hardware.md section 12).
 
 Without `--servo` everything runs in dry-run (servo output stays off; plans, timing and

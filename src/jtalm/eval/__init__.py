@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Evaluation cases and metrics for the Action LM."""
 
 from jtalm.eval.cases import CATEGORIES, EvalCase, load_cases, write_cases

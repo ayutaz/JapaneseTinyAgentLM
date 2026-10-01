@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Weight quantization for the Action LM (M5): fake-quantized checkpoints and artifact sizes.
 
     uv run --group train python -m jtalm.model.quantize --ckpt runs/.../3m/best.pt --bits 8 4

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ayutaz
 /* JapaneseTinyAgentLM reference runtime (M6): portable C11, no dependencies.
  *
  * Loads a .jtlm file written by `python -m jtalm.model.export` (layout documented there),

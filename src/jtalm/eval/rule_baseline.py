@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Keyword rule baseline for the Action LM (the "simple method" the model must beat).
 
 Clauses are split on Japanese punctuation and connectives; negated clauses are dropped; the text

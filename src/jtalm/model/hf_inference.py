@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Standalone inference for JapaneseTinyAgentLM Action 3M (published as ``inference.py``).
 
 Needs only torch (with numpy), sentencepiece and safetensors. Place it next to the model files

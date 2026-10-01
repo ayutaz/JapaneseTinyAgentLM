@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Label-first specs for synthetic Action data.
 
 Each ``Spec`` fixes the expected output (the label) by construction. An open-weight LLM only writes

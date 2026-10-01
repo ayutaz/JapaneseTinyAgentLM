@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Action LM firmware for M5Stack CoreS3 (StackChan K151), milestones B4 and A1-A3.
 //

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Train an Action LM from scratch (M4).
 
     uv run --group train python -m jtalm.model.train --size 5m \

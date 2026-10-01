@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Sequence format shared by the tokenizer, training, and decoding.
 
 One example is ``<s> <act> prompt <out> target </s>`` and the loss covers ``target </s>`` only.

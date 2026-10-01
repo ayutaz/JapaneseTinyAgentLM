@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Export an Action LM checkpoint and its tokenizer to one binary for the C runtime (M6).
 
     uv run --group train python -m jtalm.model.export \

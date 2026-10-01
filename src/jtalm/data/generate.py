@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Generate and cross-verify synthetic Action sentences with vLLM servers (runs on vast.ai).
 
 Runs in phases so only one model needs to be on the GPU at a time:

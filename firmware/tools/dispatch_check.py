@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 """Check the jtalm_action dispatcher (firmware A1-A3) against a Python reference.
 
 The reference validates with `jtalm.action.parse_output` and maps with

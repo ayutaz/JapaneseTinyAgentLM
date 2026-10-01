@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Train and compare SentencePiece tokenizers for the Action LM (M4 step 2).
 
     uv run --group train python -m jtalm.model.tokenizer --vocab 2048 4096 8192

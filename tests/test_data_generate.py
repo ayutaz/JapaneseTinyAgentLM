@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Exercise the generation phases with a fake generator (no network, no GPU)."""
 
 import json

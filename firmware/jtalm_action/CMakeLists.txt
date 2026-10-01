@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 cmake_minimum_required(VERSION 3.16)
 
 # M5Unified 0.2.17 and M5GFX 0.2.23 (MIT) for the display, touch and power: compiled in place

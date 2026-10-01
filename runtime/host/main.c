@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ayutaz
 /* jtalm: command-line front end of the reference runtime.
  *
  *     jtalm -m model.jtlm [-i prompts.txt] [--grammar] [--first-logits]

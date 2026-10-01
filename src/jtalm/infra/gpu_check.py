@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Print a JSON summary proving torch can use the GPU (run with ``uv run --group train``)."""
 
 import json

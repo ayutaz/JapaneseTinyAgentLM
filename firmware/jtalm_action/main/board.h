@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // CoreS3 / K151 board glue on top of M5Unified + M5GFX (MIT): display (the face), touch,
 // and the servo power switch (VM_EN, pin 0 of the PY32L020 IO expander at 0x6F on the

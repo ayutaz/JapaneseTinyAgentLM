@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 #
 # 16MB flash. "model" holds LM weights and is read through esp_partition_mmap,
 # so it starts on a 64KB MMU page boundary.

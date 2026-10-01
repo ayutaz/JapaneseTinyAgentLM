@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Action schema v0 validator and planner (see action.h).
 //

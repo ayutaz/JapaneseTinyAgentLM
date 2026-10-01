@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 """Send prompts to the jtalm_action firmware over serial and summarize the replies.
 
 Run without adding a project dependency:

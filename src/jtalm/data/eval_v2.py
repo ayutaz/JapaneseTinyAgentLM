@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Assemble evaluation set v2: one file per phrasing slice (jtalm.data.focus).
 
     uv run python -m jtalm.data.eval_v2 --raw <run>/artifacts/raw_eval_v2

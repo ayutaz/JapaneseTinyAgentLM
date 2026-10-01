@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 #
 # The LM runtime is compiled straight from runtime/host (not copied), so the device runs
 # exactly the code that was checked against PyTorch on the host.

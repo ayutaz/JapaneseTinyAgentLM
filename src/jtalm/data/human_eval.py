@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Human-written evaluation set (after M4): mine and label real Japanese sentences.
 
 No public dataset has human-written Japanese requests to a robot to turn its head, nod, or

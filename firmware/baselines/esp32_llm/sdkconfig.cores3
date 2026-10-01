@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 #
 # Overlay on top of esp32-llm's sdkconfig.defaults for M5Stack CoreS3 (K151).
 # Upstream targets the Waveshare ESP32-S3-LCD-1.9 (octal PSRAM).

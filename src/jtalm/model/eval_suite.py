@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Evaluate one checkpoint on every evaluation set at once and print one table.
 
     uv run --group train python -m jtalm.model.eval_suite --ckpt <best_q4_g64.pt> \

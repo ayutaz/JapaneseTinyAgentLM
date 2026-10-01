@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Prompts for sentence generation and cross-model label verification (versioned)."""
 
 import json

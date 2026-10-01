@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Minimal LM evaluation firmware for M5Stack CoreS3 (StackChan K151).
 //

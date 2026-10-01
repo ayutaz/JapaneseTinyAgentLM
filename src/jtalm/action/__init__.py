@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Action schema v0 and the category-to-servo mapping for the K151."""
 
 from jtalm.action.schema import (

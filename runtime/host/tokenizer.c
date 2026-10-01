@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ayutaz
 /* SentencePiece-compatible unigram tokenizer (encode and decode), following sentencepiece 0.2:
  * normalizer.cc (Normalize / NormalizePrefix), unigram_model.cc (EncodeOptimized),
  * sentencepiece_processor.cc (byte fallback in PopulateSentencePieceText, Decode). */

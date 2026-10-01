@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Light sanity checks for generated sentences.
 
 Deliberately NOT lexical label checks: requiring action keywords would keep only sentences that a

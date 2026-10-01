@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Action dispatcher: runs planned steps (face changes and head moves) in order in its own
 // task, drives the two SCS0009 servos when servo output is on, and guards them.

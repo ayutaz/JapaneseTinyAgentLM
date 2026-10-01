@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ayutaz
 /* Action schema v0 grammar: a port of jtalm.model.grammar.ActionGrammar.
  *
  *     [] </s>  |  [ CALL ] </s>  |  [ CALL , CALL ] </s>   (the second call differs from the first)

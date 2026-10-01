@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Amazon MASSIVE (ja-JP, CC BY 4.0) utterances as no-action negatives.
 
 MASSIVE is a virtual-assistant dataset (alarms, music, IoT, QA, chit-chat); none of its intents

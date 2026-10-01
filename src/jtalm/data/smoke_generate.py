@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """M2.5 smoke test: ask a vLLM OpenAI-compatible server for a few JSON outputs.
 
 This only checks that the generation path works end to end. Its outputs are not training data.

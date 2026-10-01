@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Grammar-constrained decoding for Action schema v0 (M5).
 
 Every target token is one of the fixed JSON pieces or enum values (``jtalm.model.format``), so the

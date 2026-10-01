@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Map categorical Action calls to K151 servo targets (firmware dispatcher reference).
 
 Conventions (docs/architecture.md section 7, docs/hardware.md section 3):

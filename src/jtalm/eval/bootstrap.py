@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Error bars for evaluation results: bootstrap confidence intervals and seed spread.
 
     # one model: 95% intervals per evaluation set

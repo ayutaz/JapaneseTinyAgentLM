@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Evaluate Action LM checkpoints and compare them with the rule baseline and existing models.
 
     uv run --group train python -m jtalm.model.evaluate \

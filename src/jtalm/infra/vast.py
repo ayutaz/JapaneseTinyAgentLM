@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Thin wrapper around the ``vastai`` CLI and SSH/SCP for running jobs on vast.ai.
 
 Operating rules (docs/development.md section 4): never copy ``.env`` or other credentials to a

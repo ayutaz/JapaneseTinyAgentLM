@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Assemble the Action dataset from raw generations (runs locally after the vast.ai job).
 
 Keeps a generated sentence only if it is well formed, consistent with its negation category, and

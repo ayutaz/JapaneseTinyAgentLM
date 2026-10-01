@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 #
 # Stand-in for Node.js inside the ESP-IDF container. The two build-time Node
 # steps (avatar DSL -> bytecode, settings page injection) were run on the

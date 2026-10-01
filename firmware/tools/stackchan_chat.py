@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# Copyright 2026 JapaneseTinyAgentLM contributors
+# Copyright 2026 ayutaz
 """Talk to the jtalm_action firmware on a Stack-chan (K151) over USB serial.
 
     pip install pyserial

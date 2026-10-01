@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Action schema v0 on the device: a strict validator for the LM output and the planner
 // that turns validated calls into servo targets and face changes. No hardware access here.

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 import pytest
 
 from jtalm.data.human_eval import is_negated_request, parse_request

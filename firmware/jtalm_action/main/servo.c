@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Copyright 2026 JapaneseTinyAgentLM contributors
+// Copyright 2026 ayutaz
 //
 // Action dispatcher and a minimal Feetech SCS (SCSCL) driver for the two SCS0009 servos of
 // the K151 (UART1, TX=G6, RX=G7, 1 Mbps; yaw ID 1, pitch ID 2; docs/hardware.md section 3).

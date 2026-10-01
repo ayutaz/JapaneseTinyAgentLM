@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Read secrets from the project's ``.env`` without ever printing them."""
 
 import os

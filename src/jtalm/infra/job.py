@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Run one job on vast.ai: pick an offer, create, upload code, run, fetch, and always destroy.
 
 Usage (creating an instance costs money, so ``--approve-dph`` is required):

@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Decoder-only Transformer for the Action LM (docs/architecture.md).
 
 RMSNorm (pre-norm), RoPE, grouped-query attention, SwiGLU MLP, and tied input/output embeddings.

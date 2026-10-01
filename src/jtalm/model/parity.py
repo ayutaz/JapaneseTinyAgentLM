@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Check the C reference runtime (runtime/host) against the Python implementation (M6).
 
     uv run --group train python -m jtalm.model.parity \

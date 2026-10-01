@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Action LM evaluation metrics (definitions: docs/roadmap.md section 10).
 
 ``evaluate`` takes cases and raw model outputs keyed by case id and returns a JSON-serializable

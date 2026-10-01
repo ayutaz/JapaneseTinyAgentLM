@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
 """Package the Action LM for Hugging Face, run the packaged model, and publish it.
 
     uv run --group train python -m jtalm.model.release prepare \

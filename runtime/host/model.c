@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0
+// Copyright 2026 ayutaz
 /* Model loading, the Transformer forward pass with a KV cache, and greedy decoding.
  *
  * The math follows jtalm.model.transformer step by step (same f32 rounding points; only the
