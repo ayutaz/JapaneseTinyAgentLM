@@ -66,6 +66,13 @@ class Policy:
 
     def __init__(self, d: dict[str, float]) -> None:
         assert d["ACT_NOD_PITCH_DEG"] == mapping.NOD_PITCH_DEG
+        lim = mapping.DEFAULT_LIMITS
+        assert (
+            d["ACT_YAW_MIN_DEG"],
+            d["ACT_YAW_MAX_DEG"],
+            d["ACT_PITCH_MIN_DEG"],
+            d["ACT_PITCH_MAX_DEG"],
+        ) == (lim.yaw_min, lim.yaw_max, lim.pitch_min, lim.pitch_max)
         self.yaw_min = int(d["ACT_YAW_MIN_DEG"])
         self.yaw_max = int(d["ACT_YAW_MAX_DEG"])
         self.pitch_min = int(d["ACT_PITCH_MIN_DEG"])
