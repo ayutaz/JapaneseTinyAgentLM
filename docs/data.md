@@ -125,14 +125,14 @@ train のカテゴリ別の件数:
 
 ## 評価セット
 
-どの評価セットも、学習にもモデルの選択（gate の閾値、checkpoint の選択）にも使いません。閾値と checkpoint は validation で選びます。結果は [`evaluation.md`](evaluation.md) にあります。
+どの評価セットも、学習にもモデルの選択（確信度の gate（confidence gate）の閾値、checkpoint の選択）にも使いません。閾値と checkpoint は validation で選びます。結果は [`evaluation.md`](evaluation.md) にあります。
 
 ### v0 eval（LLM が書いた文）
 
 | 項目 | 内容 |
 |---|---|
 | 件数 | 1,189件。single 335、multi_action 192、negation 270、no_action 337（うち MASSIVE test 150）、correction 55。英語 35件、対比ペア 80組 |
-| 書き手 | llm-jp-3.1-13b-instruct4（学習データの書き手とは別の言い方の指示）。Qwen3 が温度 0 で検証 |
+| 書き手 | llm-jp-3.1-13b-instruct4。prompt で例に挙げる文体も、学習データとは別のもの（`jtalm.data.prompts` の `STYLES_EVAL`）。Qwen3 が温度 0 で検証 |
 | ファイル | v0 以降のすべての版で同じファイル（sha256 `24120eb2…`） |
 
 ### human v1（人が書いた文）
@@ -174,7 +174,7 @@ train のカテゴリ別の件数:
 v0.5 で、実際の文で誤って動く例を学習データに加えました（`jtalm.model.mine`）。
 
 1. 人が書いた文の候補を集めます（`jtalm.data.human_eval pool`）。Tatoeba、JESC（25万文を抽出）、MASSIVE の train から、依頼の規則に当てはまらない文を選びます。Tatoeba と JESC は、評価用に取り分けた部分（下）を除きます。合計 456,553文です。
-2. v0.4 の 3M モデル（grammar と confidence gate 0.970）に読ませ、動作を出力した 6,353文を候補にします。
+2. v0.4 の 3M モデル（grammar と gate 0.970）に読ませ、動作を出力した 6,353文を候補にします。
 3. Qwen3 が温度 0 で変換し、`[]` と一致した 5,317文だけを、正解 `[]` の学習データにします。
 
 ## 評価セットを学習に入れないための仕組み
@@ -199,6 +199,12 @@ v0.5 で、実際の文で誤って動く例を学習データに加えました
 
 ## 作り直す方法
 
-外部データの取得、vLLM での生成と検証、版ごとの組み立て、評価セットの作り方は、[`training.md`](training.md) にまとめています。生成は seed を固定していますが、再生成した文が元のファイルと同じになる保証はありません。元のファイルとの一致は、manifest の sha256 で確かめられます。
+外部データの取得、vLLM での生成と検証、版ごとの組み立て、評価セットの作り方は、[`training.md`](training.md) にまとめています。
+
+- 学習データも評価セット（v0 eval、human v1、eval v2）も、作り直すには vLLM で Qwen3-30B-A3B-Instruct-2507 などを動かす GPU が要ります。
+- Hugging Face のデータセットの test は、v0 eval から MASSIVE の行（150件）を除いた合成の文（1,039件）です。v0 eval と同じファイルではなく、項目名も違います（`input` / `output`。評価の module が読むファイルは `prompt` / `expected`）。
+- GPU がなければ、[`results/`](../results/README.md) の結果を確かめることと、公開モデルでの推論（[README](../README.md) の「すぐに試す」）ができます。
+
+生成は seed を固定していますが、再生成した文が元のファイルと同じになる保証はありません。元のファイルとの一致は、manifest の sha256 で確かめられます。
 
 Chat LM の学習データは、まだ決めていません（[`roadmap.md`](roadmap.md)）。

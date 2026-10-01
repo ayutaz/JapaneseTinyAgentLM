@@ -7,11 +7,11 @@ M5Stack のスタックチャン（K151。CoreS3 と SCS0009 の servo × 2）�
 `jtalm_action` は次のことを本体だけで行います。Wi-Fi、NPU、外付けのモジュールは使いません。
 
 1. Flash の `model` partition（`0x200000`）にある `.jtlm`（モデルと tokenizer）を mmap で読む。
-2. USB serial から受けた1行の日本語の依頼を、grammar 付きの greedy と confidence gate で Action JSON にする。LM の本体は [`../runtime/host/`](../runtime/host/) の C のコードをそのまま build したもので、PC の PyTorch と同じ出力になる。
+2. USB serial から受けた1行の日本語の依頼を、grammar 付きの greedy と確信度の gate（confidence gate）で Action JSON にする。LM の本体は [`../runtime/host/`](../runtime/host/) の C のコードをそのまま build したもので、PC の PyTorch と同じ出力になる。
 3. 出力をもう一度検査し、角度に変換して制限してから、首（servo）と画面の顔（M5GFX、4種類）を動かす。
 4. 結果を `JTALM {json}` の1行ずつで serial に返す。
 
-**Servo の出力は起動時に off（dry-run）です。** 首が動くのは `!servo on` を送った後だけです。
+**servo の出力は起動時に off（dry-run）です。** 首が動くのは `!servo on` を送った後だけです。
 
 | Directory / ファイル | 内容 | License |
 |---|---|---|
@@ -74,7 +74,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT>
 python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo
 ```
 
-Servo の電源が入り、首がゆっくり正面に戻ってから、依頼に合わせて首が動きます。
+servo の電源が入り、首がゆっくり正面に戻ってから、依頼に合わせて首が動きます。
 
 - **首のまわりに指やケーブルを近づけないでください。** 本体は平らな机に置いてください。
 - **画面に触れる、Ctrl+C を押す、`!stop` を送る、のどれかで、すぐに止まり servo の電源が切れます。** それでも止まらないときは、電源ボタンを長押しして電源を切ってください（USB を抜いてもバッテリーで動き続けます）。
@@ -90,7 +90,7 @@ Servo の電源が入り、首がゆっくり正面に戻ってから、依頼�
 
 ### M5Unified と M5GFX の取得
 
-`jtalm_action/CMakeLists.txt` は、`firmware/third_party/stackchan-idf/` の submodule にある M5Unified と M5GFX を、copy せずにそのまま build します。Repository の root で次を実行してください（`firmware/third_party/` は Git の管理外です）。
+`jtalm_action/CMakeLists.txt` は、`firmware/third_party/stackchan-idf/` の submodule にある M5Unified と M5GFX を、copy せずにそのまま build します。リポジトリの root で次を実行してください（`firmware/third_party/` は Git の管理外です）。
 
 ```bash
 git clone https://github.com/ciniml/stackchan-idf.git firmware/third_party/stackchan-idf
@@ -102,14 +102,14 @@ cd ../../..
 ```
 
 - 配布しているイメージは、patch（M5Unified の Speaker と RTC の2か所）を当てた checkout で build しました。この firmware は speaker と RTC を使わないので、動作には影響しません（patch なしの build は確かめていません）。
-- 同じ version の別の checkout を使う場合は、`idf.py -DM5UNIFIED_DIR=<path> -DM5GFX_DIR=<path> build` で場所を指定します（M5GFX の directory 名は `m5gfx` にしてください）。
+- 同じ version の別の checkout を使う場合は、`idf.py -DM5UNIFIED_DIR=<path> -DM5GFX_DIR=<path> build` で場所を指定します（M5GFX のディレクトリ名は `m5gfx` にしてください）。
 
 ### Build
 
-`jtalm_action` は `runtime/host/` のコードを参照するので、repository の root を container に mount します。
+`jtalm_action` は `runtime/host/` のコードを参照するので、リポジトリの root を container に mount します。
 
 ```bash
-# Linux / macOS（repository の root で）
+# Linux / macOS（リポジトリの root で）
 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$PWD:/w" -w /w/firmware/jtalm_action \
   espressif/idf:v5.5.5 idf.py build
 
@@ -122,15 +122,15 @@ MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$(pwd -W):/w" 
 
 ### モデル（`.jtlm`）の入手
 
-Firmware が読むのは `.jtlm` 形式のファイル（モデルと tokenizer を1つにまとめたもの。形式は [`../docs/architecture.md`](../docs/architecture.md)）です。
+firmware が読むのは `.jtlm` 形式のファイル（モデルと tokenizer を1つにまとめたもの。形式は [`../docs/architecture.md`](../docs/architecture.md)）です。
 
-- **公開モデルを使う:** Hugging Face のモデルの repository にある `jtalm_action_3m_q4_g64.jtlm`（3M、INT4、1,971,456 B）。
+- **公開モデルを使う:** Hugging Face のモデルのリポジトリにある `jtalm_action_3m_q4_g64.jtlm`（3M、INT4、1,971,456 B）。
 
   ```bash
   hf download ayousanz/JapaneseTinyAgentLM-Action-3M jtalm_action_3m_q4_g64.jtlm --local-dir .
   ```
 
-- **自分で学習したモデルを使う:** checkpoint から書き出します（学習の手順は [`../docs/training.md`](../docs/training.md)）。`--out` の下に `<checkpoint の親 directory 名>_q4_g64.jtlm` ができます。
+- **自分で学習したモデルを使う:** checkpoint から書き出します（学習の手順は [`../docs/training.md`](../docs/training.md)）。`--out` の下に `<checkpoint の親ディレクトリ名>_q4_g64.jtlm` ができます。
 
   ```bash
   uv run --group train python -m jtalm.model.export \
@@ -141,7 +141,7 @@ Firmware が読むのは `.jtlm` 形式のファイル（モデルと tokenizer 
 
 ### 書き込み
 
-App とモデルを、それぞれの offset に書きます（flash の配置は [`../docs/hardware.md`](../docs/hardware.md) の「Flash の配置」）。
+app とモデルを、それぞれの offset に書きます（flash の配置は [`../docs/hardware.md`](../docs/hardware.md) の「Flash の配置」）。
 
 ```bash
 cd firmware/jtalm_action/build
@@ -189,13 +189,13 @@ JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"ri
 
 | Command | 内容 |
 |---|---|
-| `!servo on` | Servo の電源を入れ、両方が ping に答えるまで待ち（約 0.85 秒）、今の位置から正面へゆっくり戻す。**首が動く** |
+| `!servo on` | servo の電源を入れ、両方が ping に答えるまで待ち（約 0.85 秒）、今の位置から正面へゆっくり戻す。**首が動く** |
 | `!stop`、`!servo off` | 実行中と待ち行列の計画を捨て、torque を切り、servo の電源を切って dry-run に戻る。**LM の処理中でもすぐに効く** |
 | `!relax` | torque だけを切る（すぐに効く） |
 | `!servo` | servo の状態を出す（すぐに効く） |
 | `!center` | 正面を向く |
 | `!act <json>` | LM を通さずに Action JSON を検査して実行する（例: `!act [{"name":"nod","arguments":{"count":2}}]`） |
-| `!gate <閾値>` | confidence gate の閾値を変える（例: `!gate 0.9`。0 で off） |
+| `!gate <閾値>` | gate の閾値を変える（例: `!gate 0.9`。0 で off） |
 | `!grammar 0\|1` | grammar による制約の off / on（既定 on） |
 | `!info`、`!heap` | firmware とモデルの情報、メモリ |
 | `!par 0\|1`、`!batch 0\|1` | 行列積を2つの core に分ける / prompt をまとめて処理する（どちらも既定 on。計測用） |
@@ -223,9 +223,9 @@ JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"ri
 |---|---|
 | `stackchan_chat.py` | 対話。1行入力するごとに Action JSON と時間を表示する。`--servo` で首も動かす。終了時に `!stop` を送る。Hugging Face のモデルにも同梱 |
 | `lm_serial.py` | 依頼を1件ずつ送り、応答を JSONL に保存し、latency をまとめる。`--ref` で host の runtime（`runtime/host/build/jtalm --grammar`）の出力と比べる。`--act` で dispatcher の計画（`act` の行）も保存する |
-| `dispatch_check.py` | dispatcher の計画を Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。Serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz N` で `!act` を使った validator の検査 |
+| `dispatch_check.py` | dispatcher の計画を Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz N` で `!act` を使った validator の検査 |
 | `servo_test.py` | 首の動作確認の手順（`!act` の 16項目と、LM を通す 12項目。否定や雑談で動かないことを含む）を流す。`--servo` を付けないと dry-run。`--only <文字列>` で一部だけ |
-| `serial_capture.py` | Serial log の取得。`--reset`、prompt への自動応答（`--send-on`）、終了条件（`--until`）を指定できる |
+| `serial_capture.py` | serial log の取得。`--reset`、prompt への自動応答（`--send-on`）、終了条件（`--until`）を指定できる |
 
 ```bash
 # 依頼を送って保存する（prompts.txt は1行1件。.jsonl なら "prompt" の項目を使う）
@@ -237,7 +237,7 @@ uv run python firmware/tools/dispatch_check.py --results out/device.jsonl --log 
 uv run --with pyserial python firmware/tools/dispatch_check.py --port <PORT> --fuzz 400 --out out/fuzz.jsonl
 # 動作確認の手順を dry-run で流す（--servo を付けると首が動く）
 uv run --no-project --with pyserial python firmware/tools/servo_test.py --port <PORT> --out out/servo_test.jsonl
-# Serial log を 30 秒取る
+# serial log を 30 秒取る
 uv run --no-project --with pyserial python firmware/tools/serial_capture.py --port <PORT> --reset --seconds 30 --out out/boot.log
 ```
 
@@ -246,7 +246,7 @@ uv run --no-project --with pyserial python firmware/tools/serial_capture.py --po
 
 ## jtalm_eval（計測用）
 
-LM を含まない最小の firmware です。Wi-Fi、画面、servo は使わず、GPIO も操作しません。起動時に device の情報、partition table、段階ごとの heap、PSRAM と flash mmap の読み出し帯域を `JTALM {json}` で出します。Serial から `b` を送ると帯域を測り直し、`h` で heap を出します。Partition table は `jtalm_action` と同じです。
+LM を含まない最小の firmware です。Wi-Fi、画面、servo は使わず、GPIO も操作しません。起動時に device の情報、partition table、段階ごとの heap、PSRAM と flash mmap の読み出し帯域を `JTALM {json}` で出します。serial から `b` を送ると帯域を測り直し、`h` で heap を出します。partition table は `jtalm_action` と同じです。
 
 ```bash
 docker run --rm -v "$PWD/firmware:/fw" -w /fw/jtalm_eval espressif/idf:v5.5.5 idf.py build
@@ -258,7 +258,7 @@ esptool --chip esp32s3 -p <PORT> -b 921600 write-flash \
 
 ## 第三者のコードとライセンス
 
-この directory のコードは Apache-2.0 です。配布する firmware の binary には次の第三者のコードが含まれ、ライセンスの全文は [`jtalm_action/licenses/`](jtalm_action/licenses/README.md) にあります。Binary を配布するときは、このフォルダを添えてください。`0x200000` に書くモデルのデータは CC BY-SA 4.0 です。
+このディレクトリのコードは Apache-2.0 です。配布する firmware の binary には次の第三者のコードが含まれ、ライセンスの全文は [`jtalm_action/licenses/`](jtalm_action/licenses/README.md) にあります。binary を配布するときは、このディレクトリを添えてください。`0x200000` に書くモデルのデータは CC BY-SA 4.0 です。
 
 | 対象 | 使い方 | License |
 |---|---|---|

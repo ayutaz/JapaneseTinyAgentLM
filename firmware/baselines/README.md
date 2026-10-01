@@ -1,15 +1,15 @@
 # baselines
 
-既存の2つの project を M5Stack CoreS3（スタックチャン K151）で動かすための差分と手順です。どちらも本プロジェクトの firmware には含めず、比較の基準値と servo の仕様の確認だけに使いました。
+既存の2つの project を、M5Stack のスタックチャン（K151）の CoreS3 で動かすための差分と手順です。どちらも本プロジェクトの firmware には含めず、比較の基準値と servo の仕様の確認だけに使いました。
 
 | Directory | 対象 | 目的 |
 |---|---|---|
 | `esp32_llm/` | [doryiii/esp32-llm](https://github.com/doryiii/esp32-llm)（commit `c6c647f7bfbb`） | 既存の LLM runtime の CoreS3 での速度とメモリ（基準値） |
 | `stackchan_idf/` | [ciniml/stackchan-idf](https://github.com/ciniml/stackchan-idf)（commit `419385ef1b87`、v0.15.0-alpha.2） | K151 の servo の向きと中立位置の確認 |
 
-この directory のファイルは Apache-2.0 です。ただし `esp32_llm/cores3.patch` は、上流の MIT License のコード（`main/llm.c`、`main/llm8.c`、`main/main.c`）を変更する patch です。
+このディレクトリのファイルは Apache-2.0 です。ただし `esp32_llm/cores3.patch` は、上流の MIT License のコード（`main/llm.c`、`main/llm8.c`、`main/main.c`）を変更する patch です。
 
-Clone 先の `firmware/third_party/` は Git の管理外です。以下のコマンドは repository の root から実行します。Windows の Git Bash では、`docker run` の前に `MSYS_NO_PATHCONV=1` を付け、`$PWD` の代わりに `$(pwd -W)` を使ってください。`<PORT>` は自分の serial port に置き換えてください（例: Windows は `COM3`、Linux は `/dev/ttyACM0`）。
+clone 先の `firmware/third_party/` は Git の管理外です。以下のコマンドはリポジトリの root から実行します。Windows の Git Bash では、`docker run` の前に `MSYS_NO_PATHCONV=1` を付け、`$PWD` の代わりに `$(pwd -W)` を使ってください。`<PORT>` は自分の serial port に置き換えてください（例: Windows は `COM3`、Linux は `/dev/ttyACM0`）。
 
 ## esp32-llm
 

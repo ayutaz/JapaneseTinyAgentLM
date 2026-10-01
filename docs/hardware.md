@@ -1,17 +1,17 @@
 # 対象ハードウェア
 
-Action LM を動かす実機（M5Stack のスタックチャン K151）の構成、servo と座標の規約、firmware の dispatcher の設計、実機での速度とメモリをまとめます。Firmware の書き込みと使い方は [`../firmware/README.md`](../firmware/README.md)、モデルと `.jtlm` の形式は [`architecture.md`](architecture.md) を参照してください。
+Action LM を動かす実機、M5Stack のスタックチャン（K151）の構成、servo と座標の規約、firmware の dispatcher の設計、実機での速度とメモリをまとめます。firmware の書き込みと使い方は [`../firmware/README.md`](../firmware/README.md)、モデルと `.jtlm` の形式は [`architecture.md`](architecture.md) を参照してください。
 
 ## 対象機
 
 | 項目 | 内容 |
 |---|---|
-| 製品 | M5Stack 公式「M5 スタックチャン」、SKU **K151** |
+| 製品 | M5Stack のスタックチャン、SKU **K151**（M5Stack の公式製品） |
 | Main controller | M5Stack CoreS3（ESP32-S3） |
 | Servo | Feetech SCS0009 × 2（シリアルバス型） |
 | 公式 firmware | [`m5stack/StackChan`](https://github.com/m5stack/StackChan)（ESP-IDF、`firmware/` は MIT License） |
 
-有志が組み立てる SG90（PWM servo）版の Stack-chan とは servo も電源の回路も違うので、この firmware はそのままでは動きません。
+有志が組み立てる SG90（PWM servo）版のスタックチャンとは servo も電源の回路も違うので、この firmware はそのままでは動きません。
 
 ## SoC・Flash・PSRAM
 
@@ -21,7 +21,7 @@ Action LM を動かす実機（M5Stack のスタックチャン K151）の構成
 | USB | Native USB-Serial/JTAG（VID `303A` / PID `1001`） |
 | Flash | 16MB、quad（QIO 80MHz で使用） |
 | PSRAM | 外付け 8MB、quad（80MHz で使用） |
-| Firmware の設定 | data cache 64KB / line 64B、instruction cache 32KB、`-O2`、FreeRTOS 100Hz |
+| firmware の設定 | data cache 64KB / line 64B、instruction cache 32KB、`-O2`、FreeRTOS 100Hz |
 | 使わないもの | Wi-Fi、BLE、NPU（ESP32-S3 には NPU がない） |
 
 ### Flash の配置
@@ -45,14 +45,14 @@ Action LM を動かす実機（M5Stack のスタックチャン K151）の構成
 
 | 機能 | 部品 / 接続 |
 |---|---|
-| Servo のバス | UART1、TX=`G6`、RX=`G7`、1,000,000 bps |
+| servo のバス | UART1、TX=`G6`、RX=`G7`、1,000,000 bps |
 | I2C（内部） | SCL=`G11`、SDA=`G12` |
 | IO expander（胴体） | PY32L020、`0x6F`。pin 0 が servo の電源（`VM_EN`） |
 | IO expander（CoreS3） | AW9523、`0x58`（`BUS_EN`、`BOOST_EN`） |
 | 画面とタッチ | 320×240 の LCD とタッチパネル（M5Unified / M5GFX で使う） |
 | その他（使わない） | バッテリー監視 INA226（`0x41`）、NFC ST25R3916（`0x50`）、胴体のタッチ Si12T（`0x68`、3 zone）、赤外線（IR_SEND=`G5`、IR_REC=`G10`）、RGB LED 12個、550mAh バッテリー |
 
-M5GFX の自動判別は、K151 を `board_M5StackChan`（CoreS3 と同じ扱い）と判定します。Firmware は M5Unified を speaker、mic、IMU、RTC を使わない設定で初期化します。
+M5GFX の自動判別は、K151 を `board_M5StackChan`（CoreS3 と同じ扱い）と判定します。firmware は M5Unified を speaker、mic、IMU、RTC を使わない設定で初期化します。
 
 ## Servo
 
@@ -63,10 +63,10 @@ M5GFX の自動判別は、K151 を `board_M5StackChan`（CoreS3 と同じ扱い
 | 公式 firmware の角度制限（0.1° 単位） | −1280〜1280（±128°） | 30〜870（3°〜87°） |
 | 特記事項 | 連続回転（PWM mode）に対応（この firmware では使わない） | Stall protection あり |
 
-- Protocol は Feetech の SCS（SCSCL）です。Packet は `FF FF id len inst params… checksum`。Register は big-endian で、torque enable `0x28`、goal（位置、時間 ms、速度）`0x2A`、現在位置 `0x38` を使います。
-- Raw position は 0〜1000、1 step = 0.3125° です。
-- **電源:** servo の電源は、胴体の PY32L020 の `VM_EN`（pin 0）で入れます。Firmware は起動時に、出力の値を 0 にしてから pin を出力に切り替えるので、電源が一瞬も入りません。Pin の設定は stackchan-idf と同じ（pull-down off、pull-up on）です。
-- **電源を入れてからの待ち:** SCS0009 は `VM_EN` を入れてから**約 0.85 秒**たたないと ping に答えません。Firmware は電源を入れた後、両方の servo が答えるまで 50ms ごとに ping します（最大 3 秒）。
+- protocol は Feetech の SCS（SCSCL）です。packet は `FF FF id len inst params… checksum`。register は big-endian で、torque enable `0x28`、goal（位置、時間 ms、速度）`0x2A`、現在位置 `0x38` を使います。
+- raw position は 0〜1000、1 step = 0.3125° です。
+- **電源:** servo の電源は、胴体の PY32L020 の `VM_EN`（pin 0）で入れます。firmware は起動時に、出力の値を 0 にしてから pin を出力に切り替えるので、電源が一瞬も入りません。pin の設定は stackchan-idf と同じ（pull-down off、pull-up on）です。
+- **電源を入れてからの待ち:** SCS0009 は `VM_EN` を入れてから**約 0.85 秒**たたないと ping に答えません（stackchan-idf の README は電源を入れてから 200ms 待つと書いていますが、この実機ではそれより長くかかりました）。firmware は固定の時間を待たず、電源を入れた後、両方の servo が答えるまで 50ms ごとに ping します（最大 3 秒）。
 
 ## 座標の規約と raw への変換
 
@@ -90,7 +90,7 @@ LM の出力を首の動きと表情に変える部分です（`firmware/jtalm_a
 
 | 項目 | 内容 |
 |---|---|
-| 流れ | LM の task（core 1）が `gen` の行を出した後、gate をかけた後の出力を検査し、今の姿勢から計画を立てて `act` の行を出し、待ち行列（4件）に入れる。Dispatcher の task（core 0）が計画の手順を順に実行する。LM はその間に次の依頼を処理できる |
+| 流れ | LM の task（core 1）が `gen` の行を出した後、確信度の gate（confidence gate）をかけた後の出力を検査し、今の姿勢から計画を立てて `act` の行を出し、待ち行列（4件）に入れる。dispatcher の task（core 0）が計画の手順を順に実行する。LM はその間に次の依頼を処理できる |
 | 検査（validator） | JSON を Python の `json.loads` と同じ規則で読み（同じ key が重なると後の値、`2.0` も整数）、Action schema v0 と重複の禁止を検査する。`jtalm.action.parse_output(...).schema_valid` と同じものだけを通す。通らない出力と `[]` は何もしない |
 | 角度 | `src/jtalm/action/mapping.py` と同じ。yaw は slight 10° / normal 20° / large 30°、pitch は slight 5° / normal 10° / large 15°。`left` / `right` は yaw だけ、`up` / `down` は pitch だけを変え、もう一方の軸はそのまま。`center` は両軸を 0° にする |
 | Soft limit | mapping.py の上限（yaw ±30°、pitch ±15°）と stackchan-idf の soft limit（yaw −40〜+40°、pitch −10〜+25°）の重なり、つまり **yaw −30〜+30°、pitch −10〜+15°**。`down` の `large`（−15°）は −10° になり、`act` の行に `clamped` が付く |
@@ -99,11 +99,11 @@ LM の出力を首の動きと表情に変える部分です（`firmware/jtalm_a
 | うなずき（`nod`） | **今の pitch から** 14° 下へ振って戻す往復を `count` 回くり返し、最後は始めの pitch に戻る。下の限界（−10°）に近いときは、振れ幅を保ったまま上へずらす（low = max(基準 − 14, −10)、high = min(low + 14, +15)。正面からなら −10° と +4° の間）。上を向いているときは、上を向いたままうなずく。往復だけは最大速度 150°/s、最大加速度 900°/s² で、14° の片道は 280ms（ピーク約 79°/s） |
 | Torque | 計画を始める直前に、今の位置を目標にしてから torque を入れる（跳ねない）。今の位置が計画の始点から 1° 以上ずれていれば、まず始点へ同じ滑らかさで動く。計画が終わって 0.5 秒後に torque を切る |
 | 起動時（dry-run） | **servo の出力は起動時に off**。計画は時間どおりに実行されるが、servo には何も送らず、UART も開かない。`!servo on` で電源を入れ、今の位置から正面へゆっくり戻ってから、首が動くようになる |
-| 停止 | `!stop` / `!servo off`、**画面へのタッチ**、servo の通信の error、watchdog で、実行中と待ち行列の計画を捨て、torque を切り（broadcast と各 ID）、`VM_EN` を切って dry-run に戻る。`!relax` は torque だけを切る。Serial の読み取りは別の task なので、LM の処理中でもすぐに効く |
+| 停止 | `!stop` / `!servo off`、**画面へのタッチ**、servo の通信の error、watchdog で、実行中と待ち行列の計画を捨て、torque を切り（broadcast と各 ID）、`VM_EN` を切って dry-run に戻る。`!relax` は torque だけを切る。serial の読み取りは別の task なので、LM の処理中でもすぐに効く |
 | Watchdog | 監視の task（core 1、LM より高い優先度、50ms ごと）が、計画の予定時間 + 2 秒（始点への移動の時間を足す）を過ぎても終わらない実行と、計画がないのに torque が 3 秒以上入っている状態を止める。タッチは 100ms ごとに見る |
-| Servo の driver | 自前（Apache-2.0）。ping、torque、goal、現在位置の読み取り。応答は checksum と ID を確かめる。Register と byte の順は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした（コードは copy していない） |
+| servo の driver | 自前（Apache-2.0）。ping、torque、goal、現在位置の読み取り。応答は checksum と ID を確かめる。register と byte の順は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした（コードは copy していない） |
 
-Firmware の計画は、`firmware/tools/dispatch_check.py` が Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直したものと一致することを確かめています（評価セットの先頭 200件の計画、`!act` で送った 400件の validator の判定）。実機で首を動かし、向き、量、うなずきの回数、2つの依頼の順序、否定や雑談で動かないこと、タッチで止まることを目で確かめました。
+firmware の計画は、`firmware/tools/dispatch_check.py` が Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直したものと一致することを確かめています（評価セットの先頭 200件の計画、`!act` で送った 400件の validator の判定）。実機で首を動かし、向き、量、うなずきの回数、2つの依頼の順序、否定や雑談で動かないこと、タッチで止まることを目で確かめました。
 
 ## 表情
 
@@ -122,7 +122,7 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 
 ### 速度
 
-採用モデル（3M、データ v0.5.1、INT4、grammar と gate 0.868）を実機で動かした結果です。評価セットの先頭 300件で、gate の前の出力も後の出力も PC の PyTorch と 300 / 300 一致しました。
+採用モデル（3M、データ v0.5.1、INT4、grammar と gate 0.868）を実機で動かした結果です。評価セットの先頭 300件で、gate の前の出力も後の出力も PC の PyTorch と 300 / 300 一致しました。計測の記録は [`results/v051_action/device/`](../results/v051_action/device/README.md) にあります。
 
 | 項目 | 値 |
 |---|---:|
@@ -133,7 +133,7 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 
 内訳の目安は、prefill（約 12 token）が約 0.5 秒、生成が 1 token あたり約 0.1 秒です。何もしない（`[]`）応答は短く、生成も 1〜2 token で終わります。画面と dispatcher を載せても速度は変わりません（dispatcher は LM と並行して動きます）。
 
-モデルの大きさと量子化による違いです（同じ構造の初期のチェックポイント、評価セットの先頭 200件。prompt は平均 12 token）。「帯域の上限」は、重みを下の flash の読み出し帯域（31.2 MB/s）で1回読むのにかかる時間です。
+モデルの大きさと量子化による違いです（同じ構造の初期の checkpoint、[`results/b4_device/`](../results/b4_device/)、評価セットの先頭 200件。prompt は平均 12 token）。「帯域の上限」は、重みを下の flash の読み出し帯域（31.2 MB/s）で1回読むのにかかる時間です。
 
 | model | 重み | 重みの byte 数 | decode（ms/token） | 帯域の上限（ms/token） | prefill（ms/token） | 中央値（ms） | p90（ms） |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -162,7 +162,7 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 
 ### メモリ
 
-画面と dispatcher を載せた状態の値です（単位 B。内部 SRAM は `MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT`）。
+画面と dispatcher を載せた状態の値です（単位 B。内部 SRAM は `MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT`）。モデルは data v0.4 の 3M INT4 で、採用した v0.5.1 の 3M と構造も大きさも同じです（出典: [`results/a1_device/`](../results/a1_device/README.md)）。
 
 | 段階 | 内部 SRAM の空き | 最大連続ブロック | 最小空き | PSRAM の空き |
 |---|---:|---:|---:|---:|
@@ -175,13 +175,13 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 |---|---:|---|
 | 重み（`.jtlm`） | 0 | Flash（mmap） |
 | KV cache（f32、128 token 分） | 458,752 | PSRAM |
-| Activation（16 token 分）、attention の score、logits | 125,952 | 内部 SRAM |
-| Tokenizer の作業領域 | 32,768 | 内部 SRAM |
+| activation（16 token 分）、attention の score、logits | 125,952 | 内部 SRAM |
+| tokenizer の作業領域 | 32,768 | 内部 SRAM |
 | 最初の step の logits の控え（診断用） | 8,192 | PSRAM |
 | 顔の frame と待ち行列 | 約 158KB | PSRAM |
-| Task の stack（LM 16KB、行列積の worker 6KB、dispatcher 6KB、監視 4KB、serial の読み取り 3KB） | 約 35KB | 内部 SRAM |
+| task の stack（LM 16KB、行列積の worker 6KB、dispatcher 6KB、監視 4KB、serial の読み取り 3KB） | 約 35KB | 内部 SRAM |
 
-- Token ごとの確保はありません。1件目の処理の後は、空きが変わりません。
+- token ごとの確保はありません。1件目の処理の後は、空きが変わりません。
 - 5M は読み込み後の内部 SRAM の空きが約 90KB（画面なし）まで減ります。`-DJTLM_BATCH=8` で activation を半分にできます（結果は変わりません。速度への影響は未計測）。
 
 ### 読み出し帯域
@@ -192,14 +192,14 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 |---|---:|
 | PSRAM の順次読み出し | 32.8 |
 | Flash mmap の順次読み出し | 31.2 |
-| Cache に載る 32KB の繰り返し（内部 SRAM、PSRAM、flash mmap のいずれも） | 425.5 |
+| cache に載る 32KB の繰り返し（内部 SRAM、PSRAM、flash mmap のいずれも） | 425.5 |
 
-Quad PSRAM と QIO flash はほぼ同じ速さで、理論値（4 bit × 80MHz = 40 MB/s）の約 8割です。重みを PSRAM に copy しても速くならないので、重みは flash から mmap で読み、PSRAM は KV cache に使います。
+quad の PSRAM と QIO の flash はほぼ同じ速さで、理論値（4 bit × 80MHz = 40 MB/s）の約 8割です。重みを PSRAM に copy しても速くならないので、重みは flash から mmap で読み、PSRAM は KV cache に使います。
 
 ## 設計への影響
 
 - **重みの byte 数が速度を決めます。** 重みを毎 token すべて読むので、速度の上限は「約 31 MB/s ÷ 重みの byte 数」です。INT4 化、語彙の縮小、入出力の埋め込みの共有が速度に直結します。3M INT4 では演算が律速なので、さらに速くするには生成する token 数か層を減らすのが効きます。
-- **Prompt はまとめて処理します。** 1 token ずつ forward すると、入力の長さに比例して重みを読み直すことになります。Prefill のまとめ処理が最も効きました（prefill が約 1/3.4）。
+- **prompt はまとめて処理します。** 1 token ずつ forward すると、入力の長さに比例して重みを読み直すことになります。prefill のまとめ処理と 2 core の並列化を合わせて、prefill は 166 から 49 ms/token（約 1/3.4）になりました（上の表、3M INT8）。
 - **LM は角度を出しません。** LM はカテゴリだけを出し、firmware が検査、角度への変換、制限をします。LM がどんな出力をしても、首は soft limit の外へ出ません。
 - **連続回転は使いません。** Action LM からは使えないようにしています。
 - **Wi-Fi は使いません。** Wi-Fi を有効にすると内部 SRAM が約 48KB 減ります。
@@ -208,7 +208,7 @@ Quad PSRAM と QIO flash はほぼ同じ速さで、理論値（4 bit × 80MHz =
 
 - **首が動くので、指やケーブルを首のまわりに近づけないでください。** 本体は平らな机に置き、首のまわりに物を置かないでください。
 - 起動直後は servo が off（dry-run）です。首を動かすのは `!servo on`（または `stackchan_chat.py --servo`）を送ったときだけです。
-- 止めるときは、**画面のどこかに触れてください**（torque と servo の電源が切れます）。Serial から `!stop` を送っても止まります。それでも止まらないときは、電源ボタンを長押しして電源を切ってください。本体はバッテリーで動くので、USB を抜いても止まりません。
+- 止めるときは、**画面のどこかに触れてください**（torque と servo の電源が切れます）。serial から `!stop` を送っても止まります。それでも止まらないときは、電源ボタンを長押しして電源を切ってください。本体はバッテリーで動くので、USB を抜いても止まりません。
 - 角度の制限や速度を変えるときは、`main/action.h` の値を変え、`firmware/tools/servo_test.py` を `--servo` なしの dry-run で流して計画を確かめてから、首を動かしてください。
 - 開発用の PC から serial port を開くと、chip が reset されることがあります（`rst:0x15 (USB_UART_CHIP_RESET)`）。`esptool` は読み取りだけでも、接続時と終了時に chip を reset します。
 - 書き込むと、今入っている firmware（公式のスタックチャンの firmware など）は消えます。元に戻したい場合は、先に flash 全体をバックアップしてください（[`../firmware/README.md`](../firmware/README.md)）。

@@ -16,11 +16,11 @@ output: [{"name":"look","arguments":{"direction":"left","amount":"normal"}},
 
 ## What it does
 
-Up to two of three actions: `look` (direction, amount), `set_expression` (happy / sad / surprised / neutral) and `nod` (count 1–3). Non-requests, negated requests and requests the robot cannot perform give `[]` (do nothing).
+The output is a list of up to two calls to three actions: `look` (direction, amount), `set_expression` (happy / sad / surprised / neutral) and `nod` (count 1–3). Non-requests, negated requests and requests the robot cannot perform give `[]` (do nothing).
 
 - Decoding is constrained by the action schema, so the output is always valid JSON.
 - A confidence gate (0.868) turns low-confidence outputs into `[]`.
-- INT4 weights are 2.0 MB; the median latency on the device is 1.3 s per request.
+- The `.jtlm` file (INT4 weights + tokenizer) is 2.0 MB (1,971,456 bytes); the weights alone are 1.68 MB. The median latency on the device is 1.3 s per request.
 
 ## Results
 
@@ -33,7 +33,7 @@ INT4 + grammar + gate, mean ± standard deviation over five training seeds (the 
 | LLM-written evaluation set (exact match) | 1,189 | **94.0 ± 0.6%** |
 | Device (ESP32-S3) vs. PC (PyTorch) output | 300 | 300 / 300 identical |
 
-Japanese only (English requests are about 5% correct). Details: [`docs/evaluation.md`](docs/evaluation.md) (Japanese).
+Japanese only (English requests are about 5% correct). Details: [`docs/evaluation.md`](docs/evaluation.md); device measurements: [`results/v051_action/device/`](results/v051_action/device/README.md). The documents in `docs/` are written in Japanese.
 
 ## Quick start
 
@@ -45,14 +45,17 @@ hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgent
 python JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて
 ```
 
-**Stack-chan K151** (this erases the current firmware)
+**Stack-chan K151** ([this erases the current firmware](firmware/README.md#すぐに試すビルド済みのイメージ); back it up first with step 1 there if you want to restore it)
 
 ```bash
-pip install esptool pyserial
+pip install esptool pyserial huggingface_hub
+hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgentLM-Action-3M
 esptool --chip esp32s3 -p <PORT> -b 921600 write-flash 0x0 JapaneseTinyAgentLM-Action-3M/firmware/stackchan_k151_jtalm_action.bin
-python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT>            # servos off
+python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT>            # servos stay off (the head does not move)
 python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo    # the head moves
 ```
+
+`<PORT>` is the serial port of the robot, e.g. `COM3` on Windows or `/dev/ttyACM0` on Linux.
 
 The servos are off at boot. Touching the screen or sending `!stop` stops the motion and powers the servos off; the firmware limits the angles (yaw ±30°, pitch −10 to +15°). Keep fingers and cables clear of the neck.
 

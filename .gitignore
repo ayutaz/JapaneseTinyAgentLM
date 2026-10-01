@@ -52,6 +52,8 @@ lightning_logs/
 *.gguf
 *.tflite
 artifacts/
+# runtime/host/README.md の例でモデルを置く場所
+/models/
 
 # ==== Datasets ====
 # manifest と小規模な自作 dataset のみ commit する

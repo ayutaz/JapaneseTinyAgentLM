@@ -33,11 +33,13 @@ docker run --rm -v "$PWD:/w" -w /w --entrypoint make espressif/idf:v5.5.5 -C run
 
 ## モデルの入手
 
-採用モデルは、データ v0.5.1 で学習した 3M の INT4（group 64）です。`.jtlm` は Hugging Face のモデルの repository から取得できます（1,971,456 B）。
+採用モデルは、データ v0.5.1 で学習した 3M の INT4（group 64）です。`.jtlm` は Hugging Face のモデルのリポジトリから取得できます（1,971,456 B）。
 
 ```sh
 hf download ayousanz/JapaneseTinyAgentLM-Action-3M jtalm_action_3m_q4_g64.jtlm --local-dir models
 ```
+
+`models/` は Git の管理外です（`.gitignore`）。モデルのファイルは commit しないでください。
 
 自分で学習した checkpoint からは、次のコマンドで書き出します（学習の手順は [`../../docs/training.md`](../../docs/training.md)）。
 
@@ -46,7 +48,7 @@ uv run --group train python -m jtalm.model.export \
     --ckpt <best.pt> --tokenizer <tokenizer.model> --bits 0 8 4 --out <出力先>
 ```
 
-`--out` の下に、checkpoint の親 directory の名前（例: `3m`）を付けた `3m_fp32.jtlm`（12.9MB）、`3m_q8_g64.jtlm`（3.5MB）、`3m_q4_g64.jtlm`（2.0MB）ができます。どれも tokenizer（約 0.27MB。うち正規化の表が 0.24MB）を含みます。
+`--out` の下に、checkpoint の親ディレクトリの名前（例: `3m`）を付けた `3m_fp32.jtlm`（12.9MB）、`3m_q8_g64.jtlm`（3.5MB）、`3m_q4_g64.jtlm`（2.0MB）ができます。どれも tokenizer（約 0.27MB。うち正規化の表が 0.24MB）を含みます。
 
 ## 実行
 
@@ -60,7 +62,7 @@ docker run --rm -v "$PWD:/w" -w /w --entrypoint runtime/host/build/jtalm espress
     -m models/jtalm_action_3m_q4_g64.jtlm -i models/prompts.txt --grammar
 ```
 
-出力は1件につき1行の JSON です（例は初期のチェックポイントのものです）。
+出力は1件につき1行の JSON です（例は初期の checkpoint のものです）。
 
 ```json
 {"output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]","min_prob":0.999994159,"tokens":8,"ids":[7,10,16,11,22,14,8,2]}
@@ -69,11 +71,11 @@ docker run --rm -v "$PWD:/w" -w /w --entrypoint runtime/host/build/jtalm espress
 | 項目 | 内容 |
 |---|---|
 | `output` | 生成した文字列（`</s>` の手前まで）。Python の `Prediction.text` と同じ |
-| `min_prob` | 選んだ token の確率の最小値。`--grammar` のときも、制約をかける前の確率を使う（`jtalm.model.decode` と同じ）。confidence gate に使う |
+| `min_prob` | 選んだ token の確率の最小値。`--grammar` のときも、制約をかける前の確率を使う（`jtalm.model.decode` と同じ）。確信度の gate（confidence gate）に使う |
 | `tokens` | 生成した token 数（`</s>` を含む） |
 | `ids` | 生成した token id |
 
-この runtime は confidence gate をかけません。採用モデルと同じ判定にするには、`min_prob` が 0.868 未満の出力を `[]` として扱ってください（firmware と `jtalm.model.evaluate` の `gate` と同じ比較）。
+この runtime は gate をかけません。採用モデルと同じ判定にするには、`min_prob` が 0.868 未満の出力を `[]` として扱ってください（firmware と `jtalm.model.evaluate` の `gate` と同じ比較）。
 
 処理した件数と速度（tok/s）は標準エラーに出します。
 
@@ -136,7 +138,7 @@ decode（id → 文字列）も SentencePiece と同じ規則です（制御用�
 - **内積の kernel:** 部分和を local 変数に持つ（`acc[]` が入力と alias しうるので、配列のままだと毎回 memory に書き戻される）。量子化した重みは、1個ずつ f32 に戻してすぐ掛けます（行を一度 buffer に戻してから掛けるのと同じ値）。
 - `jtlm_prefill()` と `jtlm_generate_from()` は `jtlm_generate()` を2つに分けたもので、呼び出し側が prefill と decode の時間を別々に測れます。
 
-これらの変更の前後で、評価セットの先頭 200件の出力（`--grammar`、6つの model、`double` と `float` の累積、`JTLM_BATCH` = 16 と 3）は byte 単位で同じでした。
+実機での効果（速度の変化）は [`../../docs/hardware.md`](../../docs/hardware.md) の「速くするために行ったこと」にあります。これらの変更の前後で、評価セットの先頭 200件の出力（`--grammar`、6つの model、`double` と `float` の累積、`JTLM_BATCH` = 16 と 3）は byte 単位で同じでした。
 
 ## Python との一致の確認
 
@@ -146,11 +148,11 @@ uv run --group train python -m jtalm.model.parity \
     --out <出力先> --docker espressif/idf:v5.5.5 --build
 ```
 
-Checkpoint は自分で学習したもの（[`../../docs/training.md`](../../docs/training.md)）を使います。`--out` の下に `parity.json`（すべての数値と、一致しなかった例）と `golden.jsonl`（評価セットの先頭 32 件の prompt の id、生成した id、最初の step の上位 5 個の logits。実機への移植で比べる golden vector）を書きます。ネイティブのコンパイラがある環境では `--docker` の代わりに `--jtalm runtime/host/build/jtalm` を使います。
+checkpoint は自分で学習したもの（[`../../docs/training.md`](../../docs/training.md)）を使います。`--out` の下に `parity.json`（すべての数値と、一致しなかった例）と `golden.jsonl`（評価セットの先頭 32 件の prompt の id、生成した id、最初の step の上位 5 個の logits。実機への移植で比べる golden vector）を書きます。ネイティブのコンパイラがある環境では `--docker` の代わりに `--jtalm runtime/host/build/jtalm` を使います。
 
 ### 結果
 
-同じ構造の初期のチェックポイント（データ v0 で学習した 3M と 5M）と、LLM が書いた評価セット（v0 eval）1,189件で確かめました。下の完全一致の率は、この初期のチェックポイントの値です（採用モデルの精度は [`../../docs/evaluation.md`](../../docs/evaluation.md)）。
+同じ構造の初期の checkpoint（データ v0 で学習した 3M と 5M）と、LLM が書いた評価セット（v0 eval）1,189件で確かめました。下の完全一致の率は、この初期の checkpoint の値です（採用モデルの精度は [`../../docs/evaluation.md`](../../docs/evaluation.md)）。
 
 **Tokenizer:** `sentencepiece` 0.2.2 と token id が完全に一致しました。
 
@@ -176,7 +178,7 @@ Checkpoint は自分で学習したもの（[`../../docs/training.md`](../../doc
 - 完全一致の率は、C と Python で同じ値です（表の値）。token 列の一致は、どの行も 1,189 / 1,189 です。logits の絶対値は最大で約 19 です。
 - INT8 / INT4 の比較相手は、`.jtlm` から読み戻した重み（fp16 の scale）で作った Python のモデルです。`jtalm.model.quantize` の fake quant（f32 の scale）で評価した出力とも、1,189件すべてで一致しました。scale を fp16 にしても結果は変わりません。
 - `-DJTLM_ACC=float`（ESP32 向けの設定）で build した場合も、3M の6条件すべてで token 列が 1,189件一致しました（logits の差は最大 3.2e-5）。
-- データ v0.4 の 3M（INT4 / INT8、grammar あり）でも、host の C の出力は Python と評価セット全 1,189件で一致し、実機（`firmware/jtalm_action`）の出力も host と全件一致しました。採用モデル（データ v0.5.1 の 3M INT4、gate 0.868）では、実機の出力が評価セットの先頭 300件で PyTorch と一致しています（gate の前も後も 300 / 300。[`../../docs/hardware.md`](../../docs/hardware.md) の「実機の性能」）。
+- データ v0.4 の 3M（INT4 / INT8、grammar あり）でも、host の C の出力は Python と評価セット全 1,189件で一致し、実機（`firmware/jtalm_action`）の出力も host と全件一致しました。採用モデル（データ v0.5.1 の 3M INT4、gate 0.868）では、実機の出力が評価セットの先頭 300件で PyTorch と一致しています（gate の前も後も 300 / 300。[`results/v051_action/device/`](../../results/v051_action/device/README.md)）。
 
 **速度（参考）:** AMD Ryzen 9 5900X の Docker（WSL2）上で1 thread、評価セット全体（prompt と生成を合わせて約 22,500 token）を処理した値です。3M は FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。5M は FP32 で約 470 tok/s、INT8 / INT4 で約 230 tok/s。量子化した重みは group ごとに f32 へ戻してから掛けるので、PC では FP32 より遅くなります。
 

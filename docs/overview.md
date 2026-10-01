@@ -2,7 +2,7 @@
 
 JapaneseTinyAgentLM は、マイコン（ESP32-S3）の上だけで動く、日本語の超小型言語モデルを作るプロジェクトです。研究のための試作ではなく、ロボットに組み込んで**実際に使う**ことを目的にしています。
 
-開発と評価には M5Stack 公式の M5 スタックチャン（SKU K151。本体は CoreS3 = ESP32-S3、16MB Flash、8MB PSRAM、servo は Feetech SCS0009 ×2）を使います（[`hardware.md`](hardware.md)）。
+開発と評価には M5Stack のスタックチャン（K151。本体は CoreS3 = ESP32-S3、16MB Flash、8MB PSRAM、servo は Feetech SCS0009 ×2）を使います（[`hardware.md`](hardware.md)）。
 
 ## なぜ作るのか
 
@@ -37,13 +37,13 @@ Action LM は、3.15M parameter のモデルを INT4 に量子化し、tokenizer
 
 - **端末の上だけで動く:** ESP32-S3 の CPU だけで推論します。ネットワーク、NPU、外部モジュールは使いません。
 - **小さく、速く:** 量子化した LM の容量の目安を 1.5〜5MB に置き、画面や servo の制御と同居できる大きさにします。
-- **安全を優先する:** 出力は grammar で常に schema に合う形にし、確信度の低い出力は confidence gate で「何もしない」に倒します。LM は servo の raw 値を出さず、角度への変換、可動域の制限、停止は firmware が受け持ちます。
+- **安全を優先する:** 出力は grammar で常に schema に合う形にし、確信度の低い出力は、確信度の gate（confidence gate）で「何もしない」に倒します。LM は servo の raw 値を出さず、角度への変換、可動域の制限、停止は firmware が受け持ちます。
 - **評価を固定する:** prompt の形式、greedy decoding、grammar の実装、gate の閾値の選び方を固定し、PC（PyTorch と C）と実機で同じ評価をします。閾値やモデルは validation だけで選び、評価セットでは選びません。
 - **開発者が組み込みやすく:** 仕様を明確にし、再現手順を公開します。コードは Apache-2.0、重みとデータセットは CC BY-SA 4.0 です。学習データには、ライセンスが両立するオープンモデルの出力と既存のデータだけを使います（[`data.md`](data.md)）。
 
 ## Action LM の完了条件と達成状況
 
-Action LM の完了条件は、no_action カテゴリでルールベースと同程度にとどまる点（※2）を除いて、すべて満たしました。値は、採用したモデル（3M、data v0.5.1、seed 0、INT4 + grammar + gate 0.868）のものです（[`results/v051_action/adopted_q4/comparison.md`](../results/v051_action/adopted_q4/comparison.md)）。評価セットの説明と詳しい表は [`evaluation.md`](evaluation.md) にあります。
+Action LM の完了条件は、no_action カテゴリでルールベースと同程度にとどまる点（※1）を除いて、すべて満たしました。値は、採用したモデル（3M、data v0.5.1、seed 0、INT4 + grammar + gate 0.868）のものです（[`results/v051_action/adopted_q4/comparison.md`](../results/v051_action/adopted_q4/comparison.md)）。評価セットの説明と詳しい表は [`evaluation.md`](evaluation.md) にあります。
 
 | 条件 | 目標 | 結果 |
 |---|---|---|
@@ -51,14 +51,14 @@ Action LM の完了条件は、no_action カテゴリでルールベースと同
 | 完全一致（評価セット v0、LLM が書いた 1,189 件） | 90%以上 | 93.8%（5 seed の平均は 94.0 ± 0.6%） |
 | multi-action / 否定 | それぞれ 90%以上 | 92.7% / 100.0% |
 | no-action の recall / precision | 95%以上 / 0.90以上 | 99.5% / 0.915 |
-| ルールベースの baseline（完全一致 76.4%）に勝つ | 全体とカテゴリ別 | 全体 93.8%。カテゴリ別は ※2 を参照 |
+| ルールベースの baseline（完全一致 76.4%）に勝つ | 全体とカテゴリ別 | 全体 93.8%。カテゴリ別は ※1 を参照 |
 | 既存の小型モデルに勝つ（16件の比較） | Needle 2 18.8%、FunctionGemma 270M 37.5%、MimiModel 6.2% を上回る | 62.5%（16件のうち 8件は英語） |
 | 量子化しても精度を保つ | — | INT4 でも落ちない（data v0.4 の 3M: FP32 94.2% → INT4 94.3%） |
 | C の runtime が PyTorch と一致 | — | 評価セットの全件で token 列が一致 |
-| 実機で動く | 容量、速度、安定性 | 実機の出力が PyTorch と 300 / 300 件一致。`.jtlm` 1,971,456 B、app 約 494KB。応答は中央値 1,276 ms、p90 1,860 ms。200 件の連続処理の後も内部 SRAM の空きは 99,039 B |
+| 実機で動く | 容量、速度、安定性 | 実機の出力が PyTorch と 300 / 300 件一致。`.jtlm` 1,971,456 B、app 約 494KB。応答は中央値 1,276 ms、p90 1,860 ms。200 件の連続処理の後も内部 SRAM の空きは 99,039 B。出力の一致と応答時間は [`results/v051_action/device/`](../results/v051_action/device/README.md) |
 | 実機で servo を動かす | — | 向き、表情、うなずき、否定や雑談で動かないこと、touch での停止を実機で確認 |
 
-※2 single 86.3%、multi_action 92.7%、negation 100.0%、correction 80.0% で、ルールベース（60.9%、46.9%、88.1%、76.4%）を上回ります。no_action カテゴリは、本モデルもルールベースも 99.1% で、上回ってはいません（同じ）。英語は学習データに入れていないので、参考値として判定から外しています。
+※1 single 86.3%、multi_action 92.7%、negation 100.0%、correction 80.0% で、ルールベース（60.9%、46.9%、88.1%、76.4%）を上回ります。no_action カテゴリはルールベースと同じ 99.1% で、上回っていません。英語は学習データに入れていないので、参考値として判定から外しています。
 
 完了条件に加えて、人が書いた文での評価もしています。人が書いた 1,159 件（依頼 62 件と、依頼ではない文 1,097 件）で、完全一致 99.6%、依頼の正解 91.9%、誤って動いた割合 0.0% でした。依頼の正解は seed によって 75.8〜91.9% と動き、5 seed の平均は **85.2 ± 6.4%** です。採用した seed 0 は5つの中で最も高いので、期待される性能としては5回の平均を見てください。依頼は 62 件しかなく、95% bootstrap 区間は 85.5〜98.4% と広いです。
 
@@ -124,6 +124,6 @@ VLA（Vision-Language-Action）は、画像や映像をモデルの入力とし�
 | [`data.md`](data.md) | 学習データと評価セットの作り方、出典とライセンス |
 | [`training.md`](training.md) | 再現の手順（tokenizer、データの生成、学習、量子化、書き出し、評価） |
 | [`evaluation.md`](evaluation.md) | 評価指標、評価セット、版ごとの結果、誤差の範囲 |
-| [`hardware.md`](hardware.md) | K151 の構成、servo と座標の規約、安全の仕組み、実機の速度とメモリー |
+| [`hardware.md`](hardware.md) | K151 の構成、servo と座標の規約、安全の仕組み、実機の速度とメモリ |
 | [`prior_art.md`](prior_art.md) | 先行例と、主張できる範囲 |
 | [`roadmap.md`](roadmap.md) | 現状と次の計画 |

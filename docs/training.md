@@ -4,6 +4,8 @@
 
 学習済みの重み、tokenizer、`.jtlm` は [Hugging Face のモデル](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) にあります。モデルを使うだけなら、この手順は必要ありません。
 
+コマンドは bash 用です（Windows では Git Bash か WSL で実行してください）。
+
 ## 全体の流れ
 
 各段階が作るファイル（`datasets/action/`、`datasets/raw/`、`tokenizer/out/`、`runs/` の下）は Git の管理外です。
@@ -11,17 +13,19 @@
 | 順 | 段階 | 主な module | 作るもの |
 |---|---|---|---|
 | 1 | 外部データの取得 | `jtalm.data.massive`（自動）、手動の download | `datasets/downloads/` |
-| 2 | データ v0 の生成と組み立て | `jtalm.data.generate`、`jtalm.data.build` | `datasets/action/v0` |
-| 3 | Tokenizer の学習 | `jtalm.model.tokenizer` | `tokenizer/out/action_v0_sp2048.model` |
-| 4 | データ v0.3 / v0.4 | `jtalm.data.generate`、`jtalm.data.build --base` | `datasets/action/v0.3`、`v0.4` |
-| 5 | v0.4 の 3M の学習（間違えやすい例の収集に使う） | `jtalm.model.train` | v0.4 の `best.pt` |
+| 2 | 合成データの生成（GPU と vLLM が必要。各版と評価セットの文） | `jtalm.data.generate` | `datasets/raw/` |
+| 3 | データ v0 の組み立て | `jtalm.data.build` | `datasets/action/v0` |
+| 4 | Tokenizer の学習 | `jtalm.model.tokenizer` | `tokenizer/out/action_v0_sp2048.model` |
+| 5 | データ v0.3 / v0.4 と、v0.4 の 3M の学習（間違えやすい例の収集に使う） | `jtalm.data.build --base`、`jtalm.model.train` | `datasets/action/v0.3`、`v0.4`、v0.4 の `best.pt` |
 | 6 | 人が書いた評価セット human v1 | `jtalm.data.human_eval` | `datasets/action/human_v1` |
 | 7 | 評価セット eval v2 | `jtalm.data.generate`、`jtalm.data.eval_v2` | `datasets/action/eval_v2` |
 | 8 | 間違えやすい例の収集とデータ v0.5 / v0.5.1 | `jtalm.model.mine`、`jtalm.data.build --exclude` | `datasets/action/v0.5`、`v0.5.1` |
 | 9 | 採用したモデルの学習 | `jtalm.model.train` | `best.pt` |
 | 10 | 量子化、`.jtlm` の書き出し、C runtime との一致の確認 | `jtalm.model.quantize`、`export`、`parity` | `best_q4_g64.pt`、`3m_q4_g64.jtlm` |
 | 11 | 評価と誤差の範囲 | `jtalm.model.evaluate`、`eval_suite`、`jtalm.eval.bootstrap` | 評価の表 |
-| 12 | 公開用のパッケージ | `jtalm.model.release` | 公開用のフォルダ |
+| 12 | 公開用のパッケージ | `jtalm.model.release` | 公開用のディレクトリ |
+
+表の番号は、下の見出しの番号と同じです。
 
 ## 必要な環境
 
@@ -39,7 +43,8 @@
 ```sh
 uv sync --locked --group train     # 学習・評価をする場合
 uv sync --locked --all-groups      # すべて入れる場合
-uv run ruff check . && uv run ruff format --check .
+uv run ruff check src tests firmware/tools          # CI と同じ lint
+uv run ruff format --check src tests firmware/tools
 uv run --group train pytest
 ```
 
@@ -52,6 +57,10 @@ uv run --group train pytest
 - **評価、量子化、書き出し:** CPU で動きます。
 - **データの生成:** vLLM の OpenAI 互換サーバーが必要です。vLLM は本プロジェクトの依存には入っていません。生成には Docker image `vllm/vllm-openai:v0.30.0`（CUDA 13.0。host の driver が CUDA 13.0 に対応している必要があります）を使いました。bf16 で 61〜65GB ある書き手（Qwen3、ABEJA、ELYZA）は、80GB 級の GPU 1枚で動かしました。
 - **C runtime との一致の確認:** Docker と image `espressif/idf:v5.5.5` を使います。
+
+### GPU がない場合にできること
+
+学習データと評価セット（v0 eval、human v1、eval v2）を作り直すには、vLLM で Qwen3-30B-A3B-Instruct-2507 などの書き手と検証役を動かす GPU が要ります。v0.3 以降の学習データ、human v1、eval v2 は配布していません。[Hugging Face のデータセット](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) の test は、v0 eval から MASSIVE の行を除いた合成の文（1,039件）だけで、項目名も評価の module が読むファイル（`prompt`、`expected`）とは違います（`input`、`output`）。GPU がなければ、[`results/`](../results/README.md) の結果を確かめることと、公開モデルでの推論（[README](../README.md) の「すぐに試す」）ができます。
 
 ### Windows で日本語を扱うとき
 
@@ -113,15 +122,17 @@ uv run python -m jtalm.data.generate --phase train-verify \
 
 | 版 | config | phase |
 |---|---|---|
-| v0 | `configs/action_v0.json` | llm-jp で `eval-gen`、Qwen3 で `train-gen`・`eval-verify`・`train-verify` |
-| v0（否定の追加） | `configs/action_v0_negation_topup.json` | Qwen3 で `train-gen`・`train-verify`（別の `--out` に） |
+| v0 | `configs/action_v0.json` | llm-jp で `eval-gen`、Qwen3 で `train-gen`・`eval-verify`・`train-verify`（`--out datasets/raw/v0/raw`） |
+| v0（否定の追加） | `configs/action_v0_negation_topup.json` | Qwen3 で `train-gen`・`train-verify`（`--out datasets/raw/v0/raw_negation`） |
 | v0.3 | `configs/action_v03_{calm3,sarashina,qwen}.json` | 各書き手で `train-gen`、Qwen3 で `train-verify` |
 | v0.4 | `configs/action_v04_{abeja,nemoja,granite,elyza,calm3,sarashina,qwen}.json` | 同上 |
 | v0.5 | `configs/action_v05_{abeja,nemoja,elyza,calm3,sarashina,qwen}.json` | 同上（`granite` の config もありますが、v0.5 には入っていません） |
-| v0.5（間違えやすい例） | `configs/action_v05_mined.json` | Qwen3 で `train-verify` だけ（下の「8.」） |
+| v0.5（間違えやすい例） | `configs/action_v05_mined.json` | Qwen3 で `train-verify` だけ（下の「8. 間違えやすい例の収集とデータ v0.5 / v0.5.1」） |
 | v0.5.1 | `configs/action_v051_{abeja,calm3,qwen}.json` | 各書き手で `train-gen`、Qwen3 で `train-verify` |
-| human v1 | `configs/human_eval_v1.json` | Qwen3 で `train-verify` だけ（下の「6.」） |
+| human v1 | `configs/human_eval_v1.json` | Qwen3 で `train-verify` だけ（下の「6. 人が書いた評価セット（human v1）」） |
 | eval v2 | `configs/eval_v2.json` | llm-jp で `eval-gen`、Qwen3 で `eval-verify` |
+
+`--out` の既定値は `artifacts/raw` です。v0 の2つの `--out` は、次の「3. データ v0 の組み立て」の `--raw` に合わせています。ほかの版も、組み立てのコマンドの `--raw` と同じ場所（`datasets/raw/v03/raw_calm3` など）に書いてください。
 
 生成は seed を固定していますが、再生成した文が元のファイルと同じになる保証はありません。元のファイルとの一致は、manifest の sha256 で確かめられます。
 
@@ -265,7 +276,7 @@ uv run --group train python -m jtalm.model.parity --ckpt runs/local/v051/3m/best
 ```
 
 - 採用したモデルの `.jtlm` は 1,971,456 bytes です。形式は [`architecture.md`](architecture.md) を参照してください。
-- `parity` は、tokenizer の結果、生成した token 列、出力の文字列を比べ、実機への移植用に `golden.jsonl` を書きます。`--docker` を使うとき、`--out` は repository の中に置いてください。`--limit 50` で件数を絞れます。
+- `parity` は、tokenizer の結果、生成した token 列、出力の文字列を比べ、実機への移植用に `golden.jsonl` を書きます。`--docker` を使うとき、`--out` はリポジトリの中に置いてください。`--limit 50` で件数を絞れます。
 - C runtime の build は [`../runtime/host/README.md`](../runtime/host/README.md)、firmware への書き込みは [`../firmware/README.md`](../firmware/README.md) を参照してください。
 
 ## 11. 評価
@@ -279,7 +290,7 @@ uv run --group train python -m jtalm.model.evaluate \
     --modes plain grammar gate --out runs/local/v051/eval
 ```
 
-- `plain` は制約なし、`grammar` は grammar で制約した greedy、`gate` は grammar に confidence gate を加えたものです。
+- `plain` は制約なし、`grammar` は grammar で制約した greedy、`gate` は grammar に確信度の gate（confidence gate）を加えたものです。
 - ルールベースの baseline と、TinyLM-Bench の16件での既存モデルとの比較も同じ表に出します。
 
 ### すべての評価セット（`jtalm.model.eval_suite`）
@@ -290,12 +301,12 @@ uv run --group train python -m jtalm.model.eval_suite \
     --val datasets/action/v0.5.1/val.jsonl --out runs/local/suite_v051_3m_q4
 ```
 
-- v0 eval、human v1、eval v2 の12パターンを、grammar と confidence gate で評価し、`suite.md` と `suite.json`、評価セットごとの `*_predictions.jsonl` を書きます。
+- v0 eval、human v1、eval v2 の12パターンを、grammar と gate で評価し、`suite.md` と `suite.json`、評価セットごとの `*_predictions.jsonl` を書きます。
 - **gate の閾値は validation だけで選びます。** validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値です。採用したモデルでは 0.86808 になりました（firmware の既定値は千分率で 868）。`--val` の既定値は v0.4 の validation なので、モデルの学習に使った版の validation を渡してください。閾値を固定するときは `--gate 0.86808` を使います。
 
 ### 誤差の範囲（`jtalm.eval.bootstrap`）
 
-`eval_suite` の出力フォルダを入力にします。
+`eval_suite` の出力ディレクトリを入力にします。
 
 ```sh
 # 1つのモデル: 評価セットごとの 95% bootstrap 区間
@@ -317,13 +328,20 @@ uv run --group train python -m jtalm.model.release prepare \
     --ckpt runs/local/v051/3m/best.pt --ckpt-q4 runs/local/v051/3m/best_q4_g64.pt \
     --jtlm runs/local/v051/export/3m_q4_g64.jtlm --suite runs/local/suite_v051_3m_q4 \
     --gate 0.86808 --out runs/release/action_3m
-# 用意したフォルダのモデルを動かして確かめる
+# 用意したディレクトリのモデルを動かして確かめる
 uv run --group train python -m jtalm.model.release run runs/release/action_3m 右を向いて
 # 公開する（--confirm と HF_TOKEN が必要）
 uv run python -m jtalm.model.release publish runs/release/action_3m --repo <user>/<repo> --confirm
 ```
 
-- `prepare` は、評価したとおりの INT4 の重み（safetensors）、量子化前の fp32 の重み、tokenizer、Action schema、`.jtlm`、評価の表、モデルカード、firmware の書き込み用イメージ（firmware と `.jtlm` を 0x0 から書く1ファイル）を書きます。firmware の build フォルダ（既定は `firmware/jtalm_action/build_release`、`--firmware-build` で変更）が必要です。build の方法は [`../firmware/README.md`](../firmware/README.md) を参照してください。
+- `prepare` は、評価したとおりの INT4 の重み（safetensors）、量子化前の fp32 の重み、tokenizer、Action schema、`.jtlm`、評価の表、モデルカード、firmware の書き込み用イメージ（firmware と `.jtlm` を 0x0 から書く1ファイル）を書きます。firmware の build ディレクトリ（既定は `firmware/jtalm_action/build_release`）が必要です。[`../firmware/README.md`](../firmware/README.md) の手順で、build 先を `build_release` にして build するか（下）、`--firmware-build firmware/jtalm_action/build` を渡してください。
+
+  ```sh
+  # リポジトリの root で（Windows の Git Bash では firmware/README.md の書き方に合わせる）
+  docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$PWD:/w" -w /w/firmware/jtalm_action \
+    espressif/idf:v5.5.5 idf.py -B build_release build
+  ```
+
 - `publish` は `--confirm` がないと止まります。リポジトリを private で作ってアップロードし、Community contributions（Discussions と Pull Requests）を off にしたことを確かめてから public にします。`--repo` の既定値は公開済みのモデルのリポジトリなので、自分のリポジトリを指定してください。
 
 ## vast.ai での実行（任意）
@@ -340,26 +358,7 @@ uv run python -m jtalm.infra.job <job> --approve-dph <price>
 - 必要なもの: `.env` か環境変数の `VAST_API_KEY`、vast.ai のアカウントに登録した SSH 鍵 `~/.ssh/id_ed25519_vast`。`.env` と commit していない変更は送りません。
 - instance 上では `uv sync --locked --no-dev`（学習では `--group train` を追加）で環境を作ります。image は `vllm/vllm-openai:v0.30.0` で、CUDA 13.0 に対応した host だけを選びます。学習の job は compute capability 8.0〜9.0 の GPU に限ります。
 
-| job | 内容 |
-|---|---|
-| `smoke` | GPU 上の torch と、vLLM による小さな生成の動作確認 |
-| `gen_action_v0` | データ v0 の生成と検証（llm-jp が評価セット、Qwen3 が学習データ） |
-| `gen_action_v0_negation` | データ v0 の否定だけの追加生成 |
-| `train_action_v0` | v0 で 3M / 5M / 20M を学習し、v0 eval で評価 |
-| `train_action_v0_scaling` | v0 の学習データの 25% / 50% / 100% で 3M を学習（データ量の確認） |
-| `gen_action_v03` | データ v0.3 の生成（calm3、sarashina2.2、Qwen3）と検証 |
-| `train_action_v03` | v0.3 で 3M / 5M / 20M を学習し、評価 |
-| `gen_action_v04` | データ v0.4 の生成（7つの書き手）と検証 |
-| `gen_action_v04b` | データ v0.4 の残りの書き手の生成と、7つの書き手すべての検証（disk の大きい host） |
-| `train_action_v04` | v0.4 で 3M / 5M / 20M を学習し、評価 |
-| `verify_human_v1` | human v1 の候補を Qwen3 で検証 |
-| `gen_eval_v2` | eval v2 の生成（llm-jp）と検証（Qwen3） |
-| `gen_action_v05` | 間違えやすい例の収集と、データ v0.5 の生成と検証 |
-| `train_action_v05` | v0.5 で 3M（2 seed）と 5M を学習し、評価 |
-| `gen_action_v051` | データ v0.5.1 の追加分の生成と検証 |
-| `gen_action_v051b` | データ v0.5.1 の ABEJA と calm3 の分の生成のやり直しと検証 |
-| `train_action_v051` | v0.5.1 で 3M（seed 0 / 1）を学習し、評価 |
-| `train_action_v051_seeds` | v0.5.1 で 3M（seed 2〜4）を学習（誤差の範囲） |
+job の名前は、`smoke`（動作確認）、`gen_action_<版>`（データの生成と検証。例: `gen_action_v04`）、`train_action_<版>`（学習と評価。例: `train_action_v051`、seed を変える `train_action_v051_seeds`、データ量を変える `train_action_v0_scaling`）、`verify_human_v1`、`gen_eval_v2` の形です（一覧は `src/jtalm/infra/jobs.py`）。
 
 - job の手順は `src/jtalm/infra/jobs.py` にあり、上の手元の手順と同じ module を呼びます。生成の job は書き手ごとに vLLM を起動し、終わると重みを消してから次の書き手に進みます。
 - `gen_action_v05` は、v0.4 の 3M の checkpoint と収集用の候補を `jobs.py` の `V04_CKPT`、`MINE_POOL` のパスから送ります。自分で学習した checkpoint を使うときは、パスを書き換えてください。

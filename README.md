@@ -40,8 +40,8 @@
 | `nod`（うなずく） | `count`: 1〜3 |
 
 - **必ず正しい形の JSON を出します。** 生成の各 step で schema に合う token だけを選びます（文法による制約）。
-- **自信がないときは動きません。** 生成した token の確率の最小値が閾値（0.868）より低いと、`[]` にします（確信度の gate）。
-- **小さい:** 重みは INT4 で 2.0MB（`.jtlm`）。実機での応答は1文あたり中央値 1.3 秒です。
+- **自信がないときは動きません。** 生成した token の確率の最小値が閾値（0.868）より低いと、`[]` にします。これを確信度の gate（confidence gate）と呼びます。
+- **小さい:** 実機に書き込む `.jtlm` ファイル（INT4 の重みと tokenizer）は 2.0MB（1,971,456 B）で、重みだけなら 1.68MB です。実機での応答は1文あたり中央値 1.3 秒です。
 
 ## 結果
 
@@ -55,8 +55,8 @@
 | できない依頼で誤って動いた割合 | 286 | 0.3 ± 0.3% |
 | 実機（ESP32-S3）と PC（PyTorch）の出力の一致 | 300 | 300 / 300 |
 
-- 英語には対応していません（英語の依頼の正解は約5%）。ひらがなだけの文（約83%）と言い直しの文（約86%）はやや苦手です。
-- 評価セットごとの結果、誤差の範囲、版ごとの改善は [`docs/evaluation.md`](docs/evaluation.md) にあります。
+- 英語には対応していません（英語の依頼の正解は約5%）。表記の揺れ（ひらがなだけ、カタカナ、打ち間違い、方言）の文は 83.3%、言い直しの文は 85.5% で、やや苦手です（どちらも 5 seed の平均の完全一致）。
+- 評価セットごとの結果、誤差の範囲、版ごとの改善は [`docs/evaluation.md`](docs/evaluation.md) にあります。実機の計測は [`results/v051_action/device/`](results/v051_action/device/README.md) にあります。
 
 ## すぐに試す
 
@@ -82,7 +82,8 @@ Python から使う方法は [モデルカード](https://huggingface.co/ayousan
 ビルド済みの firmware とモデルを1つにしたイメージを書き込みます。**今入っている firmware は消えます。**
 
 ```bash
-pip install esptool pyserial
+pip install esptool pyserial huggingface_hub
+hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgentLM-Action-3M
 esptool --chip esp32s3 -p <PORT> -b 921600 write-flash 0x0 JapaneseTinyAgentLM-Action-3M/firmware/stackchan_k151_jtalm_action.bin
 python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT>           # 首は動かない
 python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo   # 首も動く
@@ -100,7 +101,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 
 | 項目 | 内容 |
 |---|---|
-| 対象 | M5Stack スタックチャン K151（CoreS3 = ESP32-S3、Flash 16MB、PSRAM 8MB、servo は Feetech SCS0009 ×2） |
+| 対象 | スタックチャン K151（CoreS3 = ESP32-S3、Flash 16MB、PSRAM 8MB、servo は Feetech SCS0009 ×2） |
 | 使うもの | CPU の2コア、Flash（重みを直接読む）、PSRAM、画面、touch、servo。Wi-Fi と NPU は使わない |
 | 入力 | USB serial で送る日本語のテキスト（音声認識はこのリポジトリの範囲外） |
 
@@ -128,7 +129,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 | 文書 | 内容 |
 |---|---|
 | [`docs/overview.md`](docs/overview.md) | 目的、設計の目標、範囲 |
-| [`docs/architecture.md`](docs/architecture.md) | モデル、tokenizer、Action の schema、文法による制約と gate、`.jtlm`、実機でのメモリー配置 |
+| [`docs/architecture.md`](docs/architecture.md) | モデル、tokenizer、Action の schema、文法による制約と gate、`.jtlm`、実機でのメモリ配置 |
 | [`docs/data.md`](docs/data.md) | 学習・評価データの作り方と出典 |
 | [`docs/training.md`](docs/training.md) | 再現の手順（データ生成、学習、量子化、評価、公開） |
 | [`docs/evaluation.md`](docs/evaluation.md) | 評価の方法と結果 |

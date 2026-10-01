@@ -1,6 +1,6 @@
 # ロードマップ
 
-本プロジェクトの範囲は、ESP32-S3 単体で動く日本語の小型言語モデル（Action LM と Chat LM）を作り、M5Stack Stack-chan（K151）で使えるようにすることです。音声認識（ASR）や音声合成（TTS）との統合は、本計画の範囲外です。
+本プロジェクトの範囲は、ESP32-S3 単体で動く日本語の小型言語モデル（Action LM と Chat LM）を作り、M5Stack のスタックチャン（K151）で使えるようにすることです。音声認識（ASR）や音声合成（TTS）との統合は、本計画の範囲外です。
 
 ## 現状
 
@@ -17,15 +17,15 @@
 
 | 公開先 | 内容 | ライセンス |
 |---|---|---|
-| [ayousanz/JapaneseTinyAgentLM-Action-3M](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) | 重み（INT4 と量子化前の fp32、safetensors）、`.jtlm`（INT4、1,971,456 B）、tokenizer、`inference.py`、Stack-chan 用のビルド済み firmware image、`stackchan_chat.py`、第三者のライセンス | CC BY-SA 4.0 |
+| [ayousanz/JapaneseTinyAgentLM-Action-3M](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) | 重み（INT4 と量子化前の fp32、safetensors）、`.jtlm`（INT4、1,971,456 B）、tokenizer、`inference.py`、スタックチャン用のビルド済み firmware image、`stackchan_chat.py`、第三者のライセンス | CC BY-SA 4.0 |
 | [japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) | 合成データ v0（public、manual gate）。v0.3 以降のデータは公開していません | CC BY-SA 4.0 |
 | GitHub（本リポジトリ） | 学習・評価のコード、C runtime、firmware、評価結果（[results/](../results/README.md)） | Apache-2.0 |
 
 ### 採用モデルの要点
 
-- 3M（d_model 192、7層、GQA 6/2 heads）、データ v0.5.1、INT4 group 64。Grammar で出力は常に schema に合い、confidence gate 0.868 で確信の低い出力を `[]` にします。
+- 3M（d_model 192、7層、GQA 6/2 heads）、データ v0.5.1、INT4 group 64。grammar で出力は常に schema に合い、確信度の gate（confidence gate）0.868 で確信の低い出力を `[]` にします。
 - 人が書いた文（1,159件）: 完全一致 99.6%、依頼 91.9%（5 seed の平均は 85.2 ± 6.4%）、誤って動いた割合 0.0%。
-- 実機（CoreS3）: 1回の応答は中央値 1,276ms。Wi-Fi、NPU、外部モジュールは使いません。
+- 実機（CoreS3）: 1回の応答は中央値 1,276ms（[`results/v051_action/device/`](../results/v051_action/device/README.md)）。Wi-Fi、NPU、外部モジュールは使いません。
 
 ## 次: Chat LM（約 10M）
 
@@ -68,8 +68,8 @@ Baseline:
 | INT8 の KV cache | KV cache は f32 のまま PSRAM に置いています。INT8 化は未実装です |
 | tokenizer の縮小 | `.jtlm` のうち tokenizer が 0.27MB を占めます |
 | 人が書いた依頼の評価 | 人が書いた依頼は 62件しかなく、正面を向く・笑うに偏っています。95% 区間が広く（85.5〜98.4%）、seed による差も大きいので、件数を増やす必要があります |
-| 英語 | 学習データに入れていないので、英語の依頼はほぼ解けません（5.3%）。日本語専用です |
-| 表記の揺れと言い直し | ひらがなだけ・方言・打ち間違い（80.8%）と言い直し（84.1%）が弱点です |
+| 英語 | 学習データに入れていないので、英語の依頼はほぼ解けません（seed 0 で 5.3%、5 seed の平均 5.8%）。日本語専用です |
+| 表記の揺れと言い直し | 表記の揺れ（ひらがなだけ、カタカナ、打ち間違い、方言。完全一致は 5 seed の平均 83.3%）と言い直し（同じく 85.5%）が弱点です |
 | 長時間の安定性と温度 | 連続実行は 1,189件（画面なし）と 200件（画面と dispatcher あり）まで確認済みです。それより長い連続実行、chip の温度と clock の低下は未計測です |
 | 比較の baseline | 小型の classifier や seq2seq との比較は未実施です（ルールベースとは比較済み） |
 | Base + SFT との比較 | Action LM は Action 専用のスクラッチ学習です。日本語の Base から SFT した場合との比較は、Chat LM の Base ができてから行います |

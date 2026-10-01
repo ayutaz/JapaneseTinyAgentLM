@@ -1,8 +1,8 @@
 # 評価
 
-Action LM の評価の定義、評価セット、採用モデルの結果、誤差の範囲、ここまでの判断の根拠をまとめます。表の数値はすべて [`results/`](../results/README.md) のファイルから取っており、各表の下に出典のファイルを書いています。
+Action LM の評価の定義、評価セット、採用モデルの結果、誤差の範囲、ここまでの判断の根拠をまとめます。表の数値はすべて [`results/`](../results/README.md) のファイルから取っており、各表の下に出典のファイルを書いています。採用モデルの実機の値（出力の一致と応答時間）は [`results/v051_action/device/`](../results/v051_action/device/README.md) にあります。
 
-- 採用モデル: 3M（3,148,608 params）、データ v0.5.1、seed 0、INT4（group 64、fp16 scale）、grammar + confidence gate 0.868。モデルの構成は [architecture.md](architecture.md)、データは [data.md](data.md)、再現の手順は [training.md](training.md) を参照してください。
+- 採用モデル: 3M（3,148,608 params）、データ v0.5.1、seed 0、INT4（group 64、fp16 scale）、grammar + 確信度の gate（confidence gate）0.868。モデルの構成は [architecture.md](architecture.md)、データは [data.md](data.md)、再現の手順は [training.md](training.md) を参照してください。
 - 公開モデル: [ayousanz/JapaneseTinyAgentLM-Action-3M](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)
 
 ## 指標の定義
@@ -55,7 +55,7 @@ eval v2 のパターン:
 ## Decoding と gate の評価方法
 
 - **Grammar:** Action schema に合う token だけを選べるようにした greedy decoding です。出力は必ず schema に合います（[architecture.md](architecture.md)）。
-- **Confidence gate:** 生成した token の確率の最小値（grammar の mask をかける前の確率）が閾値より小さいとき、出力を `[]` に置き換えます。
+- **Gate:** 生成した token の確率の最小値（grammar の mask をかける前の確率）が閾値より小さいとき、出力を `[]` に置き換えます。
 - **閾値の選び方:** validation だけで選びます。validation の exact が gate なしから 0.5 point 以上下がらない範囲で、最も大きい閾値を取ります（`jtalm.model.evaluate.select_gate`）。評価セットは閾値の選択に使いません。採用モデルでは 0.86808（validation の exact は gate なし 98.2%、gate あり 97.8%）で、firmware の既定値は `CONFIG_JTALM_GATE_PERMILLE=868` です。
 
 ## 採用モデルの結果
@@ -82,7 +82,7 @@ eval v2 のパターン:
 出典: [`results/v051_action/suite_3m/suite.md`](../results/v051_action/suite_3m/suite.md)（単位は %。「—」はそのセットに該当する入力がないもの）
 
 - 人が書いた文で誤って動いた件数は 1,097件中 0件、実行できない依頼では 286件中 1件です。
-- 弱いところ: 表記の揺れ（ひらがなだけの文など、80.8%）、言い直し（84.1%、44件）。英語の依頼は 5.3% で、**日本語専用**として扱ってください。
+- 弱いところ: 表記の揺れ（ひらがなだけ、カタカナ、打ち間違い、方言。exact は seed 0 で 82.6%、5 seed の平均で 83.3%）、言い直し（44件。seed 0 で 84.1%、5 seed の平均で 85.5%）。英語の依頼は seed 0 で 5.3% で、**日本語専用**として扱ってください。
 
 v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decoding の段階ごと。ルールベースとの比較）:
 
@@ -122,7 +122,7 @@ v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decodin
 - validation の exact は 5 seed とも 98.1〜98.3% でほぼ同じで、validation では seed を選べません。
 - bootstrap の区間は評価セットの標本のばらつきだけを表し、学習の seed によるばらつきは含みません。人が書いた依頼は 62件しかないので、区間が広くなります（85.5〜98.4%）。
 
-## ここまでの経緯
+## 版ごとの改善と設計判断
 
 ### データの版と主な結果
 
@@ -184,7 +184,7 @@ v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decodin
 
 ## 既存モデルとの比較（TinyLM-Bench の16件）
 
-既存の小型モデルは、別に行った検証（TinyLM-Bench、Windows host）で得た16件の出力しか手元になく、1,189件の評価セットでは比べていません。出力は [`tests/fixtures/tinylm_bench/`](../tests/fixtures/tinylm_bench/) にあり、本プロジェクトの評価器でベンチの厳格一致（3 / 6 / 1 件）を再現できることを確かめています。
+TinyLM-Bench は、作者が本プロジェクトとは別に行った、既存の小型モデルの16件の比較です（非公開）。ケースと既存モデルの出力は [`tests/fixtures/tinylm_bench/`](../tests/fixtures/tinylm_bench/) にあります。既存モデルはこの16件の出力しか手元になく、1,189件の評価セットでは比べていません。本プロジェクトの評価器で、ベンチの厳格一致（Needle 2 / FunctionGemma 270M / MimiModel で 3 / 6 / 1 件）を再現できることを確かめています。既存の3モデルは、multi-action（4件）と否定（2件）のケースを1件も正解しませんでした。
 
 | model | 規模 | exact（16件） | 出典 |
 |---|---:|---:|---|
@@ -207,48 +207,10 @@ v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decodin
 
 ## 実機と PC の一致
 
-| 確認 | 対象 | 結果 | 出典 |
-|---|---|---|---|
-| C runtime（host）と PyTorch | 3M / 5M × FP32 / INT8 / INT4、grammar なし / あり、v0 eval 1,189件 | token 列と出力がすべて一致。exact も同じ（3M INT4 で 84.78%） | [`results/m6_parity/`](../results/m6_parity/) |
-| C の tokenizer と SentencePiece | 学習 9,067、validation 477、評価 1,189、無作為 20,000件 | すべて一致 | [`results/m6_parity/3m/parity.json`](../results/m6_parity/3m/parity.json) |
-| 実機（ESP32-S3）と host | M4 の 3M FP32 / INT8 / INT4、5M INT8 / INT4、先頭 200件 | 200 / 200 一致 | [`results/b4_device/`](../results/b4_device/) |
-| 実機と host（gate を含む） | v0.4 の 3M INT4、v0 eval 全 1,189件 | gate の前と後の出力とも 1,189 / 1,189 一致 | [`results/b4_device/v04_3m_q4_g64_all.summary.json`](../results/b4_device/v04_3m_q4_g64_all.summary.json) |
-| 実機と Python（採用モデル） | v0.5.1 の 3M INT4、gate 0.868、先頭 300件 | gate の前と後の出力とも 300 / 300 一致 | [hardware.md](hardware.md) |
+C runtime（PC）の出力は PyTorch と token 単位で一致し（[`results/m6_parity/`](../results/m6_parity/)）、採用モデルの実機の出力も、v0 eval の先頭 300件で gate の前と後とも PyTorch と 300 / 300 一致しました（[`results/v051_action/device/`](../results/v051_action/device/README.md)）。そのため、上の評価結果はそのまま実機の値になります。確かめ方と詳細は [runtime/host/README.md](../runtime/host/README.md) の「Python との一致の確認」にあります。
 
-実機の出力は PC と一致するので、上の評価結果はそのまま実機の値になります。採用モデルの実機での応答時間は中央値 1,276ms、p90 1,860ms です（decode 約 105 ms/token、prefill 約 46 ms/token）。速度とメモリの詳細は [hardware.md](hardware.md) にあります。
+採用モデルの実機での応答時間は中央値 1,276ms、p90 1,860ms です（decode 約 105 ms/token、prefill 約 46 ms/token。[`results/v051_action/device/`](../results/v051_action/device/README.md)）。速度とメモリの詳細は [hardware.md](hardware.md) にあります。
 
 ## 再現の方法
 
-学習データ、評価セット、tokenizer、checkpoint の作り方は [training.md](training.md) にあります。評価セットのうち、v0 eval の合成の文は [Hugging Face のデータセット](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) の test にあります。human v1 と eval v2 は配布していないので、[data.md](data.md) の手順で作ってください。
-
-全評価セットの表（gate の閾値は `--val` で選びます）:
-
-```sh
-uv run --group train python -m jtalm.model.eval_suite \
-    --ckpt <checkpoint のディレクトリ>/best_q4_g64.pt \
-    --tokenizer tokenizer/out/action_v0_sp2048.model \
-    --val datasets/action/v0.5.1/val.jsonl \
-    --out runs/local/suite_v051_3m_q4
-```
-
-このコマンドで `runs/local/suite_v051_3m_q4/` に `suite.md`、`suite.json`、セットごとの予測（`*_predictions.jsonl`）を作ります。
-
-カテゴリ別の表と TinyLM-Bench の16件:
-
-```sh
-uv run --group train python -m jtalm.model.evaluate \
-    --ckpt <checkpoint のディレクトリ>/best.pt \
-    --tokenizer tokenizer/out/action_v0_sp2048.model \
-    --modes plain grammar gate --val datasets/action/v0.5.1/val.jsonl \
-    --out runs/local/eval_v051
-```
-
-誤差の範囲（入力は `eval_suite` の出力ディレクトリ）:
-
-```sh
-uv run python -m jtalm.eval.bootstrap ci runs/local/suite_v051_3m_q4              # 95% 区間
-uv run python -m jtalm.eval.bootstrap diff <A の suite> <B の suite>               # paired bootstrap（B − A）
-uv run python -m jtalm.eval.bootstrap seeds <seed 0 の suite> <seed 1 の suite> ...  # seed の平均 ± SD
-```
-
-実機での一致の確認は `firmware/tools/lm_serial.py`（`--port <PORT>`、例: Windows は COM3、Linux は /dev/ttyACM0）で行います。手順は [firmware/README.md](../firmware/README.md) を参照してください。
+評価の表（`jtalm.model.evaluate`）、全評価セットの表（`jtalm.model.eval_suite`）、誤差の範囲（`jtalm.eval.bootstrap`）を作るコマンドは、[training.md](training.md) の「11. 評価」にあります。評価セットの作り方は、同じ文書の「6. 人が書いた評価セット（human v1）」「7. 評価セット v2」と [data.md](data.md) にあります（作り直すには GPU が要ります）。実機での一致の確認は、[firmware/README.md](../firmware/README.md) の「ツール」にある `lm_serial.py` で行います。

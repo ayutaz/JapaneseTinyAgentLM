@@ -5,7 +5,7 @@ Action LM の構成を、モデル、tokenizer、出力の形式、decoding、�
 ## 全体像
 
 ```text
-                     CoreS3 / ESP32-S3（M5 スタックチャン K151）
+             M5Stack のスタックチャン（K151）: CoreS3 / ESP32-S3
 
  日本語テキスト（実機は USB serial、PC は UTF-8 のファイルか stdin）
                            │
@@ -16,7 +16,7 @@ Action LM の構成を、モデル、tokenizer、出力の形式、decoding、�
             grammar で制約した greedy decoding
                            │
                            ▼
-         confidence gate（確信度が低ければ []）
+  確信度の gate（confidence gate。確信度が低ければ []）
                            │
                            ▼
           validator（schema、重複、可動域）
@@ -53,14 +53,15 @@ decoder-only Transformer です（`src/jtalm/model/transformer.py`）。
 
 サイズは data v0.4 で比べて決めました。
 
-| model | 評価セット v0 の完全一致（2 seed の平均） | 重み（INT4、group 64） | `.jtlm` | 実機の1回の依頼（中央値） |
+| model | 評価セット v0 の完全一致（2 seed の平均） | 重み（INT4、group 64） | `.jtlm` | 実機の1回の依頼（中央値、当時の計測） |
 |---|---:|---:|---:|---:|
 | **3M INT4** | **94.3%** | 1.68MB | 約 2.0MB | 1.08〜1.15 秒 |
 | 5M INT4 | 93.3% | 2.69MB | 約 3.0MB | 1.79 秒 |
 | 20M（FP、PC のみ） | 95.0%（1 seed） | 10.5MB | — | 実機に載らない |
 
+- 実機の速度は、data v0.4 のモデルで比べたときの計測です。採用した v0.5.1 の 3M は、中央値 1,276 ms です（[`results/v051_action/device/`](../results/v051_action/device/README.md)。評価に使った文の長さが違います）。
 - 3M は 5M より精度が高く、実機でも速い。20M との差は +0.7 point で、20M は INT4 でも LM の容量の目安（1.5〜5MB）を超える。
-- M4（data v0）では 20M も 3M とほぼ同じ精度（83.9% と 84.4%）だった。精度が足りない原因は capacity ではなくデータの側と判断し、データの書き手を増やした（[`data.md`](data.md)）。
+- data v0 のモデルでは 20M も 3M とほぼ同じ精度（83.9% と 84.4%）だった。精度が足りない原因は capacity ではなくデータの側と判断し、データの書き手を増やした（[`data.md`](data.md)）。
 
 採用したモデルは、data v0.5.1（train 66,809 件 / validation 3,515 件）で、seed 0、12 epoch、lr 1e-3 で学習しました。手順は [`training.md`](training.md) にあります。
 
@@ -203,7 +204,7 @@ CALL = LOOK direction ","amount":" amount "}}     （direction が center なら
 
 各 step で、状態機械が許す token の中から確率が最大のものを選びます（greedy）。この grammar の下で生成した出力は、必ず parse でき、schema を満たし、重複を含みません。
 
-grammar が保証するのは構造だけです。「左を向いて」に `"direction":"right"` を返す誤りは、構文上は正しいので防げません。意味の誤りは、評価（完全一致、方向・量・否定などのカテゴリ別の集計）と、次の confidence gate で扱います。
+grammar が保証するのは構造だけです。「左を向いて」に `"direction":"right"` を返す誤りは、構文上は正しいので防げません。意味の誤りは、評価（完全一致、方向・量・否定などのカテゴリ別の集計）と、次の gate で扱います。
 
 ## Confidence gate
 
@@ -249,24 +250,17 @@ gate の効果（誤って動く割合の変化など）は [`evaluation.md`](ev
 
 - `.jtlm` を読み、モデルの構造体はファイルの中を指すだけで、何も複製しません（ESP32 では flash を mmap した領域をそのまま渡す）。
 - Tokenizer は SentencePiece の処理（`nmt_nfkc` の正規化、user-defined symbol、unigram の Viterbi、byte fallback）を C に移したものです。
-- KV cache を使った greedy 生成、grammar による制約、`min_prob` の出力（confidence gate 用）を持ちます。
+- KV cache を使った greedy 生成、grammar による制約、`min_prob` の出力（gate 用）を持ちます。
 - 書き換える状態は、`jtlm_state_bytes()` の大きさの arena 1つにまとめます。token ごとの malloc はありません。
 - 入力は UTF-8 のファイルか stdin で渡します（Windows の console の code page に左右されないよう、argv では渡しません）。
 
 ### PyTorch との一致
 
-C の出力は、PyTorch の出力と token 単位で一致します。
-
-- **Tokenizer:** `sentencepiece` と token id が、data v0 の学習データ 9,067、validation 477、評価セット 1,189 の全件と、無作為な文字列 20,000 件で一致しました。decode も 20,000 件で一致しました。
-- **生成:** 3M / 5M の FP32 / INT8 / INT4、grammar のあり・なしのすべてで、評価セット 1,189 件の token 列が PyTorch と一致しました（argmax の反転は 0 件）。最初の step の logits の差は最大 2.4e-5 です。
-- ESP32 と同じ単精度の累積（`-DJTLM_ACC=float`）でも、3M の6条件すべてで一致しました。
-- `-ffp-contract=off` で build します（f32 の乗算と加算を PyTorch と同じく別々に丸めるため）。
-- 実機の出力も PC と一致します。採用したモデル（data v0.5.1）では、実機の出力が PyTorch と 300 / 300 件で一致しました。
-- 確認には `jtalm.model.parity` を使います。golden vector（prompt の id、生成した id、最初の step の上位 logits）は `results/m6_parity/*/golden.jsonl` にあります。
+C の tokenizer と生成は、PyTorch / SentencePiece と token 単位で一致します（評価セット 1,189 件、3M / 5M × FP32 / INT8 / INT4）。実機の出力も一致し、採用したモデルでは 300 / 300 件でした（[`results/v051_action/device/`](../results/v051_action/device/README.md)）。確かめ方と結果の詳細は [`../runtime/host/README.md`](../runtime/host/README.md) の「Python との一致の確認」にあります。
 
 ## ESP32-S3 での配置
 
-対象は M5 スタックチャン K151（CoreS3、ESP32-S3、16MB Flash、8MB PSRAM）です。
+対象はスタックチャン（K151。CoreS3、ESP32-S3、16MB Flash、8MB PSRAM）です。
 
 ### Flash
 
@@ -295,30 +289,11 @@ C の出力は、PyTorch の出力と token 単位で一致します。
 
 ### 速くするための工夫
 
-どれも計算の値を変えません（変更の前後で出力は byte 単位で同じ）。
-
-- **batch prefill:** prompt を最大 16 token（`JTLM_BATCH`）ずつまとめて処理し、重みの各行を1回読んで全 token に掛けます。prompt の途中の token では出力 head の計算を省きます。
-- **2つの core:** 行列積の出力の行を2つに分け、LM の task（core 1）と行列の worker（core 0）で計算します（`jtlm_set_parallel()`）。
-
-実機の速度は、decode が約 105 ms/token、prefill が約 46 ms/token で、1回の依頼は中央値 1,276 ms、p90 1,860 ms です。計測の条件と詳細は [`hardware.md`](hardware.md) にあります。
+prompt をまとめて処理する prefill（最大 16 token）と、行列積を2つの core に分ける並列化を使います。どちらも計算の値を変えません。実機では1回の依頼が中央値 1,276 ms、p90 1,860 ms です（[`results/v051_action/device/`](../results/v051_action/device/README.md)）。工夫の内容と効果は [`hardware.md`](hardware.md) の「速くするために行ったこと」にあります。
 
 ## Action から servo へ
 
-firmware の dispatcher が、検証した Action を servo の動きに変えます。概要は次のとおりで、詳細（座標の規約、安全の仕組み、計測）は [`hardware.md`](hardware.md) にあります。対応する Python の参照実装は `jtalm.action.mapping` です。
-
-| `amount` | `left` / `right` の yaw | `up` / `down` の pitch |
-|---|---:|---:|
-| `slight` | 10° | 5° |
-| `normal` | 20° | 10° |
-| `large` | 30° | 15° |
-
-- 角度は中立からの相対値で、yaw は右が正、pitch は上が正です。raw 値への変換は yaw `raw = 460 − deg × 16 / 5`、pitch `raw = 620 + deg × 16 / 5` です（中立は yaw 460 / pitch 620）。
-- soft limit は yaw ±30°、pitch −10〜+15° です。「下を大きく」（−15°）は −10° に制限されます。
-- `nod` は、今の pitch から 14° 下げて戻す動きを `count` 回くり返します（片道 280 ms、900°/s²）。下限の近くでは、振れ幅を保つために上側へずらします。
-- `set_expression` は M5GFX で4つの表情を描きます。
-- 起動直後の servo は off（dry-run）で、`!servo on` で有効になります。画面に触れるか `!stop` で止まり、servo の電源が切れます。watchdog もあります。
-
-首が動くので、servo を有効にするときは指やケーブルを近づけないでください。
+firmware の dispatcher が、検証した Action を角度に変え、可動域（yaw ±30°、pitch −10〜+15°）に制限してから servo を動かし、`set_expression` は画面に顔を描きます（Python の参照実装は `jtalm.action.mapping`）。量ごとの角度、座標の規約、うなずきの動き、停止と watchdog は [`hardware.md`](hardware.md) の「Dispatcher」にあります。起動直後の servo は off です。首が動くので、servo を有効にするときは指やケーブルを近づけないでください。
 
 ## Chat LM（予定）
 
