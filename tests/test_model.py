@@ -108,15 +108,16 @@ def test_uploads_are_checked_before_renting(tmp_path: Path) -> None:
     assert len(digest) == 64 and json.dumps(digest)
 
 
-def _enumerate(grammar, codec: Codec) -> list[list[int]]:
-    """All complete target token sequences the grammar allows (depth-first)."""
+def _enumerate_up_to_one_call(grammar, codec: Codec) -> list[list[int]]:
+    """Complete target sequences with at most one call (depth-first; two calls are ~12.7M)."""
+    comma = grammar.id[","]
     done, stack = [], [[]]
     while stack:
         seq = stack.pop()
         for token in grammar.allowed(seq):
             if token == codec.eos:
                 done.append(seq)
-            else:
+            elif token != comma:  # after the first call only "]" is followed
                 stack.append(seq + [token])
     return done
 
@@ -127,15 +128,17 @@ def test_grammar_allows_exactly_the_valid_canonical_outputs(codec: Codec) -> Non
     from jtalm.model.grammar import ActionGrammar
 
     grammar = ActionGrammar(codec)
-    outputs = [codec.sp.decode(seq) for seq in _enumerate(grammar, codec)]
+    outputs = [codec.sp.decode(seq) for seq in _enumerate_up_to_one_call(grammar, codec)]
     parsed = [json.loads(o) for o in outputs]
-    assert all(validate(calls) == [] for calls in parsed)  # schema + no duplicates
+    assert all(validate(calls) == [] for calls in parsed)  # schema
     assert all(calls == canonicalize(calls) for calls in parsed)  # center -> normal
-    singles = 5 * 3 - 2 + 4 + 3  # look (center only normal) + expressions + nod counts
-    assert len(outputs) == 1 + singles + singles * (singles - 1)
-    texts = set(outputs)
-    for spec in all_specs():  # every label the dataset uses is reachable
-        assert target_json(list(spec.label)) in texts
+    assert len(outputs) == 1 + len(all_call_pieces())  # [] plus every single call
+    assert len(set(outputs)) == len(outputs)
+    for spec in all_specs():  # every label the dataset uses is reachable, token by token
+        ids = codec.sp.encode(target_json(list(spec.label)))
+        for k, token in enumerate(ids):
+            assert token in grammar.allowed(ids[:k]), (spec, k)
+        assert codec.eos in grammar.allowed(ids)
 
 
 def test_greedy_with_grammar_always_returns_valid_json(codec: Codec) -> None:
