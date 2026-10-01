@@ -26,8 +26,9 @@ from openai import OpenAI
 from jtalm.data import prompts
 from jtalm.data.focus import english_pool, focus_specs, sample_by_slice, slice_of
 from jtalm.data.specs import Spec, all_specs, sample_requests
+from jtalm.data.specs_v1 import all_specs_v1, paraphrase_specs
 
-PHASES = ("eval-gen", "train-gen", "eval-verify", "train-verify")
+PHASES = ("eval-gen", "train-gen", "eval-verify", "train-verify", "reverify")
 PAIR_N = 4
 EN_N = 4
 
@@ -100,13 +101,22 @@ def _read(path: Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text("utf-8").splitlines() if line]
 
 
+def _specs_for(cfg: dict, quota: dict, rng: random.Random) -> list[Spec]:
+    n = cfg["per_request"]
+    spec_set = cfg.get("spec_set")
+    if spec_set == "focus":
+        return sample_by_slice(focus_specs(), cfg["slice_quota"], n, rng)
+    if spec_set == "v1":
+        return sample_requests(all_specs_v1(), quota, n, rng)
+    if spec_set == "v1_paraphrase":
+        return sample_requests(paraphrase_specs(), quota, n, rng)
+    return sample_requests(all_specs(), quota, n, rng)
+
+
 def generate_sentences(gen: Generator, name: str, split: str, quota: dict, cfg: dict, seed0: int):
     n = cfg["per_request"]
     rng = random.Random(seed0)
-    if cfg.get("spec_set") == "focus":
-        specs = sample_by_slice(focus_specs(), cfg["slice_quota"], n, rng)
-    else:
-        specs = sample_requests(all_specs(), quota, n, rng)
+    specs = _specs_for(cfg, quota, rng)
     requests = list(enumerate(specs))
 
     style_set = cfg.get("train_styles", "v0.2") if split == "train" else "v0.2"
@@ -206,6 +216,21 @@ def phase_verify(gen: Generator, name: str, rows: list[dict], workers: int):
     return _parallel(fn, rows, workers)
 
 
+def phase_reverify(gen: Generator, name: str, inputs: list[str], workers: int):
+    rows = []
+    for path in inputs:
+        for line in Path(path).read_text("utf-8").splitlines():
+            if line.strip():
+                case = json.loads(line)
+                # EvalCase files have "prompt"; the Stack-chan sources files have "text" only.
+                rows.append({"id": case["id"], "text": case.get("prompt", case.get("text")),
+                             "expected": case.get("expected", []),
+                             "category": case.get("category", "unknown"),
+                             "language": case.get("language", "ja"),
+                             "source": case.get("source"), "file": path})  # fmt: skip
+    return phase_verify(gen, name, rows, workers)
+
+
 def run(args: argparse.Namespace) -> dict:
     cfg = json.loads(Path(args.config).read_text(encoding="utf-8"))
     out = Path(args.out)
@@ -227,6 +252,12 @@ def run(args: argparse.Namespace) -> dict:
         )
         stats = {"eval_verify_failures": failures}
         _write(out / "eval_raw.jsonl", rows)
+    elif args.phase == "reverify":
+        verifier_cfg = cfg["verifier"]
+        gen = Generator(args.base_url, verifier_cfg["served_name"], cfg)
+        rows, failures = phase_reverify(gen, verifier_cfg["hf_id"], args.input, args.workers)
+        stats = {"reverify_failures": failures}
+        _write(out / "reverify_raw.jsonl", rows)
     else:
         # v0.1 used llm-jp here, but llm-jp-3.1-13b could not parse reliably (it returned actions
         # for chit-chat); v0.2 verifies train sentences with the train generator at temperature 0.
@@ -255,6 +286,7 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://localhost:8000/v1")
     parser.add_argument("--workers", type=int, default=64)
     parser.add_argument("--out", default="artifacts/raw")
+    parser.add_argument("--input", nargs="*", default=[], help="case files for reverify")
     print(json.dumps(run(parser.parse_args()), indent=2))
 
 

@@ -133,3 +133,72 @@ def test_focus_eval_generation_tags_slices(tmp_path: Path, monkeypatch: pytest.M
     rows = [json.loads(x) for x in (tmp_path / "eval_gen.jsonl").read_text("utf-8").splitlines()]
     assert {r["slice"] for r in rows} == set(SLICES)
     assert all(r["language"] == "en" for r in rows if r["slice"] == "english")
+
+
+class BowGenerator:
+    def __init__(self, base_url: str, model: str, cfg: dict) -> None:
+        self.model = model
+
+    def chat_json(self, messages: list[dict], fmt: dict, seed: int, temperature: float):
+        return [{"name": "bow", "arguments": {}}]
+
+
+def _reverify(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, src: Path) -> tuple[dict, list]:
+    monkeypatch.setattr(generate, "Generator", BowGenerator)
+    cfg = tmp_path / "c.json"
+    cfg.write_text(
+        json.dumps({**CFG, "verifier": {"served_name": "q", "hf_id": "Qwen/x"}}), "utf-8"
+    )
+    args = Namespace(
+        phase="reverify",
+        config=str(cfg),
+        base_url="x",
+        workers=1,
+        out=str(tmp_path / "o"),
+        input=[str(src)],
+    )
+    summary = generate.run(args)
+    rows = [
+        json.loads(x) for x in (tmp_path / "o/reverify_raw.jsonl").read_text("utf-8").splitlines()
+    ]
+    return summary, rows
+
+
+def test_reverify_reads_cases_and_keeps_their_labels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = tmp_path / "train.jsonl"
+    src.write_text(
+        '{"id": "t-1", "category": "single", "prompt": "お辞儀して", '
+        '"expected": [], "language": "ja"}\n',
+        encoding="utf-8",
+    )
+    summary, rows = _reverify(tmp_path, monkeypatch, src)
+    assert summary["rows"] == 1
+    assert rows[0]["id"] == "t-1" and rows[0]["expected"] == []
+    assert rows[0]["verified"] == [{"name": "bow", "arguments": {}}]
+    assert rows[0]["file"] == str(src)
+
+
+def test_reverify_reads_the_stackchan_sources_format(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    src = tmp_path / "sources.jsonl"
+    src.write_text(
+        '{"id": "sc-001", "text": "左に頭を回して。", "source_url": "u", '
+        '"license": "MIT", "kind": "verbatim"}\n',
+        encoding="utf-8",
+    )
+    _, rows = _reverify(tmp_path, monkeypatch, src)
+    assert rows[0]["text"] == "左に頭を回して。"
+    assert rows[0]["expected"] == [] and rows[0]["category"] == "unknown"
+    assert rows[0]["file"] == str(src)
+
+
+def test_spec_set_v1_uses_the_v1_specs() -> None:
+    import random
+
+    specs = generate._specs_for(
+        {"spec_set": "v1", "per_request": 8}, {"single": 16}, random.Random(0)
+    )
+    assert all(s.id.startswith("v1.single.") for s in specs) and len(specs) == 2
