@@ -39,18 +39,26 @@ class SshTarget:
     user: str = "root"
 
 
+VASTAI_VERSION = "1.8.2"
+
+
 class VastClient:
     def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key or read_secret("VAST_API_KEY")
-        exe = shutil.which("vastai")
-        if exe is None:
-            raise VastError("vastai CLI not found; run via `uv run`")
-        self.exe = exe
+        # The vastai CLI is not a project dependency (it pins old, vulnerable versions of pillow
+        # and cryptography); use an installed one or run the pinned version through `uv tool run`.
+        exe, uv = shutil.which("vastai"), shutil.which("uv")
+        if exe is not None:
+            self.cmd = [exe]
+        elif uv is not None:
+            self.cmd = [uv, "tool", "run", "--from", f"vastai=={VASTAI_VERSION}", "vastai"]
+        else:
+            raise VastError("neither the vastai CLI nor uv was found on PATH")
 
     def _run(self, *args: str, timeout: int = 180, parse: bool = True) -> Any:
         # The key goes through the environment (not argv) so it never shows in process lists.
         proc = subprocess.run(
-            [self.exe, *args, "--raw"],
+            [*self.cmd, *args, "--raw"],
             capture_output=True,
             text=True,
             timeout=timeout,

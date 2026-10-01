@@ -37,7 +37,7 @@
 | グループ | 内容 | 入れ方 |
 |---|---|---|
 | 本体 | jsonschema、huggingface-hub、openai（vLLM の OpenAI 互換 API の client） | `uv sync --locked` |
-| `dev` | pytest、ruff、vastai | 既定で入る |
+| `dev` | pytest、ruff | 既定で入る |
 | `train` | torch、sentencepiece、numpy、safetensors | `uv sync --locked --group train` |
 
 ```sh
@@ -346,7 +346,7 @@ uv run python -m jtalm.model.release publish runs/release/action_3m --repo <user
 
 ## vast.ai での実行（任意）
 
-上の生成と学習は、GPU があれば手元で実行できます。GPU を借りて実行する場合のために、[vast.ai](https://vast.ai/) で job を実行する runner（`src/jtalm/infra/`）があります。
+上の生成と学習は、GPU があれば手元で実行できます。GPU を借りて実行する場合のために、[vast.ai](https://vast.ai/) で job を実行する runner（`src/jtalm/infra/`）があります。vast.ai の CLI（`vastai`）はプロジェクトの依存に入れていません（古い版の pillow と cryptography を固定するため）。PATH にあればそれを使い、なければ `uv tool run --from vastai==1.8.2 vastai` で実行します。
 
 ```sh
 uv run python -m jtalm.infra.job <job> --approve-dph <price>
