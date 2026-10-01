@@ -320,6 +320,13 @@ uv run python -m jtalm.eval.bootstrap seeds runs/local/suite_v051_3m_q4 runs/loc
 - 既定は 2,000 回の resample（`--n-boot`）で、`--out` で結果を Markdown に保存できます。
 - bootstrap 区間は評価セットの標本のばらつきだけを表し、学習の seed によるばらつきは含みません。両方を見てください。公開している結果は `results/v051_action/`（`ci_3m.md`、`seeds_3m.md`、`diff_v04_v051.md`、`diff_v05_v051.md`）にあります。
 
+### 小さな分類器との比較（`jtalm.model.classifier`）
+
+```sh
+# CPU で1 seed あたり約7分。出力は eval_suite と同じ形（bootstrap と consistency でも読める）
+uv run --group train python -m jtalm.model.classifier --train datasets/action/v0.5.1/train.jsonl     --val datasets/action/v0.5.1/val.jsonl --seed 0 --out runs/local/classifier_v051_s0
+```
+
 ### 言い換えへの一貫性（`jtalm.eval.consistency`）
 
 ```sh
