@@ -215,6 +215,15 @@ JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"ri
 - 実行中は `!gate <閾値>` で変えられます（再起動で既定値に戻ります）。
 - 別のモデルを書き込むときは、そのモデルの validation で選んだ閾値にしてください。
 
+## INT8 の KV cache
+
+`CONFIG_JTLM_KV_INT8=y`（menu「JapaneseTinyAgentLM runtime」、定義は [`../runtime/host/Kconfig`](../runtime/host/Kconfig)）で build すると、KV cache を int8 で持ちます（3M で PSRAM 458,752 B → 129,024 B）。3M では評価セットの gate 後の出力は f32 と同じで、応答は約 2% 遅くなります（[`results/v051_action/kv_int8/`](../results/v051_action/kv_int8/README.md)）。公開しているビルド済みの image は f32 です。起動時の `info` の `kv_int8` でどちらかがわかります。
+
+```sh
+printf 'CONFIG_JTLM_KV_INT8=y\n' > kv8.defaults
+idf.py -B build_kv8 -D SDKCONFIG=build_kv8/sdkconfig -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;kv8.defaults" build
+```
+
 ## ツール
 
 `firmware/tools/` のスクリプトです。pyserial だけが必要なものは、`uv run --no-project --with pyserial python …` で project の依存を足さずに動きます（`pip install pyserial` でも構いません）。

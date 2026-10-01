@@ -174,7 +174,7 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 | 確保するもの（3M） | B | 置き場所 |
 |---|---:|---|
 | 重み（`.jtlm`） | 0 | Flash（mmap） |
-| KV cache（f32、128 token 分） | 458,752 | PSRAM |
+| KV cache（f32、128 token 分。INT8 の KV cache にすると 129,024） | 458,752 | PSRAM |
 | activation（16 token 分）、attention の score、logits | 125,952 | 内部 SRAM |
 | tokenizer の作業領域 | 32,768 | 内部 SRAM |
 | 最初の step の logits の控え（診断用） | 8,192 | PSRAM |
@@ -216,5 +216,4 @@ quad の PSRAM と QIO の flash はほぼ同じ速さで、理論値（4 bit ×
 ## 未確認の事項
 
 - 消費電流と温度（LM を連続で動かしたとき）。
-- INT8 の KV cache（未実装。今は f32 で PSRAM に置いています）。
 - `-DJTLM_BATCH=8` にしたときの速度。

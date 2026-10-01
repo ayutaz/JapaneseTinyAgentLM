@@ -1,0 +1,75 @@
+{
+  "ckpt": "v0.5.1 3M seed 0 best.pt (FP32; INT4 exported from it)",
+  "cases": "datasets/action/v0/eval.jsonl",
+  "kv_int8": true,
+  "tokenization": {},
+  "generation": {
+    "fp32": {
+      "file": "3m_fp32.jtlm",
+      "bytes": 12883200,
+      "first_logits": {
+        "n": 1189,
+        "max_abs_diff": 0.012125492095947266,
+        "max_abs_logit": 15.935830116271973
+      },
+      "plain": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.9470142977291842,
+        "exact_c": 0.9470142977291842,
+        "min_prob_max_abs_diff": 0.0004928705303040015,
+        "c_summary": "1189 prompts, 22906 forward tokens (6456 generated) in 22.171 s: 1033.1 tok/s",
+        "python_seconds": 19.53,
+        "mismatches": []
+      },
+      "grammar": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.9470142977291842,
+        "exact_c": 0.9470142977291842,
+        "min_prob_max_abs_diff": 0.0004928705303040015,
+        "c_summary": "1189 prompts, 22906 forward tokens (6456 generated) in 23.235 s: 985.9 tok/s",
+        "python_seconds": 20.35,
+        "mismatches": []
+      }
+    },
+    "int4": {
+      "file": "3m_q4_g64.jtlm",
+      "bytes": 1971456,
+      "first_logits": {
+        "n": 1189,
+        "max_abs_diff": 0.013635635375976562,
+        "max_abs_logit": 16.063777923583984
+      },
+      "plain": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.945332211942809,
+        "exact_c": 0.945332211942809,
+        "min_prob_max_abs_diff": 0.004220783687622021,
+        "c_summary": "1189 prompts, 22910 forward tokens (6460 generated) in 36.106 s: 634.5 tok/s",
+        "python_seconds": 19.42,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.945332211942809,
+        "fake_quant_output_match": 1189
+      },
+      "grammar": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.945332211942809,
+        "exact_c": 0.945332211942809,
+        "min_prob_max_abs_diff": 0.004220783687622021,
+        "c_summary": "1189 prompts, 22910 forward tokens (6460 generated) in 36.051 s: 635.5 tok/s",
+        "python_seconds": 21.31,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.945332211942809,
+        "fake_quant_output_match": 1189
+      }
+    }
+  },
+  "fp32_roundtrip_exact": true
+}

@@ -197,6 +197,14 @@ decode（id → 文字列）も SentencePiece と同じ規則です（制御用�
 - KV cache は `層数 × 128 × 2 × kv_heads × head_dim × 4 byte` です。残りの大部分は、prompt をまとめて処理するための activation（`JTLM_BATCH × (3 × d_model + d_model + 2 × d_ff) × 4 byte`）です。`-DJTLM_BATCH=8` などで小さくできます（結果は変わりません）。
 - tokenizer の作業領域は呼び出し側が渡します（正規化後の byte 数 + 1 byte あたり 16 byte）。
 
+#### INT8 の KV cache（`-DJTLM_KV_INT8=1`）
+
+KV cache を int8 で持つ build の設定です（既定は f32）。位置と KV head ごとに、f32 の scale（そのベクトルの絶対値の最大 / 127）を1つ持ち、値は偶数への丸めで int8 にします。attention では、1つずつ f32 に戻してから使います。
+
+- 3M の KV cache は 458,752 B から 129,024 B（int8 114,688 B と scale 14,336 B）になります。量子化する前の k と v を置く 8,192 B（`2 × JTLM_BATCH × kv_heads × head_dim × 4 byte`）が「残り」に加わります。
+- 計算の値が変わるので、出力が f32 の KV cache と違うことがあります。PyTorch の対応する実装は `jtalm.model.transformer.set_kv_int8` で、`jtalm.model.eval_suite --kv-int8` と `jtalm.model.parity --kv-int8` で確かめられます。3M では評価セット 4,794 件の gate 後の出力が f32 と同じで、C と PyTorch の token 列も一致しました（[`../../results/v051_action/kv_int8/`](../../results/v051_action/kv_int8/README.md)）。
+- `jtlm_state` の中身が変わるので、`jtalm.h` を使うすべてのコードを同じ設定で build してください（ESP-IDF の component では Kconfig の `CONFIG_JTLM_KV_INT8` で設定し、自動でそうなります）。
+
 ### Prefill のまとめ処理と並列化
 
 実機では、重みを flash から読む速さ（約 31 MB/s）と、1 core の演算の速さの両方が律速になります。どちらも、**計算の値を1 bit も変えずに**速くしています。

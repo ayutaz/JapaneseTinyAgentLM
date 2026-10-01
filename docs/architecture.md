@@ -224,7 +224,7 @@ gate の効果（誤って動く割合の変化など）は [`evaluation.md`](ev
 重みだけを量子化します（`src/jtalm/model/quantize.py`）。
 
 - 2次元の重み（attention、MLP、embedding = 出力 head）を、行ごとに **64 個ずつの group** で、対称の round-to-nearest で INT8 / INT4 にします。scale は group ごとに1つで、**fp16** で保存します。
-- RMSNorm の重みは f32 のままです。activation と KV cache も f32 です。
+- RMSNorm の重みは f32 のままです。activation と KV cache も f32 です（KV cache は build の設定で INT8 にもできます。下の「RAM」）。
 - 採用したのは **INT4 group 64** です。精度は FP32 と変わりません（data v0.4 の 3M: FP32 94.2% → INT4 94.3%。3M / 5M のどの組み合わせでも ±0.4 point 以内）。
 - 量子化で挙動そのものが変わる例があるので（[`prior_art.md`](prior_art.md)）、量子化の後は評価セット全体をカテゴリ別に評価し直します。
 
@@ -285,7 +285,7 @@ C の tokenizer と生成は、PyTorch / SentencePiece と token 単位で一致
 
 - firmware は状態全体（3M で 584,704 B）を内部 SRAM に置こうとし、入らなければ KV cache だけを PSRAM に置きます（3M ではこの形になる）。
 - 画面と dispatcher を載せた状態で、読み込み後の内部 SRAM の空きは 116,831 B、200 件の依頼の後は 99,039 B でした。
-- INT8 の KV cache は未実装です（今後の課題）。
+- **INT8 の KV cache**（`-DJTLM_KV_INT8=1`、firmware では `CONFIG_JTLM_KV_INT8=y`）にすると、KV cache は 129,024 B になり、PSRAM を 330KB 減らせます。位置と KV head ごとに f32 の scale を1つ持ちます。3M では評価セット 4,794 件の gate 後の出力が f32 と同じで、実機の応答は約 2% 遅くなりました。PSRAM には余裕があるので、公開している firmware は f32 のままです（[`results/v051_action/kv_int8/`](../results/v051_action/kv_int8/README.md)）。
 
 ### 速くするための工夫
 

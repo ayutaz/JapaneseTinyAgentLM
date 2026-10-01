@@ -13,6 +13,10 @@ if(ESP_PLATFORM)
   # Same numerics as the parity-checked host build with -DJTLM_ACC=float: single-precision
   # accumulators (the S3 FPU has no double), and no fused multiply-add where PyTorch rounds twice.
   target_compile_options(${COMPONENT_LIB} PRIVATE -DJTLM_ACC=float -ffp-contract=off)
+  if(CONFIG_JTLM_KV_INT8)
+    # PUBLIC: the option changes jtlm_state, so callers must see it too (Kconfig)
+    target_compile_definitions(${COMPONENT_LIB} PUBLIC JTLM_KV_INT8=1)
+  endif()
 else()
   cmake_minimum_required(VERSION 3.16)
   project(jtalm C)

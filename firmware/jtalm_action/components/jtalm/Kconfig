@@ -1,0 +1,2 @@
+# The options of the runtime component (runtime/host/Kconfig).
+rsource "../../../../runtime/host/Kconfig"

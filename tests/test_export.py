@@ -29,7 +29,7 @@ from jtalm.model.export import (  # noqa: E402
 from jtalm.model.format import target_json  # noqa: E402
 from jtalm.model.grammar import ActionGrammar  # noqa: E402
 from jtalm.model.quantize import quantize_tensor  # noqa: E402
-from jtalm.model.transformer import ActionLM, ModelConfig  # noqa: E402
+from jtalm.model.transformer import ActionLM, ModelConfig, fake_quant_kv, set_kv_int8  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 PROMPTS = ["右を少し見て", "うなずいてから笑って", "今日はいい天気だね", "正面を向いて",
@@ -139,14 +139,19 @@ def _compiler() -> str | None:
 
 
 @pytest.mark.skipif(_compiler() is None, reason="no C compiler on PATH")
-def test_c_runtime_matches_python(tmp_path: Path, sp_model: Path, model: ActionLM) -> None:
+@pytest.mark.parametrize("kv_int8", [False, True])
+def test_c_runtime_matches_python(
+    tmp_path: Path, sp_model: Path, model: ActionLM, kv_int8: bool
+) -> None:
     exe = tmp_path / "jtalm"
     src = ROOT / "runtime/host"
     subprocess.run(
-        [_compiler(), "-O1", "-std=c11", "-ffp-contract=off", "-o", str(exe),
+        [_compiler(), "-O1", "-std=c11", "-ffp-contract=off", f"-DJTLM_KV_INT8={int(kv_int8)}",
+         "-o", str(exe),
          *[str(src / f) for f in ("model.c", "tokenizer.c", "grammar.c", "main.c")], "-lm"],
         check=True,
     )  # fmt: skip
+    set_kv_int8(model, kv_int8)
     codec = Codec(sp_model)
     out = tmp_path / "m.jtlm"
     export(model.state_dict(), model.cfg, sp_model, out)
@@ -165,9 +170,24 @@ def test_c_runtime_matches_python(tmp_path: Path, sp_model: Path, model: ActionL
         assert [r["ids"] for r in c] == [list(p.ids) for p in py]
         assert [r["output"] for r in c] == [p.text for p in py]
         for r, p in zip(c, py, strict=True):
-            assert r["min_prob"] == pytest.approx(p.min_prob, abs=1e-4)
+            # INT8 KV: a value near a rounding boundary can get another code from a tiny difference
+            assert r["min_prob"] == pytest.approx(p.min_prob, abs=1e-2 if kv_int8 else 1e-4)
+    set_kv_int8(model, False)
 
 
 def test_header_layout_is_128_bytes() -> None:
     assert HEADER.size == 128
     assert struct.calcsize("<8I6I2I") == TOK_HEAD.size == 64
+
+
+def test_fake_quant_kv_codes_and_error() -> None:
+    torch.manual_seed(0)
+    x = torch.randn(2, 3, 5, 16)
+    x[0, 0, 0] = 0.0  # an all-zero vector stays zero
+    y = fake_quant_kv(x)
+    scale = x.abs().amax(-1, keepdim=True) / 127
+    codes = torch.where(scale > 0, y / scale, torch.zeros_like(y))
+    assert torch.equal(y[0, 0, 0], torch.zeros(16))
+    assert torch.allclose(codes, codes.round(), atol=1e-4)
+    assert codes.round().abs().max() == 127  # the largest value maps to +-127
+    assert ((y - x).abs() <= scale / 2 + 1e-7).all()

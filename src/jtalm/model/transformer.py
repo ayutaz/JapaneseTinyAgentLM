@@ -72,10 +72,19 @@ def apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.T
     return out.flatten(-2).type_as(x)
 
 
+def fake_quant_kv(x: torch.Tensor) -> torch.Tensor:
+    """INT8 KV cache as in the C runtime built with JTLM_KV_INT8: each head vector (last dim)
+    gets one f32 scale = max|x| / 127 and int8 codes rounded half to even; returns q * scale."""
+    scale = x.abs().amax(-1, keepdim=True) / 127
+    q = torch.where(scale > 0, torch.round(x / scale), torch.zeros_like(x)).clamp(-127, 127)
+    return q * scale
+
+
 class Attention(nn.Module):
     def __init__(self, cfg: ModelConfig) -> None:
         super().__init__()
         self.cfg = cfg
+        self.kv_int8 = False  # inference only: see set_kv_int8
         hd = cfg.head_dim
         self.wq = nn.Linear(cfg.d_model, cfg.n_heads * hd, bias=False)
         self.wk = nn.Linear(cfg.d_model, cfg.n_kv_heads * hd, bias=False)
@@ -89,6 +98,8 @@ class Attention(nn.Module):
         k = self.wk(x).view(b, t, c.n_kv_heads, c.head_dim).transpose(1, 2)
         v = self.wv(x).view(b, t, c.n_kv_heads, c.head_dim).transpose(1, 2)
         q, k = apply_rope(q, cos, sin), apply_rope(k, cos, sin)
+        if self.kv_int8:
+            k, v = fake_quant_kv(k), fake_quant_kv(v)
         rep = c.n_heads // c.n_kv_heads
         k, v = k.repeat_interleave(rep, dim=1), v.repeat_interleave(rep, dim=1)
         p = c.dropout if self.training else 0.0
@@ -154,6 +165,12 @@ class ActionLM(nn.Module):
         for block in self.blocks:
             x = block(x, cos, sin)
         return F.linear(self.norm(x), self.embed.weight)  # tied output head
+
+
+def set_kv_int8(model: ActionLM, on: bool = True) -> None:
+    """Quantize the keys (after RoPE) and values like the C runtime's INT8 KV cache."""
+    for block in model.blocks:
+        block.attn.kv_int8 = on
 
 
 def count_params(model: nn.Module) -> int:

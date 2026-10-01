@@ -19,6 +19,10 @@
    cost nothing.
 4. Writes ``golden.jsonl`` (prompt ids, generated ids, top first-step logits) for device ports.
 
+``--kv-int8`` checks the INT8 KV cache instead: the C runtime built with ``-DJTLM_KV_INT8=1``
+(``--build`` passes it) against the Python models with ``jtalm.model.transformer.set_kv_int8``.
+Give it its own binary, e.g. ``--jtalm runtime/host/build/kv8/jtalm``.
+
 The C binary runs natively (``--jtalm``) or inside a Docker image with the repository mounted
 at /w (``--docker``); files are exchanged under ``--out``, which must be inside the repository
 in the Docker case.
@@ -44,7 +48,7 @@ from jtalm.model.evaluate import load_model
 from jtalm.model.export import export, export_name, read_export
 from jtalm.model.grammar import ActionGrammar
 from jtalm.model.quantize import quantize_state
-from jtalm.model.transformer import ActionLM, ModelConfig
+from jtalm.model.transformer import ActionLM, ModelConfig, set_kv_int8
 
 DATA = PROJECT_ROOT / "datasets/action/v0"
 
@@ -65,9 +69,14 @@ class Runner:
         return ["docker", "run", "--rm", "-v", mount, "-w", "/w", "--entrypoint", program,
                 self.docker, *args]  # fmt: skip
 
-    def build(self) -> None:
-        make = self._cmd("make", ["-C", self._path(self.binary.parent.parent)])
-        subprocess.run(make, check=True, capture_output=True)
+    def build(self, cflags: str | None = None) -> None:
+        """``make`` in runtime/host, writing the binary to ``self.binary``."""
+        src = PROJECT_ROOT / "runtime/host"
+        build_dir = self.binary.resolve().parent.relative_to(src.resolve()).as_posix()
+        args = ["-C", self._path(src), f"BUILD={build_dir}"]
+        if cflags:
+            args.append(f"CFLAGS={cflags}")
+        subprocess.run(self._cmd("make", args), check=True, capture_output=True)
 
     def run(self, model: Path, flags: list[str], lines: list[str], work: Path) -> tuple[list, str]:
         """JSON values printed for ``lines`` and the stderr summary."""
@@ -278,11 +287,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--build", action="store_true", help="run make first")
     parser.add_argument("--fuzz", type=int, default=5000)
     parser.add_argument("--limit", type=int, default=0, help="only the first N cases (smoke)")
+    parser.add_argument("--kv-int8", action="store_true", help="check the INT8 KV cache")
     args = parser.parse_args(argv)  # fmt: skip
 
     runner = Runner(args.jtalm, args.docker)
     if args.build:
-        runner.build()
+        runner.build("-O2 -DJTLM_KV_INT8=1" if args.kv_int8 else None)
     ckpt_model, state = load_model(args.ckpt, torch.device("cpu"))
     codec = Codec(args.tokenizer)
     if state["tokenizer_sha256"] != codec.sha256:
@@ -293,7 +303,9 @@ def main(argv: list[str] | None = None) -> None:
         cases = cases[: args.limit]
     args.out.mkdir(parents=True, exist_ok=True)
     work = args.out / "work"
-    report: dict[str, Any] = {"ckpt": str(args.ckpt), "cases": str(args.cases)}
+    report: dict[str, Any] = {
+        "ckpt": str(args.ckpt), "cases": str(args.cases), "kv_int8": args.kv_int8
+    }  # fmt: skip
 
     files = {}
     for bits in args.bits:
@@ -318,6 +330,7 @@ def main(argv: list[str] | None = None) -> None:
         model = ActionLM(ModelConfig(**{**ex.cfg.to_dict(), "dropout": 0.0}))
         model.load_state_dict(ex.state)
         model.eval()
+        set_kv_int8(model, args.kv_int8)
         fake = None
         if bits == 0:
             same = all(torch.equal(ex.state[k], v) for k, v in state["state_dict"].items())
@@ -327,6 +340,7 @@ def main(argv: list[str] | None = None) -> None:
             fake = ActionLM(ckpt_model.cfg)
             fake.load_state_dict(q_state)
             fake.eval()
+            set_kv_int8(fake, args.kv_int8)
         label = "fp32" if bits == 0 else f"int{bits}"
         entry: dict[str, Any] = {"file": files[bits].name, "bytes": files[bits].stat().st_size}
         entry["first_logits"] = logit_diff(

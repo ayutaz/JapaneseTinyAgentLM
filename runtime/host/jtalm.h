@@ -32,6 +32,16 @@
 #define JTLM_BATCH 16
 #endif
 
+/* INT8 KV cache: int8 codes with one f32 scale per position and KV head (symmetric, max|x| / 127,
+ * round half to even), about 0.28x the bytes of the f32 cache. It changes the numerics, so the
+ * outputs can differ from the default f32 cache; the matching PyTorch reference is
+ * jtalm.model.transformer.set_kv_int8. Callers must build with the same value (it changes
+ * jtlm_state). */
+#ifndef JTLM_KV_INT8
+#define JTLM_KV_INT8 0
+#endif
+#define JTLM_MAX_HEAD_DIM 256 /* JTLM_KV_INT8 only */
+
 enum {
     JTLM_OK = 0,
     JTLM_ERR_FORMAT = -1, /* not a valid .jtlm image */
@@ -91,7 +101,13 @@ typedef struct {
 typedef struct {
     float *x, *xb, *xb2, *q, *hb, *hb2; /* JTLM_BATCH rows each */
     float *att, *logits;
+#if JTLM_KV_INT8
+    float *k_new, *v_new;            /* JTLM_BATCH rows: keys and values before quantization */
+    int8_t *key_cache, *value_cache; /* [n_layers][max_seq_len][n_kv_heads * head_dim] */
+    float *key_scale, *value_scale;  /* [n_layers][max_seq_len][n_kv_heads] */
+#else
     float *key_cache, *value_cache; /* [n_layers][max_seq_len][n_kv_heads * head_dim] */
+#endif
 } jtlm_state;
 
 /* Model image (must stay alive and 4-byte aligned; nothing is copied). */

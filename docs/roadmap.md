@@ -9,7 +9,7 @@
 | Action LM（3M、日本語の発話 → 首・表情・うなずきの Action） | **完成**。評価は [evaluation.md](evaluation.md) |
 | 学習データ（v0 → v0.5.1）と評価セット（v0 eval、human v1、eval v2） | 完成。[data.md](data.md) |
 | 学習・量子化・書き出しの pipeline | 完成。[training.md](training.md) |
-| C runtime（host）と ESP32-S3 firmware | 完成。PC と実機の出力が一致。[architecture.md](architecture.md)、[hardware.md](hardware.md)、[firmware/README.md](../firmware/README.md) |
+| C runtime（host）と ESP32-S3 firmware | 完成。PC と実機の出力が一致。ESP-IDF の component としても使え、INT8 の KV cache を選べる。[architecture.md](architecture.md)、[hardware.md](hardware.md)、[firmware/README.md](../firmware/README.md) |
 | Action から servo を動かす dispatcher | 完成（可動域の制限、停止、watchdog を含む）。実機で動作を確認済み |
 | Chat LM | 未着手（次の段階） |
 
@@ -65,7 +65,6 @@ Baseline:
 | 項目 | 内容 |
 |---|---|
 | 消費電力 | idle、推論中、servo 駆動中の電流と、1回の依頼あたりの energy は未計測です |
-| INT8 の KV cache | KV cache は f32 のまま PSRAM に置いています。INT8 化は未実装です |
 | tokenizer の縮小 | `.jtlm` のうち tokenizer が 0.27MB を占めます |
 | 人が書いた依頼の評価 | 人が書いた依頼は 62件しかなく、正面を向く・笑うに偏っています。95% 区間が広く（85.5〜98.4%）、seed による差も大きいので、件数を増やす必要があります。言い換えへの一貫性も、人が書いた依頼ではルールベースより低い値でした（[evaluation.md](evaluation.md)） |
 | 英語 | 学習データに入れていないので、英語の依頼はほぼ解けません（seed 0 で 5.3%、5 seed の平均 5.8%）。日本語専用です |

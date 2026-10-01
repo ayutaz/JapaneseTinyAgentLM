@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 ayutaz
+menu "JapaneseTinyAgentLM runtime"
+
+config JTLM_KV_INT8
+    bool "INT8 KV cache"
+    default n
+    help
+        Keep the KV cache in int8 with one f32 scale per position and KV
+        head (about 0.28x the bytes of the f32 cache). It changes the
+        numerics: outputs can differ from the default f32 cache (see
+        runtime/host/README.md). The PyTorch reference is
+        jtalm.model.transformer.set_kv_int8.
+
+endmenu

@@ -189,13 +189,13 @@ static void emit_info(const lm_t *lm) {
       ",\"built\":\"%s %s\",\"cpu_mhz\":%d,\"model_sha\":\"%s\",\"image_bytes\":%u"
       ",\"vocab\":%d,\"d_model\":%d,\"n_layers\":%d,\"n_heads\":%d,\"n_kv_heads\":%d"
       ",\"d_ff\":%d,\"max_seq_len\":%d,\"bits\":%d,\"group\":%d"
-      ",\"arena\":\"%s\",\"arena_bytes\":%u,\"kv_bytes\":%u,\"batch\":%d"
+      ",\"arena\":\"%s\",\"arena_bytes\":%u,\"kv_bytes\":%u,\"kv_int8\":%d,\"batch\":%d"
       ",\"grammar\":%d,\"gate\":%.3f,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
       app->project_name, app->idf_ver, elf_sha, app->date, app->time,
       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, lm->sha, (unsigned)lm->image_bytes,
       c->vocab_size, c->d_model, c->n_layers, c->n_heads, c->n_kv_heads, c->d_ff,
       c->max_seq_len, c->bits, c->group, lm->arena_where, (unsigned)lm->arena_bytes,
-      (unsigned)lm->kv_bytes, JTLM_BATCH, lm->use_grammar, lm->gate, lm->use_par,
+      (unsigned)lm->kv_bytes, JTLM_KV_INT8, JTLM_BATCH, lm->use_grammar, lm->gate, lm->use_par,
       lm->use_batch, xPortGetCoreID()
   );
 }

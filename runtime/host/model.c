@@ -157,6 +157,9 @@ int jtlm_model_init(jtlm_model *m, const void *image, size_t size) {
         return JTLM_ERR_FORMAT;
     c->head_dim = c->d_model / c->n_heads;
     if (c->head_dim % 2) return JTLM_ERR_FORMAT;
+#if JTLM_KV_INT8
+    if (c->head_dim > JTLM_MAX_HEAD_DIM) return JTLM_ERR_FORMAT;
+#endif
     if (c->bits != 0 && c->bits != 8 && c->bits != 4) return JTLM_ERR_FORMAT;
     if (c->bits && (c->group < 2 || c->group % 2 || c->group > JTLM_MAX_GROUP || c->d_model % c->group ||
                     c->d_ff % c->group || (c->n_heads * c->head_dim) % c->group))
@@ -191,23 +194,37 @@ int jtlm_model_init(jtlm_model *m, const void *image, size_t size) {
 
 /* -- state ------------------------------------------------------------------------------------- */
 
-static size_t state_floats(const jtlm_config *c, size_t *kv_each) {
-    size_t kv = (size_t)c->n_layers * (size_t)c->max_seq_len * (size_t)(c->n_kv_heads * c->head_dim);
-    *kv_each = kv;
+static size_t align8(size_t n) { return (n + 7u) & ~(size_t)7u; }
+
+/* Bytes of the small, hot part (*small) and of the KV cache (*kv_bytes); *kv_each is the number
+ * of cached values per K or V ([n_layers][max_seq_len][n_kv_heads * head_dim]). */
+static void state_sizes(const jtlm_config *c, size_t *small, size_t *kv_bytes, size_t *kv_each) {
+    size_t kv_dim = (size_t)(c->n_kv_heads * c->head_dim);
+    size_t kv = (size_t)c->n_layers * (size_t)c->max_seq_len * kv_dim;
     size_t per_token = 3 * (size_t)c->d_model + (size_t)(c->n_heads * c->head_dim) + 2 * (size_t)c->d_ff;
-    return JTLM_BATCH * per_token + (size_t)c->n_heads * (size_t)c->max_seq_len +
-           (size_t)c->vocab_size + 2 * kv;
+    size_t floats = JTLM_BATCH * per_token + (size_t)c->n_heads * (size_t)c->max_seq_len +
+                    (size_t)c->vocab_size;
+#if JTLM_KV_INT8
+    floats += 2 * JTLM_BATCH * kv_dim; /* k_new, v_new */
+    size_t scales = (size_t)c->n_layers * (size_t)c->max_seq_len * (size_t)c->n_kv_heads;
+    *kv_bytes = align8(2 * kv) + 2 * scales * sizeof(float);
+#else
+    *kv_bytes = 2 * kv * sizeof(float);
+#endif
+    *small = align8(floats * sizeof(float));
+    *kv_each = kv;
 }
 
 size_t jtlm_state_bytes(const jtlm_config *c) {
-    size_t kv;
-    return state_floats(c, &kv) * sizeof(float);
+    size_t small, kv_bytes, kv;
+    state_sizes(c, &small, &kv_bytes, &kv);
+    return small + kv_bytes;
 }
 
 size_t jtlm_state_kv_bytes(const jtlm_config *c) {
-    size_t kv;
-    state_floats(c, &kv);
-    return 2 * kv * sizeof(float);
+    size_t small, kv_bytes, kv;
+    state_sizes(c, &small, &kv_bytes, &kv);
+    return kv_bytes;
 }
 
 void jtlm_state_init(jtlm_state *s, const jtlm_config *c, void *arena) {
@@ -216,11 +233,11 @@ void jtlm_state_init(jtlm_state *s, const jtlm_config *c, void *arena) {
 }
 
 void jtlm_state_init_split(jtlm_state *s, const jtlm_config *c, void *arena, void *kv_cache) {
-    size_t kv;
+    size_t small, kv_bytes, kv;
     float *p = arena;
-    state_floats(c, &kv);
+    state_sizes(c, &small, &kv_bytes, &kv);
     /* The KV cache is not cleared: position t is always written before it is read. */
-    memset(arena, 0, jtlm_state_bytes(c) - jtlm_state_kv_bytes(c));
+    memset(arena, 0, small);
     s->x = p, p += JTLM_BATCH * c->d_model;
     s->xb = p, p += JTLM_BATCH * c->d_model;
     s->xb2 = p, p += JTLM_BATCH * c->d_model;
@@ -228,9 +245,20 @@ void jtlm_state_init_split(jtlm_state *s, const jtlm_config *c, void *arena, voi
     s->hb = p, p += JTLM_BATCH * c->d_ff;
     s->hb2 = p, p += JTLM_BATCH * c->d_ff;
     s->att = p, p += (size_t)c->n_heads * (size_t)c->max_seq_len;
-    s->logits = p;
+#if JTLM_KV_INT8
+    size_t kv_dim = (size_t)(c->n_kv_heads * c->head_dim);
+    size_t scales = (size_t)c->n_layers * (size_t)c->max_seq_len * (size_t)c->n_kv_heads;
+    s->k_new = p, p += JTLM_BATCH * kv_dim;
+    s->v_new = p, p += JTLM_BATCH * kv_dim;
     s->key_cache = kv_cache;
     s->value_cache = s->key_cache + kv;
+    s->key_scale = (float *)((char *)kv_cache + align8(2 * kv));
+    s->value_scale = s->key_scale + scales;
+#else
+    s->key_cache = kv_cache;
+    s->value_cache = s->key_cache + kv;
+#endif
+    s->logits = p;
 }
 
 /* -- forward ----------------------------------------------------------------------------------- */
@@ -412,6 +440,24 @@ static void softmax(float *x, int n) {
     for (int i = 0; i < n; i++) x[i] *= inv;
 }
 
+#if JTLM_KV_INT8
+/* One head vector of the INT8 KV cache, as jtalm.model.transformer.fake_quant_kv: scale =
+ * max|x| / 127 in f32, codes x / scale rounded half to even (the default rounding mode). */
+static void kv_quant(const float *x, int n, int8_t *q, float *scale) {
+    float amax = 0.0f;
+    for (int i = 0; i < n; i++) {
+        float a = fabsf(x[i]);
+        if (a > amax) amax = a;
+    }
+    float s = amax / 127.0f;
+    *scale = s;
+    for (int i = 0; i < n; i++) {
+        float r = s > 0.0f ? nearbyintf(x[i] / s) : 0.0f;
+        q[i] = (int8_t)(r > 127.0f ? 127.0f : r < -127.0f ? -127.0f : r);
+    }
+}
+#endif
+
 /* Runs n tokens (n <= JTLM_BATCH) at positions pos0 .. pos0 + n - 1, reading each weight once
  * for all of them. Token t is processed exactly as if it were run alone, so the result does not
  * depend on the batching. The logits (of the last token) are computed only when want_logits. */
@@ -426,8 +472,16 @@ static void forward_batch(const jtlm_model *m, jtlm_state *s, const int *tokens,
     for (int l = 0; l < c->n_layers; l++) {
         const jtlm_layer *L = &m->layers[l];
         size_t loff = (size_t)l * (size_t)c->max_seq_len * (size_t)kv_dim;
+#if JTLM_KV_INT8
+        int nkv = c->n_kv_heads;
+        size_t soff = (size_t)l * (size_t)c->max_seq_len * (size_t)nkv;
+        const int8_t *kc = s->key_cache + loff, *vc = s->value_cache + loff;
+        const float *ks = s->key_scale + soff, *vs = s->value_scale + soff;
+        float *k0 = s->k_new, *v0 = s->v_new; /* quantized into the cache after RoPE */
+#else
         float *kc = s->key_cache + loff, *vc = s->value_cache + loff;
         float *k0 = kc + (size_t)pos0 * (size_t)kv_dim, *v0 = vc + (size_t)pos0 * (size_t)kv_dim;
+#endif
 
         for (int t = 0; t < n; t++) rmsnorm(s->xb + t * d, s->x + t * d, L->attn_norm, d, c->norm_eps);
         matmul(c, &L->wq, s->xb, d, s->q, qd, n);
@@ -440,6 +494,16 @@ static void forward_batch(const jtlm_model *m, jtlm_state *s, const int *tokens,
             float *q = s->q + t * qd, *k = k0 + (size_t)t * (size_t)kv_dim;
             for (int h = 0; h < c->n_heads; h++) rope(q + h * hd, cr, sr, hd);
             for (int h = 0; h < c->n_kv_heads; h++) rope(k + h * hd, cr, sr, hd);
+#if JTLM_KV_INT8
+            size_t at = (size_t)pos * (size_t)kv_dim, sat = (size_t)pos * (size_t)nkv;
+            const float *v = v0 + (size_t)t * (size_t)kv_dim;
+            for (int h = 0; h < nkv; h++) {
+                kv_quant(k + h * hd, hd, s->key_cache + loff + at + (size_t)(h * hd),
+                         s->key_scale + soff + sat + (size_t)h);
+                kv_quant(v + h * hd, hd, s->value_cache + loff + at + (size_t)(h * hd),
+                         s->value_scale + soff + sat + (size_t)h);
+            }
+#endif
         }
 
         for (int t = 0; t < n; t++) { /* causal: position pos sees 0 .. pos, all written above */
@@ -448,14 +512,32 @@ static void forward_batch(const jtlm_model *m, jtlm_state *s, const int *tokens,
                 const float *qh = s->q + t * qd + h * hd;
                 int kh = h / rep; /* repeat_interleave */
                 float *att = s->att + (size_t)h * (size_t)c->max_seq_len;
+#if JTLM_KV_INT8
+                float kd[JTLM_MAX_HEAD_DIM]; /* dequantized key (code * scale, as in PyTorch) */
+                for (int u = 0; u <= pos; u++) {
+                    const int8_t *kq = kc + (size_t)u * (size_t)kv_dim + (size_t)kh * (size_t)hd;
+                    float sk = ks[(size_t)u * (size_t)nkv + (size_t)kh];
+                    for (int i = 0; i < hd; i++) kd[i] = (float)kq[i] * sk;
+                    att[u] = dot(qh, kd, hd) * scale;
+                }
+#else
                 for (int u = 0; u <= pos; u++)
                     att[u] = dot(qh, kc + (size_t)u * (size_t)kv_dim + (size_t)kh * (size_t)hd, hd) * scale;
+#endif
                 softmax(att, pos + 1);
                 float *o = s->xb2 + t * d + h * hd;
                 for (int i = 0; i < hd; i++) {
                     JTLM_ACC acc = 0;
+#if JTLM_KV_INT8
+                    for (int u = 0; u <= pos; u++) {
+                        size_t at = (size_t)u * (size_t)kv_dim + (size_t)kh * (size_t)hd + (size_t)i;
+                        float vd = (float)vc[at] * vs[(size_t)u * (size_t)nkv + (size_t)kh];
+                        acc += (JTLM_ACC)att[u] * (JTLM_ACC)vd;
+                    }
+#else
                     for (int u = 0; u <= pos; u++)
                         acc += (JTLM_ACC)att[u] * (JTLM_ACC)vc[(size_t)u * (size_t)kv_dim + (size_t)kh * (size_t)hd + (size_t)i];
+#endif
                     o[i] = (float)acc;
                 }
             }
