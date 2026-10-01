@@ -22,7 +22,7 @@
 // (servo.c), which changes the face on the display (board.cpp) and moves the head. Servo
 // output is off after boot (dry-run: plans run with their timing but nothing is sent to the
 // servos). Commands: "!act <json>" (dispatch an Action JSON without the LM), "!center",
-// "!led <r> <g> <b>" (diagnostics: the base LEDs), "!servo on" (power the servos and center the head), and, handled at once even while the
+// "!pose <yaw> <pitch>" (one move within the soft limits), "!led <r> <g> <b>" (diagnostics: the base LEDs), "!servo on" (power the servos and center the head), and, handled at once even while the
 // LM is busy, "!stop" / "!servo off" (torque off and servo power off), "!relax" (torque
 // off), "!servo" (status). A touch on the screen also stops. "!wdtest" (dry-run only) runs a
 // plan that overruns its deadline, to check the watchdog. No Wi-Fi.
@@ -299,24 +299,18 @@ static void reset_state(lm_t *lm) {
   }
 }
 
-// Validates an Action JSON string, plans it from the current pose, queues it and prints
+// Queues a plan and prints
 //   JTALM {"t":"act","seq":..,"valid":..,"calls":[..],"from":[yaw,pitch],"steps":[..],...}
-// Only "output" (after the gate) is dispatched; "[]" and invalid outputs do nothing.
-static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
-  static act_plan_t plan;
-  int64_t t0 = now_us();
-  const char *err = NULL;
-  int valid = act_parse(json, len, plan.calls, &plan.n_calls, &err) == 0;
-  if (!valid) plan.n_calls = 0;
-  act_plan(&plan, lm->pose_yaw, lm->pose_pitch);
+static void submit_and_report(lm_t *lm, const char *src, act_plan_t *plan, int valid,
+                              const char *err, int64_t t0) {
   uint32_t seq = ++lm->act_seq;
   int queued = 0, dropped = 0;
-  if (plan.n_steps > 0) {
-    queued = servo_submit(&plan, seq) == 0;
+  if (plan->n_steps > 0) {
+    queued = servo_submit(plan, seq) == 0;
     dropped = !queued;
     if (queued) {
-      lm->pose_yaw = plan.yaw1;
-      lm->pose_pitch = plan.pitch1;
+      lm->pose_yaw = plan->yaw1;
+      lm->pose_pitch = plan->pitch1;
     }
   }
   int64_t t1 = now_us();
@@ -325,12 +319,32 @@ static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
       "JTALM {\"t\":\"act\",\"seq\":%" PRIu32 ",\"src\":\"%s\",\"valid\":%d,\"err\":%s%s%s,",
       seq, src, valid, err ? "\"" : "", err ? err : "null", err ? "\"" : ""
   );
-  act_print_body(stdout, &plan);
+  act_print_body(stdout, plan);
   printf(
       ",\"queued\":%d,\"dropped\":%d,\"servo\":\"%s\",\"plan_us\":%" PRId64 "}\n", queued,
       dropped, servo_output_on() ? "on" : "dry", t1 - t0
   );
   out_unlock();
+}
+
+// Validates an Action JSON string, plans it from the current pose and queues it.
+// Only "output" (after the gate) is dispatched; "[]" and invalid outputs do nothing.
+static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
+  static act_plan_t plan;
+  int64_t t0 = now_us();
+  const char *err = NULL;
+  int valid = act_parse(json, len, plan.calls, &plan.n_calls, &err) == 0;
+  if (!valid) plan.n_calls = 0;
+  act_plan(&plan, lm->pose_yaw, lm->pose_pitch);
+  submit_and_report(lm, src, &plan, valid, err, t0);
+}
+
+// "!pose <yaw> <pitch>": one move within the soft limits (limit checks, maintenance).
+static void dispatch_pose(lm_t *lm, int yaw, int pitch) {
+  static act_plan_t plan;
+  int64_t t0 = now_us();
+  act_plan_pose(&plan, lm->pose_yaw, lm->pose_pitch, yaw, pitch);
+  submit_and_report(lm, "pose", &plan, 1, NULL, t0);
 }
 
 static void run_prompt(lm_t *lm, const char *text, size_t len) {
@@ -478,6 +492,13 @@ static void run_command(lm_t *lm, const char *line) {
     int err = board_led((uint8_t)r, (uint8_t)g, (uint8_t)b);
     printf("JTALM {\"t\":\"led\",\"r\":%d,\"g\":%d,\"b\":%d,\"ok\":%d,\"cfg\":%d}\n", r, g, b,
            err == 0, board_led_cfg());
+  } else if (!strncmp(line, "!pose ", 6)) {
+    int yaw = 0, pitch = 0;
+    if (sscanf(line + 6, "%d %d", &yaw, &pitch) != 2) {
+      emit_error("usage: !pose <yaw> <pitch>");
+      return;
+    }
+    dispatch_pose(lm, yaw, pitch);
   } else if (!strcmp(line, "!center")) {
     dispatch(lm, "center", kCenter, strlen(kCenter));
   } else if (!strcmp(line, "!servo on")) {

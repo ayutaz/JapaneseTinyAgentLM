@@ -324,13 +324,10 @@ int act_parse(const char *s, size_t n, act_call_t *calls, int *n_calls, const ch
 
 static int clampi(int v, int lo, int hi) { return v < lo ? lo : v > hi ? hi : v; }
 
-// Soft limits: the Action limits (mapping.py) intersected with the servo soft limits.
-#define YAW_MIN (-ACT_YAW_LIMIT_DEG > HW_YAW_MIN_DEG ? -ACT_YAW_LIMIT_DEG : HW_YAW_MIN_DEG)
-#define YAW_MAX (ACT_YAW_LIMIT_DEG < HW_YAW_MAX_DEG ? ACT_YAW_LIMIT_DEG : HW_YAW_MAX_DEG)
-#define PITCH_MIN \
-  (-ACT_PITCH_LIMIT_DEG > HW_PITCH_MIN_DEG ? -ACT_PITCH_LIMIT_DEG : HW_PITCH_MIN_DEG)
-#define PITCH_MAX \
-  (ACT_PITCH_LIMIT_DEG < HW_PITCH_MAX_DEG ? ACT_PITCH_LIMIT_DEG : HW_PITCH_MAX_DEG)
+#define YAW_MIN ACT_YAW_MIN_DEG
+#define YAW_MAX ACT_YAW_MAX_DEG
+#define PITCH_MIN ACT_PITCH_MIN_DEG
+#define PITCH_MAX ACT_PITCH_MAX_DEG
 
 uint16_t act_move_ms_limits(double deg, double vmax_dps, double amax_dps2) {
   if (deg <= 0) return 0;
@@ -463,4 +460,15 @@ void act_print_body(FILE *f, const act_plan_t *p) {
     print_step(f, &p->steps[i]);
   }
   fprintf(f, "],\"to\":[%d,%d],\"total_ms\":%" PRIu32, p->yaw1, p->pitch1, p->total_ms);
+}
+
+void act_plan_pose(act_plan_t *p, int yaw, int pitch, int to_yaw, int to_pitch) {
+  p->n_calls = 0;
+  p->n_steps = 0;
+  p->total_ms = 0;
+  p->yaw0 = yaw;
+  p->pitch0 = pitch;
+  add_move(p, 0, to_yaw, to_pitch, &yaw, &pitch, 0);
+  p->yaw1 = yaw;
+  p->pitch1 = pitch;
 }

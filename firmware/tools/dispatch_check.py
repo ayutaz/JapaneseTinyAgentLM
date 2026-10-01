@@ -65,13 +65,11 @@ class Policy:
     """Device policy constants, taken from action.h and cross-checked with mapping.py."""
 
     def __init__(self, d: dict[str, float]) -> None:
-        assert d["ACT_YAW_LIMIT_DEG"] == mapping.YAW_LIMIT_DEG
-        assert d["ACT_PITCH_LIMIT_DEG"] == mapping.PITCH_LIMIT_DEG
         assert d["ACT_NOD_PITCH_DEG"] == mapping.NOD_PITCH_DEG
-        self.yaw_min = int(max(-mapping.YAW_LIMIT_DEG, d["HW_YAW_MIN_DEG"]))
-        self.yaw_max = int(min(mapping.YAW_LIMIT_DEG, d["HW_YAW_MAX_DEG"]))
-        self.pitch_min = int(max(-mapping.PITCH_LIMIT_DEG, d["HW_PITCH_MIN_DEG"]))
-        self.pitch_max = int(min(mapping.PITCH_LIMIT_DEG, d["HW_PITCH_MAX_DEG"]))
+        self.yaw_min = int(d["ACT_YAW_MIN_DEG"])
+        self.yaw_max = int(d["ACT_YAW_MAX_DEG"])
+        self.pitch_min = int(d["ACT_PITCH_MIN_DEG"])
+        self.pitch_max = int(d["ACT_PITCH_MAX_DEG"])
         self.yaw_zero = d["SERVO_YAW_ZERO"]
         self.pitch_zero = d["SERVO_PITCH_ZERO"]
         self.vmax = d["MOTION_VMAX_DPS"]

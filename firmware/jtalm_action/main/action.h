@@ -22,15 +22,15 @@ enum { DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN, DIR_CENTER };
 enum { AMT_SLIGHT, AMT_NORMAL, AMT_LARGE };
 enum { EXPR_HAPPY, EXPR_SAD, EXPR_SURPRISED, EXPR_NEUTRAL, EXPR_COUNT };
 
-// mapping.py: YAW_DEG, PITCH_DEG, YAW_LIMIT_DEG, PITCH_LIMIT_DEG, NOD_PITCH_DEG
-#define ACT_YAW_LIMIT_DEG 30
-#define ACT_PITCH_LIMIT_DEG 15
+// Soft limits of the head in degrees from the neutral pose (right / up positive). F2 widened
+// them from the v0 values (yaw -30..+30, pitch -10..+15) towards the official firmware's
+// recommended range, checked on the K151 with someone watching (docs/hardware.md).
+// mapping.DEFAULT_LIMITS holds the same values (firmware/tools/dispatch_check.py checks it).
+#define ACT_YAW_MIN_DEG (-45)
+#define ACT_YAW_MAX_DEG 45
+#define ACT_PITCH_MIN_DEG (-10)
+#define ACT_PITCH_MAX_DEG 85
 #define ACT_NOD_PITCH_DEG 14  // nod amplitude (8 was too small to notice, 2026-09-30)
-// stackchan-idf soft limits (relative to the zero position) (docs/hardware.md)
-#define HW_YAW_MIN_DEG (-40)
-#define HW_YAW_MAX_DEG 40
-#define HW_PITCH_MIN_DEG (-10)
-#define HW_PITCH_MAX_DEG 25
 // Raw position of the neutral pose; 1 step = 0.3125 deg. Right (+yaw) lowers the yaw raw,
 // up (+pitch) raises the pitch raw.
 #define SERVO_YAW_ZERO 460
@@ -82,6 +82,9 @@ int act_parse(const char *s, size_t n, act_call_t *calls, int *n_calls, const ch
 
 // Plans validated calls from the pose (yaw, pitch) in degrees.
 void act_plan(act_plan_t *p, int yaw, int pitch);
+
+// A single move to (to_yaw, to_pitch) within the soft limits, without calls ("!pose").
+void act_plan_pose(act_plan_t *p, int yaw, int pitch, int to_yaw, int to_pitch);
 
 // Move duration in ms for a distance in degrees (0 for 0): act_move_ms with the general
 // limits, act_move_ms_limits with the given peak speed and acceleration.
