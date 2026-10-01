@@ -28,9 +28,7 @@
   },
   "offer": {
     "gpu_name": "Tesla V100",
-    "gpu_ram": 32768,
-    "dph_total": 0.2188888888888889,
-    "geolocation": "Bulgaria, BG"
+    "gpu_ram": 32768
   },
   "started_utc": "20260929T054319Z",
   "uploads": {
@@ -101,6 +99,5 @@
   ],
   "status": "succeeded",
   "destroyed": true,
-  "hours": 1.085,
-  "cost_usd_estimate": 0.238
+  "hours": 1.085
 }

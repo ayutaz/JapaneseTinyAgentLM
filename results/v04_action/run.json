@@ -32,9 +32,7 @@
   "commit": "c6c4c07bdc0a1bcb6de6c416a2dac4c97391abd5",
   "offer": {
     "gpu_name": "RTX 3090",
-    "gpu_ram": 24576,
-    "dph_total": 0.2685185185185185,
-    "geolocation": "Utah, US"
+    "gpu_ram": 24576
   },
   "driver_version": "595.71.05",
   "cuda_max_good": 13.2,
@@ -83,9 +81,7 @@
       "gpu_name": "RTX 3090",
       "error": "instance not running after 1800s: Error response from daemon: Get \"https://registry-1.docker.io/v2/\": net/http: TLS handshake timeout\n",
       "destroyed": true,
-      "hours": 0.506,
-      "cost_usd_estimate": 0.077
+      "hours": 0.506
     }
-  ],
-  "cost_usd_estimate": 0.173
+  ]
 }

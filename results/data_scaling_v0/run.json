@@ -36,9 +36,7 @@
   "commit": "6a93cc07334cdf3a8f88a4b7ef7d72c0293f2570",
   "offer": {
     "gpu_name": "RTX 3090",
-    "gpu_ram": 24576,
-    "dph_total": 0.2009259259259259,
-    "geolocation": "Bulgaria, BG"
+    "gpu_ram": 24576
   },
   "driver_version": "580.95.05",
   "cuda_max_good": 13.0,
@@ -102,6 +100,5 @@
   "status": "succeeded",
   "destroyed": true,
   "hours": 0.382,
-  "failed_starts": [],
-  "cost_usd_estimate": 0.077
+  "failed_starts": []
 }
