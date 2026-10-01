@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 ayutaz
 //
-// Action schema v0 validator and planner (see action.h).
+// Action schema v1 validator and planner (see action.h).
 //
 // The validator parses any JSON the way Python's json.loads does (duplicate object keys keep
 // the last value; 2.0 is an integer for the schema, as in jsonschema) and then applies the
@@ -14,12 +14,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-const char *const act_dir_names[5] = {"left", "right", "up", "down", "center"};
-const char *const act_amount_names[3] = {"slight", "normal", "large"};
-const char *const act_expr_names[EXPR_COUNT] = {"happy", "sad", "surprised", "neutral"};
+const char *const act_tool_names[ACT_KIND_COUNT] = {
+    "look", "turn", "nod", "shake", "bow", "set_expression", "set_led", "set_volume",
+    "adjust_volume", "set_brightness", "adjust_brightness"};
+const char *const act_dir_names[DIR_COUNT] = {"left", "right", "up", "down", "up_left",
+                                              "up_right", "down_left", "down_right", "center"};
+const char *const act_amount_names[AMT_COUNT] = {"slight", "normal", "large"};
+const char *const act_expr_names[EXPR_COUNT] = {"happy", "sad", "surprised", "neutral",
+                                                "angry", "sleepy", "doubt"};
+const char *const act_color_names[COLOR_COUNT] = {"red", "orange", "yellow", "green",
+                                                  "light_blue", "blue", "purple", "pink",
+                                                  "white", "off"};
+const char *const act_adjust_names[ADJ_COUNT] = {"up", "down"};
+const uint8_t act_led_rgb[COLOR_COUNT][3] = {
+    {168, 0, 0},   {168, 60, 0}, {168, 140, 0},  {0, 168, 0},     {0, 140, 168},
+    {0, 0, 168},   {110, 0, 168}, {168, 50, 100}, {100, 100, 100}, {0, 0, 0}};
 
-static const int kYawDeg[3] = {10, 20, 30};   // mapping.YAW_DEG
-static const int kPitchDeg[3] = {5, 10, 15};  // mapping.PITCH_DEG
+static const int kYawDeg[AMT_COUNT] = {10, 20, 30};   // mapping.YAW_DEG
+static const int kPitchDeg[AMT_COUNT] = {5, 10, 15};  // mapping.PITCH_DEG
+static const int kAdjustStep[AMT_COUNT] = {ACT_ADJUST_SLIGHT, ACT_ADJUST_NORMAL,
+                                           ACT_ADJUST_LARGE};  // mapping.ADJUST_STEP
+// Sign of the yaw (right +) and pitch (up +) change for each direction; 0 keeps that axis.
+static const int8_t kDirYaw[DIR_COUNT] = {-1, 1, 0, 0, -1, 1, -1, 1, 0};
+static const int8_t kDirPitch[DIR_COUNT] = {0, 0, 1, -1, 1, 1, -1, -1, 0};
 
 // ---------------------------------------------------------------------------------------
 // JSON
@@ -139,7 +156,7 @@ static int js_number(js_t *j) {
   }
   char buf[64];
   size_t len = (size_t)(j->p - s);
-  if (len >= sizeof(buf)) len = sizeof(buf) - 1;  // only 1..3 can be valid anyway
+  if (len >= sizeof(buf)) len = sizeof(buf) - 1;  // only 0..180 can be valid anyway
   memcpy(buf, s, len);
   buf[len] = '\0';
   int id = js_new(j, JS_NUM);
@@ -240,43 +257,96 @@ static int js_members(const js_t *j, int obj, const char *const *keys, int n, in
   return 0;
 }
 
-static const char *js_call(const js_t *j, int item, act_call_t *call, uint8_t *count_float) {
+// An integer for the schema (integral floats count, as in jsonschema) within lo..hi.
+static int js_int(const js_t *j, int id, int lo, int hi, act_call_t *call) {
+  const js_node_t *c = &j->nodes[id];
+  if (c->type != JS_NUM || c->num != floor(c->num) || c->num < lo || c->num > hi) return -1;
+  call->value = (int16_t)c->num;
+  // json.dumps writes -0.0 and 0.0 differently, so the duplicate rule tells them apart too.
+  call->num_float = c->is_float ? (signbit(c->num) ? 2 : 1) : 0;
+  return 0;
+}
+
+// {"direction": <names>, "amount": ...} or {"direction": <names>, <num_key>: lo..hi}.
+static const char *js_dir_and_size(const js_t *j, int args, const char *num_key, int lo,
+                                   int hi, const char *const *names, int n_names,
+                                   act_call_t *call) {
+  const char *keys_amount[2] = {"direction", "amount"};
+  const char *keys_num[2] = {"direction", num_key};
+  int a[2];
+  if (!js_members(j, args, keys_amount, 2, a)) {
+    int amount = js_enum(j, a[1], act_amount_names, AMT_COUNT);
+    if (amount < 0) return "amount enum";
+    call->amount = (uint8_t)amount;
+  } else if (!js_members(j, args, keys_num, 2, a)) {
+    if (js_int(j, a[1], lo, hi, call)) return "number out of range";
+  } else {
+    return "arguments";
+  }
+  int dir = js_enum(j, a[0], names, n_names);
+  if (dir < 0) return "direction enum";
+  call->dir = (uint8_t)dir;
+  return NULL;
+}
+
+static const char *js_call(const js_t *j, int item, act_call_t *call) {
   static const char *const kCallKeys[2] = {"name", "arguments"};
-  static const char *const kTools[3] = {"look", "set_expression", "nod"};
-  static const char *const kLookKeys[2] = {"direction", "amount"};
   static const char *const kExprKeys[1] = {"expression"};
-  static const char *const kNodKeys[1] = {"count"};
-  int v[2], a[2];
+  static const char *const kCountKeys[1] = {"count"};
+  static const char *const kColorKeys[1] = {"color"};
+  static const char *const kLevelKeys[1] = {"level"};
+  int v[2], a[1];
   if (j->nodes[item].type != JS_OBJ) return "call is not an object";
   if (js_members(j, item, kCallKeys, 2, v)) return "call keys";
-  int kind = js_enum(j, v[0], kTools, 3);
+  int kind = js_enum(j, v[0], act_tool_names, ACT_KIND_COUNT);
   if (kind < 0) return "unknown tool";
   int args = v[1];
   if (j->nodes[args].type != JS_OBJ) return "arguments is not an object";
   memset(call, 0, sizeof(*call));
   call->kind = (uint8_t)kind;
-  *count_float = 0;
-  if (kind == ACT_LOOK) {
-    if (js_members(j, args, kLookKeys, 2, a)) return "look arguments";
-    int dir = js_enum(j, a[0], act_dir_names, 5);
-    int amount = js_enum(j, a[1], act_amount_names, 3);
-    if (dir < 0 || amount < 0) return "look enum";
-    call->dir = (uint8_t)dir;
-    call->amount = (uint8_t)amount;
-  } else if (kind == ACT_EXPR) {
-    if (js_members(j, args, kExprKeys, 1, a)) return "set_expression arguments";
-    int expr = js_enum(j, a[0], act_expr_names, EXPR_COUNT);
-    if (expr < 0) return "expression enum";
-    call->expr = (uint8_t)expr;
-  } else {
-    if (js_members(j, args, kNodKeys, 1, a)) return "nod arguments";
-    const js_node_t *c = &j->nodes[a[0]];
-    if (c->type != JS_NUM || c->num != floor(c->num)) return "count is not an integer";
-    if (c->num < 1 || c->num > 3) return "count out of range";
-    call->count = (uint8_t)c->num;
-    *count_float = c->is_float;
+  call->amount = ACT_NONE;
+  const char *e = NULL;
+  switch (kind) {
+    case ACT_LOOK:
+      e = js_dir_and_size(j, args, "degrees", 1, 180, act_dir_names, DIR_COUNT, call);
+      if (!e && call->dir == DIR_CENTER && call->amount == ACT_NONE) e = "center with degrees";
+      break;
+    case ACT_TURN:  // relative: no center
+      e = js_dir_and_size(j, args, "degrees", 1, 180, act_dir_names, DIR_CENTER, call);
+      break;
+    case ACT_NOD:
+    case ACT_SHAKE:
+      if (js_members(j, args, kCountKeys, 1, a) || js_int(j, a[0], 1, 5, call)) e = "count";
+      break;
+    case ACT_BOW:
+      if (js_members(j, args, NULL, 0, a)) e = "bow takes no arguments";
+      break;
+    case ACT_EXPR: {
+      int expr = js_members(j, args, kExprKeys, 1, a) ? -1
+                                                      : js_enum(j, a[0], act_expr_names, EXPR_COUNT);
+      if (expr < 0) e = "expression";
+      call->expr = (uint8_t)(expr < 0 ? 0 : expr);
+      break;
+    }
+    case ACT_LED: {
+      int color = js_members(j, args, kColorKeys, 1, a)
+                      ? -1
+                      : js_enum(j, a[0], act_color_names, COLOR_COUNT);
+      if (color < 0) e = "color";
+      call->color = (uint8_t)(color < 0 ? 0 : color);
+      break;
+    }
+    case ACT_SET_VOLUME:
+    case ACT_SET_BRIGHTNESS:
+      if (js_members(j, args, kLevelKeys, 1, a) || js_int(j, a[0], 0, ACT_LEVEL_MAX, call)) {
+        e = "level";
+      }
+      break;
+    default:  // ACT_ADJUST_VOLUME, ACT_ADJUST_BRIGHTNESS
+      e = js_dir_and_size(j, args, "by", 1, ACT_LEVEL_MAX, act_adjust_names, ADJ_COUNT, call);
+      break;
   }
-  return NULL;
+  return e;
 }
 
 int act_parse(const char *s, size_t n, act_call_t *calls, int *n_calls, const char **err) {
@@ -295,20 +365,19 @@ int act_parse(const char *s, size_t n, act_call_t *calls, int *n_calls, const ch
     *err = "top level is not a JSON array";
     return -1;
   }
-  uint8_t count_float[ACT_MAX_CALLS];
   int k = 0;
   for (int item = j.nodes[root].child; item >= 0; item = j.nodes[item].next) {
     if (k == ACT_MAX_CALLS) {
       *err = "more than 2 calls";
       return -1;
     }
-    const char *e = js_call(&j, item, &calls[k], &count_float[k]);
+    const char *e = js_call(&j, item, &calls[k]);
     if (e) {
       *err = e;
       return -1;
     }
     for (int i = 0; i < k; i++) {
-      if (!memcmp(&calls[i], &calls[k], sizeof(calls[k])) && count_float[i] == count_float[k]) {
+      if (!memcmp(&calls[i], &calls[k], sizeof(calls[k]))) {
         *err = "duplicate call";
         return -1;
       }
@@ -353,7 +422,7 @@ double act_yaw_deg(int raw) { return (SERVO_YAW_ZERO - raw) * 5.0 / 16.0; }
 double act_pitch_deg(int raw) { return (raw - SERVO_PITCH_ZERO) * 5.0 / 16.0; }
 
 static void add_move(act_plan_t *p, int call, int yaw_req, int pitch_req, int *yaw,
-                     int *pitch, int nod) {
+                     int *pitch, int swing) {
   if (p->n_steps >= ACT_MAX_STEPS) return;
   act_step_t *s = &p->steps[p->n_steps++];
   memset(s, 0, sizeof(*s));
@@ -366,11 +435,27 @@ static void add_move(act_plan_t *p, int call, int yaw_req, int pitch_req, int *y
   s->pitch_raw = act_pitch_raw(s->pitch);
   int dy = abs(s->yaw - *yaw), dp = abs(s->pitch - *pitch);
   int d = dy > dp ? dy : dp;
-  s->ms = nod ? act_move_ms_limits(d, MOTION_NOD_VMAX_DPS, MOTION_NOD_AMAX_DPS2)
-              : act_move_ms(d);
+  s->ms = swing ? act_move_ms_limits(d, MOTION_NOD_VMAX_DPS, MOTION_NOD_AMAX_DPS2)
+                : act_move_ms(d);
   p->total_ms += s->ms;
   *yaw = s->yaw;
   *pitch = s->pitch;
+}
+
+static act_step_t *add_step(act_plan_t *p, int call, int kind, int yaw, int pitch) {
+  if (p->n_steps >= ACT_MAX_STEPS) return NULL;
+  act_step_t *s = &p->steps[p->n_steps++];
+  memset(s, 0, sizeof(*s));
+  s->kind = (uint8_t)kind;
+  s->call = (uint8_t)call;
+  s->yaw = (int16_t)yaw;
+  s->pitch = (int16_t)pitch;
+  return s;
+}
+
+// Size of a look / turn / adjust call: the amount's table entry or its number.
+static int call_size(const act_call_t *c, const int *table) {
+  return c->amount == ACT_NONE ? c->value : table[c->amount];
 }
 
 void act_plan(act_plan_t *p, int yaw, int pitch) {
@@ -381,70 +466,165 @@ void act_plan(act_plan_t *p, int yaw, int pitch) {
   for (int c = 0; c < p->n_calls; c++) {
     const act_call_t *call = &p->calls[c];
     if (c > 0) p->total_ms += MOTION_CALL_GAP_MS;
-    if (call->kind == ACT_EXPR) {
-      if (p->n_steps >= ACT_MAX_STEPS) continue;
-      act_step_t *s = &p->steps[p->n_steps++];
-      memset(s, 0, sizeof(*s));
-      s->kind = STEP_EXPR;
-      s->call = (uint8_t)c;
-      s->expr = call->expr;
-      s->yaw = (int16_t)yaw;
-      s->pitch = (int16_t)pitch;
-    } else if (call->kind == ACT_LOOK) {
-      // mapping.look_target: center sets both axes; the others set one and keep the other.
-      int y = yaw, pt = pitch;
-      switch (call->dir) {
-        case DIR_CENTER: y = 0, pt = 0; break;
-        case DIR_RIGHT: y = kYawDeg[call->amount]; break;
-        case DIR_LEFT: y = -kYawDeg[call->amount]; break;
-        case DIR_UP: pt = kPitchDeg[call->amount]; break;
-        case DIR_DOWN: pt = -kPitchDeg[call->amount]; break;
+    act_step_t *s = NULL;
+    switch (call->kind) {
+      case ACT_LOOK:
+      case ACT_TURN: {
+        // mapping.plan_v1: look sets the axes the direction names (from the neutral pose),
+        // turn adds the same amounts to the current pose; center sets both axes to 0.
+        int y = yaw, pt = pitch;
+        if (call->dir == DIR_CENTER) {
+          y = 0, pt = 0;
+        } else {
+          int base_y = call->kind == ACT_TURN ? yaw : 0;
+          int base_p = call->kind == ACT_TURN ? pitch : 0;
+          if (kDirYaw[call->dir]) y = base_y + kDirYaw[call->dir] * call_size(call, kYawDeg);
+          if (kDirPitch[call->dir]) {
+            pt = base_p + kDirPitch[call->dir] * call_size(call, kPitchDeg);
+          }
+        }
+        add_move(p, c, y, pt, &yaw, &pitch, 0);
+        break;
       }
-      add_move(p, c, y, pt, &yaw, &pitch, 0);
-    } else {
-      // mapping.nod_targets(count, base_pitch, pitch_min, pitch_max): a swing of
-      // NOD_PITCH_DEG down from the current pitch and back, `count` times, so "look up, then
-      // nod" nods while looking up. Near the lower limit the swing keeps its full amplitude
-      // by moving up (from 0 with a -10 limit: between -10 and +4). It ends at the start.
-      int start = pitch;
-      int low = start - ACT_NOD_PITCH_DEG;
-      if (low < PITCH_MIN) low = PITCH_MIN;
-      int high = low + ACT_NOD_PITCH_DEG;
-      if (high > PITCH_MAX) high = PITCH_MAX;
-      for (int i = 0; i < call->count; i++) {
-        add_move(p, c, yaw, low, &yaw, &pitch, 1);
-        add_move(p, c, yaw, high, &yaw, &pitch, 1);
+      // nod, shake and bow end with a move back to the start pose only when they are not
+      // already there (mapping.plan_v1's back_to).
+      case ACT_NOD: {
+        // mapping.nod_targets: a swing of NOD_PITCH_DEG down from the current pitch and back,
+        // `count` times; near the lower limit it keeps its amplitude by moving up. It ends at
+        // the start pitch.
+        int start = pitch;
+        int low = start - ACT_NOD_PITCH_DEG;
+        if (low < PITCH_MIN) low = PITCH_MIN;
+        int high = low + ACT_NOD_PITCH_DEG;
+        if (high > PITCH_MAX) high = PITCH_MAX;
+        for (int i = 0; i < call->value; i++) {
+          add_move(p, c, yaw, low, &yaw, &pitch, 1);
+          add_move(p, c, yaw, high, &yaw, &pitch, 1);
+        }
+        if (pitch != start) add_move(p, c, yaw, start, &yaw, &pitch, 1);
+        break;
       }
-      if (high != start) add_move(p, c, yaw, start, &yaw, &pitch, 1);
+      case ACT_SHAKE: {
+        // mapping.plan_v1: right then left of the current yaw, `count` times, then back.
+        int start = yaw;
+        for (int i = 0; i < call->value; i++) {
+          add_move(p, c, start + ACT_SHAKE_YAW_DEG, pitch, &yaw, &pitch, 1);
+          add_move(p, c, start - ACT_SHAKE_YAW_DEG, pitch, &yaw, &pitch, 1);
+        }
+        if (yaw != start) add_move(p, c, start, pitch, &yaw, &pitch, 1);
+        break;
+      }
+      case ACT_BOW: {
+        int start = pitch;
+        add_move(p, c, yaw, PITCH_MIN, &yaw, &pitch, 0);
+        s = add_step(p, c, STEP_PAUSE, yaw, pitch);
+        if (s) {
+          s->ms = ACT_BOW_HOLD_MS;
+          p->total_ms += ACT_BOW_HOLD_MS;
+        }
+        if (pitch != start) add_move(p, c, yaw, start, &yaw, &pitch, 0);
+        break;
+      }
+      case ACT_EXPR:
+        s = add_step(p, c, STEP_EXPR, yaw, pitch);
+        if (s) s->arg = call->expr;
+        break;
+      case ACT_LED:
+        s = add_step(p, c, STEP_LED, yaw, pitch);
+        if (s) s->arg = call->color;
+        break;
+      case ACT_SET_VOLUME:
+      case ACT_SET_BRIGHTNESS:
+        s = add_step(p, c, call->kind == ACT_SET_VOLUME ? STEP_VOLUME : STEP_BRIGHTNESS, yaw,
+                     pitch);
+        if (s) s->level = call->value;
+        break;
+      default: {  // ACT_ADJUST_VOLUME, ACT_ADJUST_BRIGHTNESS
+        int size = call_size(call, kAdjustStep);
+        s = add_step(p, c, call->kind == ACT_ADJUST_VOLUME ? STEP_VOLUME : STEP_BRIGHTNESS, yaw,
+                     pitch);
+        if (s) {
+          s->arg = 1;
+          s->level = (int16_t)(call->dir == ADJ_UP ? size : -size);
+        }
+        break;
+      }
     }
   }
   p->yaw1 = yaw;
   p->pitch1 = pitch;
 }
 
+int act_apply_level(int current, const act_step_t *s) {
+  int lo = s->kind == STEP_BRIGHTNESS ? ACT_BRIGHTNESS_MIN : 0;
+  return clampi(s->arg ? current + s->level : s->level, lo, ACT_LEVEL_MAX);
+}
+
 // ---------------------------------------------------------------------------------------
 // The "act" record
 
 static void print_call(FILE *f, const act_call_t *c) {
-  if (c->kind == ACT_LOOK) {
-    fprintf(f, "{\"name\":\"look\",\"arguments\":{\"direction\":\"%s\",\"amount\":\"%s\"}}",
-            act_dir_names[c->dir], act_amount_names[c->amount]);
-  } else if (c->kind == ACT_EXPR) {
-    fprintf(f, "{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"%s\"}}",
-            act_expr_names[c->expr]);
-  } else {
-    fprintf(f, "{\"name\":\"nod\",\"arguments\":{\"count\":%d}}", c->count);
+  fprintf(f, "{\"name\":\"%s\",\"arguments\":{", act_tool_names[c->kind]);
+  switch (c->kind) {
+    case ACT_LOOK:
+    case ACT_TURN:
+      fprintf(f, "\"direction\":\"%s\",", act_dir_names[c->dir]);
+      if (c->amount == ACT_NONE) {
+        fprintf(f, "\"degrees\":%d", c->value);
+      } else {
+        fprintf(f, "\"amount\":\"%s\"", act_amount_names[c->amount]);
+      }
+      break;
+    case ACT_NOD:
+    case ACT_SHAKE:
+      fprintf(f, "\"count\":%d", c->value);
+      break;
+    case ACT_BOW:
+      break;
+    case ACT_EXPR:
+      fprintf(f, "\"expression\":\"%s\"", act_expr_names[c->expr]);
+      break;
+    case ACT_LED:
+      fprintf(f, "\"color\":\"%s\"", act_color_names[c->color]);
+      break;
+    case ACT_SET_VOLUME:
+    case ACT_SET_BRIGHTNESS:
+      fprintf(f, "\"level\":%d", c->value);
+      break;
+    default:
+      fprintf(f, "\"direction\":\"%s\",", act_adjust_names[c->dir]);
+      if (c->amount == ACT_NONE) {
+        fprintf(f, "\"by\":%d", c->value);
+      } else {
+        fprintf(f, "\"amount\":\"%s\"", act_amount_names[c->amount]);
+      }
+      break;
   }
+  fputs("}}", f);
 }
 
 static void print_step(FILE *f, const act_step_t *s) {
-  if (s->kind == STEP_EXPR) {
-    fprintf(f, "{\"c\":%d,\"k\":\"expr\",\"expr\":\"%s\"}", s->call, act_expr_names[s->expr]);
-  } else {
-    fprintf(f,
-            "{\"c\":%d,\"k\":\"move\",\"yaw\":%d,\"pitch\":%d,\"yaw_raw\":%d,\"pitch_raw\":%d"
-            ",\"ms\":%d,\"clamped\":%d}",
-            s->call, s->yaw, s->pitch, s->yaw_raw, s->pitch_raw, s->ms, s->clamped);
+  switch (s->kind) {
+    case STEP_MOVE:
+      fprintf(f,
+              "{\"c\":%d,\"k\":\"move\",\"yaw\":%d,\"pitch\":%d,\"yaw_raw\":%d,\"pitch_raw\":%d"
+              ",\"ms\":%d,\"clamped\":%d}",
+              s->call, s->yaw, s->pitch, s->yaw_raw, s->pitch_raw, s->ms, s->clamped);
+      break;
+    case STEP_EXPR:
+      fprintf(f, "{\"c\":%d,\"k\":\"expr\",\"expr\":\"%s\"}", s->call, act_expr_names[s->arg]);
+      break;
+    case STEP_LED:
+      fprintf(f, "{\"c\":%d,\"k\":\"led\",\"color\":\"%s\"}", s->call, act_color_names[s->arg]);
+      break;
+    case STEP_PAUSE:
+      fprintf(f, "{\"c\":%d,\"k\":\"pause\",\"ms\":%d}", s->call, s->ms);
+      break;
+    default:
+      fprintf(f, "{\"c\":%d,\"k\":\"%s\",\"%s\":%d}", s->call,
+              s->kind == STEP_VOLUME ? "volume" : "brightness", s->arg ? "delta" : "level",
+              s->level);
+      break;
   }
 }
 

@@ -318,12 +318,12 @@ static void run_plan(const msg_t *m) {
     if (r.aborted) break;
     if (s->kind == STEP_EXPR) {
       face_info_t f;
-      int err = board_face(s->expr, &f);
+      int err = board_face(s->arg, &f);
       out_lock();
       printf(
           "JTALM {\"t\":\"face\",\"seq\":%" PRIu32 ",\"expr\":\"%s\",\"ok\":%d"
           ",\"crc\":\"%08" PRIx32 "\",\"draw_us\":%" PRIu32 ",\"push_us\":%" PRIu32 "}\n",
-          m->seq, act_expr_names[s->expr], err == 0, f.crc, f.draw_us, f.push_us
+          m->seq, act_expr_names[s->arg], err == 0, f.crc, f.draw_us, f.push_us
       );
       out_unlock();
     } else {
