@@ -216,18 +216,32 @@ def phase_verify(gen: Generator, name: str, rows: list[dict], workers: int):
     return _parallel(fn, rows, workers)
 
 
-def phase_reverify(gen: Generator, name: str, inputs: list[str], workers: int):
+def _load_cases(inputs: list[str]) -> list[dict]:
     rows = []
     for path in inputs:
-        for line in Path(path).read_text("utf-8").splitlines():
-            if line.strip():
+        for lineno, line in enumerate(Path(path).read_text("utf-8").splitlines(), 1):
+            if not line.strip():
+                continue
+            where = f"{path}:{lineno}"
+            try:
                 case = json.loads(line)
-                # EvalCase files have "prompt"; the Stack-chan sources files have "text" only.
-                rows.append({"id": case["id"], "text": case.get("prompt", case.get("text")),
-                             "expected": case.get("expected", []),
-                             "category": case.get("category", "unknown"),
-                             "language": case.get("language", "ja"),
-                             "source": case.get("source"), "file": path})  # fmt: skip
+            except json.JSONDecodeError as e:
+                raise ValueError(f"{where}: not valid JSON ({e})") from e
+            if not isinstance(case, dict) or not case.get("id"):
+                raise ValueError(f"{where}: missing id")
+            # EvalCase files have "prompt"; the Stack-chan sources files have "text" only.
+            text = case.get("prompt", case.get("text"))
+            if not isinstance(text, str) or not text.strip():
+                raise ValueError(f"{where}: missing prompt/text")
+            rows.append({"id": case["id"], "text": text,
+                         "expected": case.get("expected", []),
+                         "category": case.get("category", "unknown"),
+                         "language": case.get("language", "ja"),
+                         "source": case.get("source"), "file": path})  # fmt: skip
+    return rows
+
+
+def phase_reverify(gen: Generator, name: str, rows: list[dict], workers: int):
     return phase_verify(gen, name, rows, workers)
 
 
@@ -253,10 +267,13 @@ def run(args: argparse.Namespace) -> dict:
         stats = {"eval_verify_failures": failures}
         _write(out / "eval_raw.jsonl", rows)
     elif args.phase == "reverify":
+        if not args.input:
+            raise ValueError("reverify needs --input")
+        cases = _load_cases(args.input)
         verifier_cfg = cfg["verifier"]
         gen = Generator(args.base_url, verifier_cfg["served_name"], cfg)
-        rows, failures = phase_reverify(gen, verifier_cfg["hf_id"], args.input, args.workers)
-        stats = {"reverify_failures": failures}
+        rows, failures = phase_reverify(gen, verifier_cfg["hf_id"], cases, args.workers)
+        stats = {"input_rows": len(cases), "reverify_failures": failures}
         _write(out / "reverify_raw.jsonl", rows)
     else:
         # v0.1 used llm-jp here, but llm-jp-3.1-13b could not parse reliably (it returned actions

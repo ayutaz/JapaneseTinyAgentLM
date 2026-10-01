@@ -202,3 +202,40 @@ def test_spec_set_v1_uses_the_v1_specs() -> None:
         {"spec_set": "v1", "per_request": 8}, {"single": 16}, random.Random(0)
     )
     assert all(s.id.startswith("v1.single.") for s in specs) and len(specs) == 2
+
+
+@pytest.mark.parametrize(
+    "line", ["{not json", '{"id": "x"}', '{"id": "x", "text": ""}', '{"id": "x", "prompt": null}']
+)
+def test_reverify_fails_fast_on_bad_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, line: str
+) -> None:
+    src = tmp_path / "bad.jsonl"
+    src.write_text('{"id": "ok", "text": "a"}\n' + line + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"bad\.jsonl:2"):
+        _reverify(tmp_path, monkeypatch, src)
+    assert not (tmp_path / "o/reverify_raw.jsonl").exists()
+
+
+def test_reverify_requires_input_and_reports_input_rows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(generate, "Generator", BowGenerator)
+    cfg = tmp_path / "c.json"
+    cfg.write_text(
+        json.dumps({**CFG, "verifier": {"served_name": "q", "hf_id": "Qwen/x"}}), "utf-8"
+    )
+    args = Namespace(
+        phase="reverify",
+        config=str(cfg),
+        base_url="x",
+        workers=1,
+        out=str(tmp_path / "o"),
+        input=[],
+    )
+    with pytest.raises(ValueError, match="reverify needs --input"):
+        generate.run(args)
+    src = tmp_path / "s.jsonl"
+    src.write_text('{"id": "a", "text": "x"}\n', encoding="utf-8")
+    summary, _ = _reverify(tmp_path, monkeypatch, src)
+    assert summary["input_rows"] == 1 and summary["rows"] == 1
