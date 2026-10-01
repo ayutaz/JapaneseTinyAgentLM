@@ -65,14 +65,13 @@ datasets:
 1. **文法による制約:** 各 step で、schema に合う token だけから最も確率の高いものを選びます。出力は必ず schema に合う JSON になります。
 2. **確信度の gate:** 生成した token の確率（制約をかける前の確率）の最小値が {{GATE}} 未満なら、出力を `[]` にします。閾値は validation だけで決めました。
 
-**Python:** 推論のコードは [GitHub のリポジトリ](https://github.com/ayutaz/JapaneseTinyAgentLM) にあります。
+**コード:** 学習、推論（Python と C）、ESP32 の firmware のコード（Apache-2.0）は、後日 GitHub で公開する予定です。それまでは、次の情報で推論を組み立てられます。
 
-```bash
-uv run --group train python -m jtalm.model.release run <このリポジトリを置いた folder> 右を向いて
-# {"input": "右を向いて", "output": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}], "confidence": 0.9999}
-```
+- 入力: `<s>` `<act>` 文の token 列 `<out>`。文は `tokenizer.model` で分割します（`<act>` と `<out>` は tokenizer にある記号です）。
+- 出力: `<out>` の後を `</s>` まで greedy に生成し、token 列を文字列に戻すと JSON になります（最大 24 token）。
+- 重み: `model.safetensors` の名前は、`embed`（出力層と共有）、`blocks.{i}.attn.{wq,wk,wv,wo}`、`blocks.{i}.mlp.{w1,w2,w3}`、`blocks.{i}.{attn_norm,mlp_norm}`、`norm` です。構造の数値は `config.json` にあります。
 
-**スタックチャン（ESP32-S3）:** `{{JTLM}}` を flash の 0x200000 に書き込み、リポジトリの `firmware/jtalm_action` を使います。USB serial で文を送ると、動作の JSON が返り、首の servo と画面の顔が動きます。
+**スタックチャン（ESP32-S3）:** firmware は、`{{JTLM}}` を flash の 0x200000 から読み込んで動かします。USB serial で文を送ると、動作の JSON が返り、首の servo と画面の顔が動きます。
 
 - 1文の応答時間の中央値は約 1.3 秒でした（CoreS3、2コア）。300文で、PC の PyTorch と出力が完全に一致しました。
 - servo は Feetech SCS0009 ×2（K151）です。首の角度は firmware 側で制限します（左右 ±30°、上下 −10〜+15°）。
@@ -131,11 +130,11 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 ## 先行例との関係
 
-マイコンで動く言語モデルや、マイコンで動く tool calling のモデル（英語と欧州の言語）、外付けの NPU で動くスタックチャンの function calling には先行例があります。日本語の発話からロボットの動作呼び出し（JSON）を決める言語モデルを、ESP32-S3 単体（NPU・外部モジュール・ネットワークなし）で動かした公開事例は、2026年10月1日時点の私たちの調査では見つかりませんでした。詳しくはリポジトリの `docs/research_notes.md` §6.1 を見てください。
+マイコンで動く言語モデルや、マイコンで動く tool calling のモデル（英語と欧州の言語）、外付けの NPU で動くスタックチャンの function calling には先行例があります。日本語の発話からロボットの動作呼び出し（JSON）を決める言語モデルを、ESP32-S3 単体（NPU・外部モジュール・ネットワークなし）で動かした公開事例は、2026年10月1日時点の私たちの調査では見つかりませんでした。調べた範囲と先行例の一覧は、コードの公開時に合わせて公開します。
 
 ## ライセンスと帰属
 
-- 重み: **CC BY-SA 4.0**。コード（GitHub）: Apache-2.0。
+- 重み: **CC BY-SA 4.0**。コード（後日 GitHub で公開予定）: Apache-2.0。
 - 学習データに次のものを含みます: [Tatoeba](https://tatoeba.org/)（CC BY 2.0 FR）、[JESC](https://nlp.stanford.edu/projects/jesc/)（Pryzant et al., 2018、CC BY-SA 4.0）、[Amazon MASSIVE](https://github.com/alexa/massive)（FitzGerald et al., 2022、CC BY 4.0）。
 - 実装、データの生成と検査、学習、評価、firmware は Claude Code（Anthropic）が行いました。学習データと評価データの文章と正解は、上記のオープンモデル、人が書いた公開コーパス、プログラムによるもので、Claude の出力は含みません。
 
