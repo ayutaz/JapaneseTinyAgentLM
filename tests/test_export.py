@@ -175,6 +175,46 @@ def test_c_runtime_matches_python(
     set_kv_int8(model, False)
 
 
+@pytest.mark.skipif(_compiler() is None, reason="no C compiler on PATH")
+def test_c_grammar_matches_python(tmp_path: Path, sp_model: Path, model: ActionLM) -> None:
+    import random
+
+    from jtalm.model.format import all_call_pieces
+
+    exe = tmp_path / "jtalm"
+    src = ROOT / "runtime/host"
+    subprocess.run([_compiler(), "-O1", "-std=c11", "-ffp-contract=off", "-o", str(exe),
+                    *[str(src / f) for f in ("model.c", "tokenizer.c", "grammar.c", "main.c")],
+                    "-lm"], check=True)  # fmt: skip
+    out = tmp_path / "m.jtlm"
+    export(model.state_dict(), model.cfg, sp_model, out)
+    g = ActionGrammar(Codec(sp_model))
+    calls = all_call_pieces()
+    seqs = [[g.id["["], *(g.id[p] for p in c), g.id["]"]] for c in calls]
+    rng = random.Random(0)
+    for c in rng.sample(calls, 400):  # the second call follows the first as far as allowed
+        ids = [g.id["["], *(g.id[p] for p in c), g.id[","]]
+        for p in c:
+            if g.id[p] not in g.allowed(ids):
+                break
+            ids.append(g.id[p])
+        seqs.append(ids)
+    for _ in range(400):
+        ids = []
+        while (nxt := rng.choice(g.allowed(ids))) != g.eos:
+            ids.append(nxt)
+        seqs.append(ids)
+    inp = tmp_path / "seqs.txt"
+    inp.write_text("\n".join(" ".join(map(str, s)) for s in seqs) + "\n")
+    proc = subprocess.run([str(exe), "-m", str(out), "-i", str(inp), "--grammar-trace"],
+                          check=True, capture_output=True)  # fmt: skip
+    rows = [json.loads(x) for x in proc.stdout.decode().splitlines() if x.strip()]
+    assert len(rows) == len(seqs)
+    for s, r in zip(seqs, rows, strict=True):
+        expected = [g.allowed(s[:i]) for i in range(len(s) + 1)]
+        assert r["allowed"] == expected, s
+
+
 def test_header_layout_is_128_bytes() -> None:
     assert HEADER.size == 128
     assert struct.calcsize("<8I6I2I") == TOK_HEAD.size == 64

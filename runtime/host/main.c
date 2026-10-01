@@ -5,6 +5,7 @@
  *     jtalm -m model.jtlm [-i prompts.txt] [--grammar] [--first-logits]
  *     jtalm -m model.jtlm --tokenize [-i texts.txt]
  *     jtalm -m model.jtlm --decode [-i ids.txt]
+ *     jtalm -m model.jtlm --grammar-trace [-i ids.txt]
  *
  * Input is UTF-8, one item per line, from a file or stdin (never argv, so Japanese text does not
  * depend on the console code page). A UTF-8 BOM on the first line and CR/LF line ends are
@@ -86,12 +87,14 @@ static void usage(void) {
             "usage: jtalm -m MODEL.jtlm [-i FILE] [--grammar] [--first-logits]\n"
             "       jtalm -m MODEL.jtlm --tokenize [-i FILE]   (text -> ids)\n"
             "       jtalm -m MODEL.jtlm --decode [-i FILE]     (space-separated ids -> text)\n"
+            "       jtalm -m MODEL.jtlm --grammar-trace [-i FILE]"
+            "   (id lines -> allowed ids per prefix)\n"
             "Reads UTF-8 lines from FILE or stdin and prints one JSON value per line.\n");
 }
 
 int main(int argc, char **argv) {
     const char *model_path = NULL, *input_path = NULL;
-    int use_grammar = 0, tokenize = 0, decode = 0, first_logits = 0;
+    int use_grammar = 0, tokenize = 0, decode = 0, first_logits = 0, trace = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-m") && i + 1 < argc) model_path = argv[++i];
         else if (!strcmp(argv[i], "-i") && i + 1 < argc) input_path = argv[++i];
@@ -99,6 +102,7 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "--tokenize")) tokenize = 1;
         else if (!strcmp(argv[i], "--decode")) decode = 1;
         else if (!strcmp(argv[i], "--first-logits")) first_logits = 1;
+        else if (!strcmp(argv[i], "--grammar-trace")) trace = 1;
         else {
             usage();
             return 2;
@@ -134,7 +138,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     jtlm_grammar grammar;
-    if (use_grammar && jtlm_grammar_init(&grammar, &model.tok, work, work_bytes) != JTLM_OK) {
+    if ((use_grammar || trace) &&
+        jtlm_grammar_init(&grammar, &model.tok, work, work_bytes) != JTLM_OK) {
         fprintf(stderr, "the tokenizer lacks the Action grammar pieces\n");
         return 1;
     }
@@ -153,6 +158,26 @@ int main(int argc, char **argv) {
     while ((len = read_line(in, &line, &line_cap)) >= 0) {
         char *text = line;
         if (n_lines++ == 0 && len >= 3 && !memcmp(text, "\xef\xbb\xbf", 3)) text += 3, len -= 3;
+
+        if (trace) { /* allowed ids before each token of the line and after the last one */
+            int n = 0;
+            for (char *p = text, *end; n < 4096; p = end) {
+                long v = strtol(p, &end, 10);
+                if (end == p) break;
+                ids[n++] = (int)v;
+            }
+            jtlm_grammar_state st;
+            jtlm_grammar_reset(&st);
+            fputs("{\"allowed\":[", stdout);
+            for (int i = 0; i <= n; i++) {
+                int allowed[JTLM_MAX_ALLOWED], k = jtlm_grammar_allowed(&grammar, &st, allowed);
+                if (i) putchar(',');
+                print_ids(allowed, k);
+                if (i < n) jtlm_grammar_advance(&grammar, &st, ids[i]);
+            }
+            fputs("]}\n", stdout);
+            continue;
+        }
 
         if (decode) {
             int n = 0;
@@ -215,7 +240,7 @@ int main(int argc, char **argv) {
         fputs("}\n", stdout);
     }
     double dt = now_seconds() - t0;
-    if (!tokenize && !decode && n_lines)
+    if (!tokenize && !decode && !trace && n_lines)
         fprintf(stderr, "%ld prompts, %ld forward tokens (%ld generated) in %.3f s: %.1f tok/s\n",
                 n_lines, n_forward, n_generated, dt, dt > 0 ? (double)n_forward / dt : 0.0);
     if (in != stdin) fclose(in);

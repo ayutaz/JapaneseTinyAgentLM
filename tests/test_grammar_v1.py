@@ -70,6 +70,19 @@ def test_second_call_cannot_repeat_the_first(grammar: ActionGrammar, pieces: tup
     pytest.fail(f"the grammar allowed a duplicate of {pieces}")
 
 
+def test_second_number_avoids_only_the_first_calls_value(grammar: ActionGrammar) -> None:
+    head = '{"name":"set_volume","arguments":{"level":'
+    first = (head, "1", "0", "}}")  # set_volume level 10
+    ids = [grammar.id["["], *(grammar.id[p] for p in first), grammar.id[","], grammar.id[head]]
+    ids.append(grammar.id["1"])
+    # 1 itself is not a duplicate; after "1" each digit still reaches a level other than 10
+    # ("0" via 100, "1".."9" via 11..19).
+    expected = sorted([grammar.id[d] for d in "0123456789"] + [grammar.id["}}"]])
+    assert grammar.allowed(ids) == expected
+    ids.append(grammar.id["0"])
+    assert grammar.allowed(ids) == [grammar.id["0"]]  # only 100 remains; "}}" would repeat 10
+
+
 def test_numbers_have_no_leading_zero_and_stay_in_range(grammar: ActionGrammar) -> None:
     head = grammar.id['{"name":"look","arguments":{"direction":"']
     ids = [grammar.id["["], head, grammar.id["right"], grammar.id['","degrees":']]
