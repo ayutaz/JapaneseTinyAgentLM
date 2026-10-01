@@ -12,7 +12,7 @@ from jtalm.action.schema import canonicalize, parse_output  # noqa: E402
 from jtalm.model import tokenizer  # noqa: E402
 from jtalm.model.data import IGNORE, Codec, collate  # noqa: E402
 from jtalm.model.decode import greedy  # noqa: E402
-from jtalm.model.format import target_json  # noqa: E402
+from jtalm.model.format import ENUM_VALUES, JSON_PIECES, all_call_pieces, target_json  # noqa: E402
 from jtalm.model.transformer import (  # noqa: E402
     SIZES,
     ActionLM,
@@ -166,3 +166,33 @@ def test_quantization_error_is_bounded_and_int4_is_coarser_than_int8() -> None:
     q, info = quantize_state(state, 4, 64)
     assert torch.equal(q["norm.weight"], state["norm.weight"])  # 1-D stays float
     assert info["artifact_bytes_estimate"] == 8 * 128 // 2 + (8 * 128 // 64) * 2 + 128 * 4
+
+
+V1_TARGETS = [
+    [{"name": "look", "arguments": {"direction": "right", "degrees": 45}}],
+    [{"name": "turn", "arguments": {"direction": "up_left", "degrees": 180}},
+     {"name": "adjust_volume", "arguments": {"direction": "down", "by": 100}}],
+    [{"name": "bow", "arguments": {}}, {"name": "set_led", "arguments": {"color": "light_blue"}}],
+    [{"name": "set_volume", "arguments": {"level": 0}}],
+]  # fmt: skip
+
+
+def test_every_call_piece_sequence_is_its_target_json() -> None:
+    calls = all_call_pieces()
+    assert len(calls) == len(set(calls))
+    for pieces in calls:
+        text = "[" + "".join(pieces) + "]"
+        parsed = parse_output(text)
+        assert parsed.schema_valid, text
+        assert target_json(parsed.calls) == text
+
+
+def test_v1_targets_keep_pieces_whole_and_fit_the_target_limit(tmp_path: Path) -> None:
+    lines = [target_json(c) for c in V1_TARGETS] * 20 + ["右を向いて", "音量を上げて"] * 20
+    sp = tokenizer.train(lines, 400, tmp_path / "v1").as_posix()
+    codec = Codec(sp)
+    for piece in (*JSON_PIECES, *ENUM_VALUES):
+        assert len(codec.sp.encode(piece)) == 1, piece
+    longest = target_json(V1_TARGETS[1])
+    assert codec.sp.decode(codec.sp.encode(longest)) == longest
+    assert len(codec.sp.encode(longest)) + 1 <= 24  # + </s>
