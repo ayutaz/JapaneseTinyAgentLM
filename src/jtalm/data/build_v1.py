@@ -23,7 +23,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from jtalm.action.schema import canonicalize, to_json, uses_v1_only
+from jtalm.action.schema import canonicalize, to_json, uses_v1_only, validate
 from jtalm.data.build import _case, _filter, _load
 from jtalm.data.checks import dedup_key
 from jtalm.eval.cases import EvalCase, load_cases, write_cases
@@ -42,7 +42,8 @@ OLD_EVAL = {
 
 
 def _category(expected: list, old: str) -> str:
-    if expected and old in ("no_action", "negation"):
+    """Single vs multi_action follows the call count; correction keeps its category."""
+    if expected and old in ("single", "multi_action", "no_action", "negation"):
         return "single" if len(expected) == 1 else "multi_action"
     return old
 
@@ -56,12 +57,16 @@ def relabel(rows: list[dict]) -> tuple[list[EvalCase], list[dict], Counter]:
             continue
         try:
             old, new = canonicalize(r["expected"]), canonicalize(verified)
-        except (AttributeError, TypeError):
+            if validate(new):
+                dropped["verified_invalid"] += 1
+                continue
+            v1_only = uses_v1_only(new)
+        except (AttributeError, TypeError, KeyError, ValueError):
             dropped["verify_failed"] += 1
             continue
         source = r.get("source") or ""
         if new != old:
-            if not uses_v1_only(new):
+            if not v1_only:
                 dropped["verifier_disagrees_v0"] += 1
                 continue
             changed.append({**r, "old": old, "new": new})
@@ -86,7 +91,10 @@ def _read_overrides(path: Path) -> dict[str, list]:
     for line in path.read_text("utf-8").splitlines():
         if line.strip():
             o = json.loads(line)
-            out[o["id"]] = canonicalize(o["expected"])
+            expected = canonicalize(o["expected"])
+            if errors := validate(expected):
+                raise ValueError(f"override {o['id']!r} is not a valid label: {errors}")
+            out[o["id"]] = expected
     return out
 
 
@@ -94,39 +102,61 @@ def relabel_old_eval(
     rev: dict[str, list[dict]], old_eval: dict[str, str], relabel_out: Path, stats: dict
 ) -> set[str]:
     """Write relabel_v1/<set>.jsonl and changes.md, apply overrides.jsonl; return dedup keys."""
-    relabel_out.mkdir(parents=True, exist_ok=True)
     overrides = _read_overrides(relabel_out / "overrides.jsonl")
-    matched: set[str] = set()
+    sets: dict[str, list[EvalCase]] = {}
     review = ["| set | id | 入力 | v0 の正解 | v1 の正解 |", "|---|---|---|---|---|"]
-    eval_keys: set[str] = set()
+    over_review = ["| set | id | 入力 | v1 検証役の正解 | 上書き後 |", "|---|---|---|---|---|"]
+    matched: set[str] = set()
     for name, path in old_eval.items():
         cases, changed, dropped = relabel(rev.get(path, []))
+        originals = {c.id: c for c in load_cases(path)}
+        # keep fields relabel does not rebuild (pair_id, ...) from the original case
+        cases = [
+            replace(
+                c,
+                pair_id=originals[c.id].pair_id if c.id in originals else c.pair_id,
+                source=c.source or (originals[c.id].source if c.id in originals else None),
+            )
+            for c in cases
+        ]
         kept_ids = {c.id for c in cases}
         # keep the v0 label of rows whose v1 parse was dropped: they stay comparable with v0
-        cases += [c for c in load_cases(path) if c.id not in kept_ids]
+        cases += [c for i, c in originals.items() if i not in kept_ids]
         n_over = 0
         for i, c in enumerate(cases):
             if c.id in overrides:
+                over_review.append(
+                    f"| {name} | {c.id} | {c.prompt} | `{to_json(c.expected)}` "
+                    f"| `{to_json(overrides[c.id])}` |"
+                )
                 cases[i] = replace(
                     c, expected=overrides[c.id], category=_category(overrides[c.id], c.category)
                 )
                 matched.add(c.id)
                 n_over += 1
-        write_cases(relabel_out / f"{name}.jsonl", cases)
+        sets[name] = cases
         review += [
             f"| {name} | {r['id']} | {r['text']} | `{to_json(r['old'])}` | `{to_json(r['new'])}` |"
             for r in changed
         ]
         stats[f"relabel_{name}"] = {
             "n": len(cases),
+            "reverify_rows": len(rev.get(path, [])),
             "changed": len(changed),
             "overridden": n_over,
             **dropped,
         }
-        eval_keys |= {dedup_key(c.prompt) for c in cases}
     if unknown := sorted(set(overrides) - matched):
         raise ValueError(f"overrides.jsonl ids match no case in any relabeled set: {unknown}")
-    (relabel_out / "changes.md").write_text("\n".join(review) + "\n", "utf-8")
+    relabel_out.mkdir(parents=True, exist_ok=True)
+    eval_keys: set[str] = set()
+    for name, cases in sets.items():
+        write_cases(relabel_out / f"{name}.jsonl", cases)
+        eval_keys |= {dedup_key(c.prompt) for c in cases}
+    lines = review
+    if len(over_review) > 2:
+        lines = [*review, "", "## 上書き（overrides.jsonl）", "", *over_review]
+    (relabel_out / "changes.md").write_text("\n".join(lines) + "\n", "utf-8")
     return eval_keys
 
 
@@ -155,6 +185,9 @@ def main() -> None:
         ]
     )
     stats: dict = {"created": datetime.now(UTC).isoformat(timespec="seconds")}
+    for path in INHERITED:
+        if not rev.get(path):
+            raise ValueError(f"no reverify rows for {path} (path mismatch with --input?)")
 
     # 4. older evaluation sets (labels for the v1 evaluation; the user reviews changes.md)
     eval_keys = relabel_old_eval(rev, OLD_EVAL, args.relabel_out, stats)
@@ -171,6 +204,7 @@ def main() -> None:
     stats["eval_v3"] = {"n": len(ev3), **ev_stats}
     sc = Path("datasets/action/stackchan_v1/eval.jsonl")
     eval_keys |= {dedup_key(c.prompt) for c in ev3}
+    stats["stackchan_eval_included"] = sc.exists()
     if sc.exists():
         eval_keys |= {dedup_key(c.prompt) for c in load_cases(sc)}
 
@@ -184,6 +218,7 @@ def main() -> None:
         split.extend(kept)
         stats[f"inherited_{Path(path).stem}"] = {
             "n": len(kept),
+            "reverify_rows": len(rev[path]),
             "relabeled": len(changed),
             "overlap_or_dup": len(cases) - len(kept),
             **dropped,

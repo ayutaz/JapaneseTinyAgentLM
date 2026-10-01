@@ -87,3 +87,60 @@ def test_old_eval_relabel_unknown_override_id_raises(tmp_path: Path) -> None:
     (out / "overrides.jsonl").write_text(json.dumps({"id": "nope", "expected": []}) + "\n", "utf-8")
     with pytest.raises(ValueError, match="nope"):
         relabel_old_eval(rev, old, out, {})
+
+
+def test_relabel_drops_schema_invalid_verified_labels() -> None:
+    center_deg = [{"name": "look", "arguments": {"direction": "center", "degrees": 30}}]
+    bows = [{"name": "bow", "arguments": {}}] * 2
+    broken = [{"name": "nod", "arguments": {"count": "x"}}]
+    rows = [
+        row("a", "x", [], center_deg, "no_action"),
+        row("b", "y", [], bows, "no_action"),
+        row("c", "z", [], broken, "no_action"),
+    ]
+    cases, _, dropped = relabel(rows)
+    assert cases == []
+    assert dropped["verified_invalid"] >= 2
+    assert dropped["verify_failed"] + dropped["verified_invalid"] == 3
+
+
+def test_category_follows_call_count() -> None:
+    two = [*LOOK, *TURN]
+    cases, _, _ = relabel(
+        [
+            row("a", "x", two, two, "single"),
+            row("b", "y", LOOK, LOOK, "multi_action"),
+            row("c", "z", LOOK, LOOK, "correction"),
+        ]
+    )
+    assert {c.id: c.category for c in cases} == {
+        "a": "multi_action",
+        "b": "single",
+        "c": "correction",
+    }
+
+
+def test_invalid_override_raises(tmp_path: Path) -> None:
+    rev, old, out = _setup(tmp_path)
+    out.mkdir()
+    bad = [{"name": "bow", "arguments": {}}] * 2
+    (out / "overrides.jsonl").write_text(json.dumps({"id": "z", "expected": bad}) + "\n", "utf-8")
+    with pytest.raises(ValueError, match="z"):
+        relabel_old_eval(rev, old, out, {})
+
+
+def test_old_eval_keeps_pair_id_and_checks_overrides_before_writing(tmp_path: Path) -> None:
+    src = tmp_path / "old.jsonl"
+    write_cases(src, [EvalCase(id="b", prompt="p", expected=LOOK, category="single", pair_id="P1")])
+    rev = {src.as_posix(): [row("b", "p", LOOK, DEG)]}
+    out = tmp_path / "out"
+    relabel_old_eval(rev, {"s": src.as_posix()}, out, {})
+    assert load_cases(out / "s.jsonl")[0].pair_id == "P1"
+    out2 = tmp_path / "out2"
+    out2.mkdir()
+    (out2 / "overrides.jsonl").write_text(
+        json.dumps({"id": "nope", "expected": []}) + "\n", "utf-8"
+    )
+    with pytest.raises(ValueError):
+        relabel_old_eval(rev, {"s": src.as_posix()}, out2, {})
+    assert not (out2 / "s.jsonl").exists()
