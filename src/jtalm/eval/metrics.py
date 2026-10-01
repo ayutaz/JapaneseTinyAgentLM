@@ -15,7 +15,11 @@ from typing import Any
 from jtalm.action.schema import Call, canonicalize, parse_output
 from jtalm.eval.cases import EvalCase
 
-OPPOSITE = {"left": "right", "right": "left", "up": "down", "down": "up"}
+OPPOSITE = {"left": "right", "right": "left", "up": "down", "down": "up",
+            "up_left": "down_right", "down_right": "up_left",
+            "up_right": "down_left", "down_left": "up_right"}  # fmt: skip
+DIRECTED = ("look", "turn", "adjust_volume", "adjust_brightness")
+NUMERIC_ARGS = ("degrees", "count", "level", "by")
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,11 @@ class CaseResult:
     slots_correct: int
     slots_total: int
     critical: tuple[str, ...]
+    numeric_errors: tuple[float, ...] = ()
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 
 def _names(calls: list[Call]) -> list[Any]:
@@ -69,10 +78,23 @@ def score_case(case: EvalCase, raw: str | None) -> CaseResult:
         critical.append("false_action")
     if pred is not None:
         for exp_call, pred_call in zip(expected, pred, strict=False):
-            if exp_call["name"] == pred_call["name"] == "look":
+            if exp_call["name"] == pred_call["name"] and exp_call["name"] in DIRECTED:
                 exp_dir = exp_call["arguments"].get("direction")
                 if OPPOSITE.get(exp_dir) == pred_call["arguments"].get("direction"):
                     critical.append("reverse_direction")
+
+    numeric: list[float] = []
+    if pred is not None:
+        for exp_call, pred_call in zip(expected, pred, strict=False):
+            if exp_call["name"] != pred_call["name"]:
+                continue
+            e, p = exp_call["arguments"], pred_call["arguments"]
+            others = {k: v for k, v in e.items() if k not in NUMERIC_ARGS}
+            if all(p.get(k) == v for k, v in others.items()):
+                for k in NUMERIC_ARGS:
+                    pv, ev = p.get(k), e.get(k)
+                    if _is_number(pv) and _is_number(ev):
+                        numeric.append(abs(float(pv) - float(ev)))
 
     return CaseResult(
         id=case.id,
@@ -86,6 +108,7 @@ def score_case(case: EvalCase, raw: str | None) -> CaseResult:
         slots_correct=slots_correct,
         slots_total=slots_total,
         critical=tuple(critical),
+        numeric_errors=tuple(numeric),
     )
 
 
@@ -129,6 +152,8 @@ def evaluate(cases: list[EvalCase], predictions: Mapping[str, str | None]) -> di
             pairs[case_pair[r.id]].append(r)
     complete_pairs = [v for v in pairs.values() if len(v) >= 2]
 
+    errors = [x for r in results for x in r.numeric_errors]
+
     return {
         "n": n,
         "json_valid": sum(r.json_valid for r in results),
@@ -147,6 +172,11 @@ def evaluate(cases: list[EvalCase], predictions: Mapping[str, str | None]) -> di
             "fn": fn,
             "precision": _rate(tp, tp + fp),
             "recall": _rate(tp, tp + fn),
+        },
+        "numeric": {
+            "n": len(errors),
+            "exact": sum(x == 0 for x in errors),
+            "mean_abs_error": sum(errors) / len(errors) if errors else None,
         },
         "critical_error_rate": _rate(sum(bool(r.critical) for r in results), n),
         "critical_counts": dict(sorted(critical_counts.items())),
