@@ -61,6 +61,7 @@ def prepare(args: argparse.Namespace) -> Path:
     shutil.copy(args.tokenizer, out / "tokenizer.model")
     shutil.copy(SCHEMA, out / "action_schema_v0.json")
     shutil.copy(args.jtlm, out / JTLM_NAME)
+    shutil.copy(Path(__file__).with_name("hf_inference.py"), out / "inference.py")
     config = {
         "architecture": "ActionLM (decoder-only Transformer: RMSNorm, RoPE, GQA, SwiGLU, tied "
         "embeddings)",
@@ -98,7 +99,7 @@ def prepare(args: argparse.Namespace) -> Path:
     (out / "README.md").write_text(card, encoding="utf-8")
     files = sorted(p for p in out.rglob("*") if p.is_file() and p.name != "SHA256SUMS")
     for p in files:  # LF everywhere, so `sha256sum -c` works on Linux after a Windows build
-        if p.suffix in (".md", ".json"):
+        if p.suffix in (".md", ".json", ".py"):
             p.write_bytes(p.read_bytes().replace(b"\r\n", b"\n"))
     sums = [f"{_sha256(p)}  {p.relative_to(out).as_posix()}" for p in files]
     (out / "SHA256SUMS").write_bytes(("\n".join(sums) + "\n").encode())

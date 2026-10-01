@@ -46,10 +46,77 @@ datasets:
 | 右むかないで、ちょっとやめといてくれる? | `[]` |
 | まっすぐ行って、右に曲がってください。 | `[]` |
 
+## すぐに試す（Python）
+
+必要なのは Python 3.10 以上と、PyTorch、NumPy、sentencepiece、safetensors だけです。GPU は要りません（CPU で1文あたり約 0.03 秒）。
+
+**1. インストール**
+
+```bash
+pip install torch numpy sentencepiece safetensors huggingface_hub
+```
+
+**2. ダウンロードして実行**
+
+```bash
+hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgentLM-Action-3M
+python JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて 笑わないでね
+```
+
+```text
+{"input": "右を向いて", "actions": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}], "confidence": 0.9989, "raw": "..."}
+{"input": "笑わないでね", "actions": [], "confidence": 0.9999, "raw": "[]"}
+```
+
+引数を付けずに `python JapaneseTinyAgentLM-Action-3M/inference.py` と実行すると、標準入力から1行に1文ずつ読みます。
+
+**Python から使う**
+
+```python
+import sys
+from huggingface_hub import snapshot_download
+
+folder = snapshot_download("ayousanz/JapaneseTinyAgentLM-Action-3M")
+sys.path.insert(0, folder)
+from inference import ActionModel
+
+model = ActionModel(folder)
+print(model("少し上を向いてから、二回うなずいて"))
+# [{'name': 'look', 'arguments': {'direction': 'up', 'amount': 'slight'}},
+#  {'name': 'nod', 'arguments': {'count': 2}}]
+print(model.predict("こんにちは"))  # {'actions': [], 'confidence': ..., 'raw': '[]'}
+```
+
+uv を使う場合は、インストールせずに `uv run --with torch --with numpy --with sentencepiece --with safetensors JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて` でも動きます。
+
+| 出力の項目 | 意味 |
+|---|---|
+| `actions` | 実行する動作のリスト。`[]` なら何もしない |
+| `confidence` | 生成した token の確率の最小値。{{GATE}} 未満のときは、`actions` を `[]` にしています |
+| `raw` | gate をかける前のモデルの出力 |
+
+`inference.py` は、評価に使ったコードと同じ計算をする単体のスクリプト（約 270 行、Apache-2.0）です。評価セット全 4,794 文で、評価したときの出力と完全に一致することを確かめています。
+
+## ロボットにつなぐ
+
+`actions` を順に実行します。スタックチャン（K151）では、次の角度を使いました。ほかのロボットでは、可動域に合わせて変えてください。
+
+| 動作 | 角度 |
+|---|---|
+| `look` left / right | 左右に slight 10°、normal 20°、large 30° |
+| `look` up / down | 上下に slight 5°、normal 10°、large 15° |
+| `look` center | 左右・上下とも 0°（正面） |
+| `nod` | 下へ 14° 振って戻す動きを `count` 回 |
+| `set_expression` | 画面の顔を変える（首は動かさない） |
+
+- 出力は必ず [`action_schema_v0.json`](action_schema_v0.json) に合いますが、ロボットを動かす前に、角度の上限で必ず制限してください。
+- 文字の入力を前提にしています。音声で使う場合は、音声認識の結果を入力してください（音声認識の誤りへの強さは評価していません）。
+
 ## ファイル
 
 | ファイル | 内容 |
 |---|---|
+| `inference.py` | 単体の推論スクリプト（上の「すぐに試す」） |
 | `model.safetensors` | 評価した重み。INT4（group 64）で量子化した値を fp32 で保存したもので、ESP32 が計算する値と同じです |
 | `model_fp32.safetensors` | 量子化する前の fp32 の重み（追加学習用） |
 | `{{JTLM}}` | スタックチャンの firmware が読む形式（{{JTLM_BYTES}} bytes、sha256 `{{JTLM_SHA256}}`） |
@@ -57,21 +124,17 @@ datasets:
 | `config.json` | 構造、tokenizer の hash、確信度の閾値（gate） |
 | `action_schema_v0.json` | 出力の JSON Schema |
 | `eval/` | 評価の表と、誤差の範囲 |
+| `SHA256SUMS` | 各ファイルの sha256（`sha256sum -c SHA256SUMS` で確認できます） |
 
-## 使い方
+## 推論の仕組み
 
-**出力の決め方（重要）:** 本モデルの数値は、次の2つを使ったときのものです。
+ほかの言語や環境に移すときは、`inference.py` と同じ次の手順にしてください。本モデルの評価の数値は、この手順で出したものです。
 
-1. **文法による制約:** 各 step で、schema に合う token だけから最も確率の高いものを選びます。出力は必ず schema に合う JSON になります。
-2. **確信度の gate:** 生成した token の確率（制約をかける前の確率）の最小値が {{GATE}} 未満なら、出力を `[]` にします。閾値は validation だけで決めました。
+1. **入力:** `<s>` `<act>` 文の token 列 `<out>`。文は `tokenizer.model` で分割します（`<act>` と `<out>` は tokenizer にある記号です）。
+2. **文法による制約:** `<out>` の後を `</s>` まで greedy に生成します（最大 24 token）。各 step で、schema に合う token だけから最も確率の高いものを選ぶので、出力は必ず schema に合う JSON になります。
+3. **確信度の gate:** 生成した token（`</s>` を含む）の、制約をかける前の確率の最小値が {{GATE}} 未満なら、出力を `[]` にします。閾値は validation だけで決めました。
 
-**コード:** 学習、推論（Python と C）、ESP32 の firmware のコード（Apache-2.0）は、後日 GitHub で公開する予定です。それまでは、次の情報で推論を組み立てられます。
-
-- 入力: `<s>` `<act>` 文の token 列 `<out>`。文は `tokenizer.model` で分割します（`<act>` と `<out>` は tokenizer にある記号です）。
-- 出力: `<out>` の後を `</s>` まで greedy に生成し、token 列を文字列に戻すと JSON になります（最大 24 token）。
-- 重み: `model.safetensors` の名前は、`embed`（出力層と共有）、`blocks.{i}.attn.{wq,wk,wv,wo}`、`blocks.{i}.mlp.{w1,w2,w3}`、`blocks.{i}.{attn_norm,mlp_norm}`、`norm` です。構造の数値は `config.json` にあります。
-
-**スタックチャン（ESP32-S3）:** firmware は、`{{JTLM}}` を flash の 0x200000 から読み込んで動かします。USB serial で文を送ると、動作の JSON が返り、首の servo と画面の顔が動きます。
+**スタックチャン（ESP32-S3）:** `{{JTLM}}` は、ESP32 用の firmware が flash の 0x200000 から読み込む形式です。firmware と C の推論コードは、後日 GitHub で公開する予定です。
 
 - 1文の応答時間の中央値は約 1.3 秒でした（CoreS3、2コア）。300文で、PC の PyTorch と出力が完全に一致しました。
 - servo は Feetech SCS0009 ×2（K151）です。首の角度は firmware 側で制限します（左右 ±30°、上下 −10〜+15°）。
@@ -134,10 +197,20 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 ## ライセンスと帰属
 
-- 重み: **CC BY-SA 4.0**。コード（後日 GitHub で公開予定）: Apache-2.0。
+- 重み: **CC BY-SA 4.0**。コード: Apache-2.0（`inference.py`。学習と firmware のコードは後日 GitHub で公開予定）。
 - 学習データに次のものを含みます: [Tatoeba](https://tatoeba.org/)（CC BY 2.0 FR）、[JESC](https://nlp.stanford.edu/projects/jesc/)（Pryzant et al., 2018、CC BY-SA 4.0）、[Amazon MASSIVE](https://github.com/alexa/massive)（FitzGerald et al., 2022、CC BY 4.0）。
 - 実装、データの生成と検査、学習、評価、firmware は Claude Code（Anthropic）が行いました。学習データと評価データの文章と正解は、上記のオープンモデル、人が書いた公開コーパス、プログラムによるもので、Claude の出力は含みません。
 
 ## English summary
 
 A {{PARAMS}}-parameter decoder-only Transformer, trained from scratch, that maps short Japanese requests to robot action calls (JSON: `look`, `set_expression`, `nod`; up to two per request) or `[]` for non-requests, negated requests and requests the robot cannot perform. It runs entirely on an ESP32-S3 (M5Stack Stack-chan, CoreS3) in INT4 with a median latency of about 1.3 s, bit-exact with the PyTorch reference on 300 prompts. Decoding uses a schema grammar plus a confidence gate ({{GATE}}); the reported numbers use both. Japanese only (English requests are about 5% correct). Results vary across training seeds: on the 62 human-written requests the five seeds scored 75.8–91.9% (mean 85.2%); the released seed 0 was deployed and verified on the device before the other seeds were trained, and is the highest of the five on that set. See the error-bar tables above. Weights are CC BY-SA 4.0; training data includes Tatoeba (CC BY 2.0 FR), JESC (CC BY-SA 4.0) and MASSIVE (CC BY 4.0) plus sentences written by Apache-2.0/MIT open models. Built by Claude Code.
+
+Quick start (CPU is enough):
+
+```bash
+pip install torch numpy sentencepiece safetensors huggingface_hub
+hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgentLM-Action-3M
+python JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて
+```
+
+`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (4,794 of 4,794 evaluation prompts). The ESP32 firmware and training code will be published on GitHub later.
