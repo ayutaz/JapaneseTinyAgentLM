@@ -1,9 +1,22 @@
 [project]
 name = "jtalm"
 version = "0.1.0"
-description = "Japanese tiny Action / Chat language models for ESP32-S3 (M5Stack StackChan K151)"
+description = "Tiny Japanese language models that run on an ESP32-S3: an Action LM for M5Stack Stack-chan (K151)"
+readme = "README.md"
 authors = [{ name = "ayutaz" }]
 license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
+keywords = ["japanese", "tiny-llm", "function-calling", "esp32", "microcontroller", "robotics", "stack-chan"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: Japanese",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: C",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "huggingface-hub>=2.0.0",
@@ -11,11 +24,18 @@ dependencies = [
     "openai>=3.20.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ayutaz/JapaneseTinyAgentLM"
+Repository = "https://github.com/ayutaz/JapaneseTinyAgentLM"
+Issues = "https://github.com/ayutaz/JapaneseTinyAgentLM/issues"
+Model = "https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M"
+Dataset = "https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth"
+
 [build-system]
 requires = ["uv_build>=0.12.20,<0.13.0"]
 build-backend = "uv_build"
 
-# PyTorch: Windows (local) uses CPU wheels, Linux (vast.ai) uses CUDA 12.6 wheels.
+# PyTorch: CPU wheels on Windows / macOS, CUDA 12.6 wheels on Linux.
 [[tool.uv.index]]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"

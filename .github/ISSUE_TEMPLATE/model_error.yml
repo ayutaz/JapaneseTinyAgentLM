@@ -1,0 +1,17 @@
+name: モデルの誤り / Wrong model output
+description: 文に対して間違った動作を返した / The model returned a wrong action for a request
+labels: [model]
+body:
+  - type: textarea
+    id: cases
+    attributes:
+      label: 入力と出力 / Input and output
+      description: 入力した文、モデルの出力（inference.py の出力そのまま）、正しいと思う動作 / Input text, model output, expected action
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: 実行した環境 / Where
+      description: Python (inference.py) / スタックチャン実機 / その他

@@ -1,0 +1,14 @@
+name: 提案 / Feature request
+description: 新しい機能、ほかのロボットへの対応、改善の提案 / Ideas and improvements
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: 提案 / Proposal
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: 理由・使い道 / Motivation

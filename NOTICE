@@ -1,0 +1,18 @@
+JapaneseTinyAgentLM
+Copyright 2026 ayutaz
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Model weights and datasets produced by this project are licensed separately under
+Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0); see README.md.
+
+Third-party components:
+
+- The firmware in firmware/jtalm_action is built with ESP-IDF (Apache-2.0) and links M5Unified
+  and M5GFX (MIT, Copyright (c) 2021 M5Stack), newlib, FreeRTOS (MIT) and a font from
+  Adafruit GFX (BSD). Their license texts are in firmware/jtalm_action/licenses/.
+- firmware/baselines/esp32_llm/cores3.patch modifies doryiii/esp32-llm (MIT); the patch
+  context lines are upstream code under its MIT license.
+- runtime/host/tokenizer.c is written to behave like SentencePiece 0.2 (unigram encoding,
+  byte fallback). The normalization table stored in tokenizer.model and .jtlm files is
+  SentencePiece's nmt_nfkc table (SentencePiece is Apache-2.0, Copyright Google LLC).

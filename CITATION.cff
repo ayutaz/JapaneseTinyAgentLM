@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+message: "If you use this software or the model, please cite it as below."
+title: "JapaneseTinyAgentLM: tiny Japanese language models that run on an ESP32-S3"
+abstract: >-
+  A 3.15M-parameter Japanese Action language model, trained from scratch, that maps short
+  Japanese requests to robot action calls (JSON) and runs entirely on an ESP32-S3
+  (M5Stack Stack-chan, CoreS3) in INT4 with grammar-constrained decoding and a confidence gate.
+authors:
+  - name: ayutaz
+type: software
+license: Apache-2.0
+repository-code: "https://github.com/ayutaz/JapaneseTinyAgentLM"
+url: "https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M"
+version: 0.1.0
+date-released: "2026-10-01"
+keywords:
+  - japanese
+  - tiny language model
+  - function calling
+  - esp32
+  - microcontroller
+  - robotics
+  - stack-chan

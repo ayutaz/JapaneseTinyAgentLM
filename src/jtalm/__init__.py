@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 ayutaz
-"""JapaneseTinyAgentLM: tiny Japanese Action / Chat language models for ESP32-S3."""
+"""JapaneseTinyAgentLM: tiny Japanese language models for ESP32-S3 (Action LM; Chat LM planned)."""
 
 __version__ = "0.1.0"

@@ -1,0 +1,26 @@
+name: 不具合の報告 / Bug report
+description: 動かない、エラーになる、実機での不具合など / Something does not work
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 何が起きたか / What happened
+      description: 期待した動作と実際の動作 / Expected vs. actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現の手順 / Steps to reproduce
+      description: 実行したコマンド、入力した文、エラーの全文 / Commands, input text, full error output
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 環境 / Environment
+      description: OS、Python、実機の場合は機種と firmware / OS, Python, device and firmware if relevant
+    validations:
+      required: true
