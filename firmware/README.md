@@ -176,7 +176,7 @@ USB-Serial/JTAG の console を使います。PC 側は 115200 bps で開いて�
 | `stop` | 止めたとき | `src`（`stop` / `servo off` / `relax` / `touch` / `watchdog` など）、`power_off`、`torque_off`、`vm_off` |
 | `fault` | watchdog、servo の通信の error | `why`。続けて `stop` を出す |
 | `servo` | `!servo on` の後、`!servo` | 状態（`on` / `off`）、ping の応答時間、`vm_en`（IO expander から読み返した servo の電源）、`pose` |
-| `heap` | 起動の各段階、最初の依頼の後、`!heap` | 内部 SRAM と PSRAM の空き、最大連続ブロック、最小空き |
+| `heap` | 起動の各段階、最初の依頼の後、`!heap` | 内部 SRAM と PSRAM の空き、最大連続ブロック、最小空き、chip の温度（`temp_c`。内蔵センサーの値で、相対的な変化を見るもの）、CPU の clock（`cpu_mhz`） |
 | `ok` / `error` | 設定の command の後 / 失敗したとき | 変えた値 / `msg` |
 
 `gen` の行の形（値は省略）:
@@ -231,7 +231,7 @@ idf.py -B build_kv8 -D SDKCONFIG=build_kv8/sdkconfig -D SDKCONFIG_DEFAULTS="sdkc
 | ファイル | 内容 |
 |---|---|
 | `stackchan_chat.py` | 対話。1行入力するごとに Action JSON と時間を表示する。`--servo` で首も動かす。終了時に `!stop` を送る。Hugging Face のモデルにも同梱 |
-| `lm_serial.py` | 依頼を1件ずつ送り、応答を JSONL に保存し、latency をまとめる。`--ref` で host の runtime（`runtime/host/build/jtalm --grammar`）の出力と比べる。`--act` で dispatcher の計画（`act` の行）も保存する |
+| `lm_serial.py` | 依頼を1件ずつ送り、応答を JSONL に保存し、latency をまとめる。`--ref` で host の runtime（`runtime/host/build/jtalm --grammar`）の出力と比べる。`--act` で dispatcher の計画（`act` の行）も保存する。長時間の実行には `--repeat K`（依頼を K 周送る）と `--heap-every N`（N 件ごとに `heap` を記録）を使う |
 | `dispatch_check.py` | dispatcher の計画を Python（`jtalm.action.parse_output` と `jtalm.action.mapping`）で計算し直して照合する。serial log の `act_done` / `face` / `fault` も確かめる。`--fuzz N` で `!act` を使った validator の検査 |
 | `servo_test.py` | 首の動作確認の手順（`!act` の 16項目と、LM を通す 12項目。否定や雑談で動かないことを含む）を流す。`--servo` を付けないと dry-run。`--only <文字列>` で一部だけ |
 | `serial_capture.py` | serial log の取得。`--reset`、prompt への自動応答（`--send-on`）、終了条件（`--until`）を指定できる |

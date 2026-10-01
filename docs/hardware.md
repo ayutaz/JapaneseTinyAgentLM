@@ -215,5 +215,6 @@ quad の PSRAM と QIO の flash はほぼ同じ速さで、理論値（4 bit ×
 
 ## 未確認の事項
 
-- 消費電流と温度（LM を連続で動かしたとき）。
+- 消費電流（LM を連続で動かしたとき、servo を動かしたとき）。
+- 数時間以上の連続実行と、servo を動かしながらの連続実行（72分・3,567件の連続実行では、出力がすべて PC と一致し、reset もエラーもなく、chip の温度は 57.6℃ で頭打ちでした。[`results/v051_action/long_run/`](../results/v051_action/long_run/README.md)）。
 - `-DJTLM_BATCH=8` にしたときの速度。

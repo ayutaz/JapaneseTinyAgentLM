@@ -35,9 +35,11 @@
 
 #include "action.h"
 #include "board.h"
+#include "driver/temperature_sensor.h"
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "esp_app_desc.h"
+#include "esp_clk_tree.h"
 #include "esp_heap_caps.h"
 #include "esp_partition.h"
 #include "esp_timer.h"
@@ -122,12 +124,34 @@ static void run_parallel(jtlm_range_fn fn, void *ctx, int n) {
 
 static int64_t now_us(void) { return esp_timer_get_time(); }
 
+// The chip's internal temperature sensor (die temperature; meant for relative changes, see the
+// ESP-IDF docs) and the CPU clock, reported with the heap stats for long runs.
+static temperature_sensor_handle_t g_tsens;
+
+static void tsens_init(void) {
+  temperature_sensor_config_t cfg = TEMPERATURE_SENSOR_CONFIG_DEFAULT(-10, 80);
+  if (temperature_sensor_install(&cfg, &g_tsens) != ESP_OK ||
+      temperature_sensor_enable(g_tsens) != ESP_OK) {
+    g_tsens = NULL;
+  }
+}
+
 static void emit_heap(const char *stage) {
   const uint32_t internal = MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT;
+  char temp[24] = "null";
+  float celsius;
+  if (g_tsens && temperature_sensor_get_celsius(g_tsens, &celsius) == ESP_OK) {
+    snprintf(temp, sizeof temp, "%.1f", (double)celsius);
+  }
+  uint32_t cpu_hz = 0;
+  esp_clk_tree_src_get_freq_hz(
+      SOC_MOD_CLK_CPU, ESP_CLK_TREE_SRC_FREQ_PRECISION_CACHED, &cpu_hz
+  );
   printf(
       "JTALM {\"t\":\"heap\",\"stage\":\"%s\",\"ms\":%" PRId64
       ",\"int_free\":%u,\"int_largest\":%u,\"int_min\":%u"
-      ",\"ps_free\":%u,\"ps_largest\":%u,\"ps_min\":%u,\"stack_hwm\":%u}\n",
+      ",\"ps_free\":%u,\"ps_largest\":%u,\"ps_min\":%u,\"stack_hwm\":%u"
+      ",\"temp_c\":%s,\"cpu_mhz\":%u}\n",
       stage, now_us() / 1000,
       (unsigned)heap_caps_get_free_size(internal),
       (unsigned)heap_caps_get_largest_free_block(internal),
@@ -135,7 +159,7 @@ static void emit_heap(const char *stage) {
       (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
       (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM),
       (unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_SPIRAM),
-      (unsigned)uxTaskGetStackHighWaterMark(NULL)
+      (unsigned)uxTaskGetStackHighWaterMark(NULL), temp, (unsigned)(cpu_hz / 1000000)
   );
 }
 
@@ -604,6 +628,7 @@ void app_main(void) {
   usb_serial_jtag_vfs_use_driver();
   out_init();
   g_lines = xQueueCreateWithCaps(LINE_QUEUE_LEN, sizeof(line_t), MALLOC_CAP_SPIRAM);
+  tsens_init();
   emit_heap("boot");
   xTaskCreatePinnedToCore(worker_task, "lm_worker", WORKER_TASK_STACK, NULL, 5, &g_worker,
                           WORKER_TASK_CORE);

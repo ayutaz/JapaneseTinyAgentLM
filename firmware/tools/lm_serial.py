@@ -13,7 +13,9 @@ Each prompt is one line; the device answers with one `JTALM {"t":"gen",...}` rec
 --grammar`, one JSON object per line); generated ids and output text are compared.
 With `--act`, the `JTALM {"t":"act",...}` record that follows each reply (the dispatcher's
 plan, firmware A1 and later) is stored under "act"; `firmware/tools/dispatch_check.py`
-checks it. `wall_ms` is the time from sending the prompt to receiving the reply.
+checks it. `wall_ms` is the time from sending the prompt to receiving the reply. For long runs,
+`--repeat K` sends the prompts K times and `--heap-every N` asks for a `heap` record (memory,
+chip temperature, CPU clock) after every N prompts; they are stored under "health".
 The raw serial log goes to `--log` (default: next to `--out`).
 """
 
@@ -169,12 +171,16 @@ def main() -> int:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--log", type=Path, default=None)
     ap.add_argument("--timeout", type=float, default=60.0, help="seconds per reply")
+    ap.add_argument("--repeat", type=int, default=1, help="send the prompts this many times")
+    ap.add_argument("--heap-every", type=int, default=0, help="a heap record every N prompts")
     args = ap.parse_args()
 
-    prompts = load_prompts(args.cases, args.limit)
+    base = load_prompts(args.cases, args.limit)
+    prompts = base * args.repeat
     ref = None
     if args.ref:
-        ref = [json.loads(line) for line in args.ref.open(encoding="utf-8")][: len(prompts)]
+        ref = [json.loads(line) for line in args.ref.open(encoding="utf-8")][: len(base)]
+        ref = ref * args.repeat
     args.out.parent.mkdir(parents=True, exist_ok=True)
     dev = Device(args.port, args.log or args.out.with_suffix(".log"))
     boot: list[dict] = []
@@ -188,6 +194,8 @@ def main() -> int:
             dev.send(cmd)
             boot.append(dev.wait_for("ok", 10.0))
         results = []
+        health: list[dict] = []
+        start = time.monotonic()
         with args.out.open("w", encoding="utf-8") as f:
             for i, prompt in enumerate(prompts):
                 t0 = time.monotonic()
@@ -198,6 +206,11 @@ def main() -> int:
                     rec["act"] = dev.wait_for("act", args.timeout, boot)
                 results.append(rec)
                 f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+                if args.heap_every and (i + 1) % args.heap_every == 0:
+                    dev.send("!heap")
+                    h = dev.wait_for("heap", 10.0)
+                    h.update(i=i + 1, wall_s=round(time.monotonic() - start, 1))
+                    health.append(h)
                 if (i + 1) % 25 == 0:
                     print(f"{i + 1}/{len(prompts)}", file=sys.stderr)
         dev.send("!heap")
@@ -208,10 +221,12 @@ def main() -> int:
     summary = summarize(results, ref)
     kinds = ("info", "load", "heap", "ok", "board")
     summary["device"] = [r for r in boot if r.get("t") in kinds]
+    if health:
+        summary["health"] = health
     args.out.with_suffix(".summary.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8"
     )
-    brief = {k: v for k, v in summary.items() if k not in ("device", "mismatches")}
+    brief = {k: v for k, v in summary.items() if k not in ("device", "mismatches", "health")}
     print(json.dumps(brief, ensure_ascii=False))
     for m in summary.get("mismatches", []):
         print("MISMATCH", json.dumps(m, ensure_ascii=False))
