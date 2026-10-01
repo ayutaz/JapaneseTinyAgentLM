@@ -20,6 +20,7 @@ typedef struct {
   int vm_mode_before, vm_out_before;  // GPIO mode / output registers (low byte) at boot
   int vm_mode_after, vm_out_after;    // after forcing VM_EN to a low output
   uint32_t begin_ms;  // M5.begin() time
+  int led_init;       // the base LEDs were set up (PY32 pin 13, 12 LEDs)
 } board_info_t;
 
 typedef struct {
@@ -42,6 +43,14 @@ int board_servo_power_state(void);
 
 // Raw registers for diagnostics: PY32L020 0..n_py32-1 and AW9523 0..n_aw9523-1.
 void board_regs(uint8_t *py32, int n_py32, uint8_t *aw9523, int n_aw9523);
+
+// The 12 RGB LEDs on the back of the base (WS2812 driven by the PY32): all set to one color,
+// each channel 0..255 (callers keep it at 168 or less, the official firmware's safe range).
+// Returns 0 on success.
+int board_led(uint8_t r, uint8_t g, uint8_t b);
+
+// REG_LED_CFG of the PY32 read back (LED count in bits 0-5), -1 without the PY32. Diagnostics.
+int board_led_cfg(void);
 
 // 1 while the screen is touched (polls the touch controller).
 int board_touched(void);

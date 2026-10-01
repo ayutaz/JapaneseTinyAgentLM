@@ -6,6 +6,9 @@
 // register map (version 0x02, GPIO mode 0x03, output 0x05; VM_EN is pin 0) is the one used
 // by stackchan-idf components/board/io_expander_py32.cpp (BSL-1.0, (c) Kenta IDA); this file
 // only reads and writes those registers through M5Unified's I2C class.
+// The base LED protocol (pin 13 as a push-pull output with pull-up, LED count in 0x24 bits 0-5,
+// refresh bit 6, RGB565 little-endian pairs from 0x30) follows the M5Stack StackChan firmware
+// (MIT, hal_io_expander.cpp and PY32IOExpander_Class.cpp); no code is copied.
 
 #include "board.h"
 
@@ -29,6 +32,15 @@ constexpr uint8_t kPy32RegPullDownLow = 0x0B;
 constexpr uint8_t kAw9523Addr = 0x58;  // CoreS3 IO expander (BUS_EN, BOOST_EN)
 constexpr uint32_t kAw9523Freq = 400000;
 constexpr uint8_t kVmEnMask = 1u << 0;
+constexpr uint8_t kPy32RegModeHigh = 0x04;      // pins 8-15
+constexpr uint8_t kPy32RegPullUpHigh = 0x0A;
+constexpr uint8_t kPy32RegPullDownHigh = 0x0C;
+constexpr uint8_t kPy32RegDriveHigh = 0x14;     // 0 = push-pull
+constexpr uint8_t kPy32RegLedCfg = 0x24;        // bits 0-5 LED count, bit 6 refresh
+constexpr uint8_t kPy32RegLedRam = 0x30;        // RGB565 little-endian, 2 bytes per LED
+constexpr uint8_t kLedPinMask = 1u << (13 - 8);  // the LED data line is PY32 pin 13
+constexpr uint8_t kLedRefresh = 1u << 6;
+constexpr int kLedCount = 12;
 
 constexpr int kW = 320, kH = 240;
 
@@ -62,6 +74,29 @@ void draw_face(M5Canvas &c, int expr) {
       c.fillRoundRect(120, 166, 80, 8, 4, fg);
       break;
   }
+}
+
+// Caller holds g_gfx_lock (the internal I2C is also used by the touch controller).
+bool led_write(uint8_t r, uint8_t g, uint8_t b) {
+  const uint16_t c = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+  uint8_t buf[2 * kLedCount];
+  for (int i = 0; i < kLedCount; i++) {
+    buf[2 * i] = (uint8_t)(c & 0xFF);
+    buf[2 * i + 1] = (uint8_t)(c >> 8);
+  }
+  bool ok = M5.In_I2C.writeRegister(kPy32Addr, kPy32RegLedRam, buf, sizeof(buf), kPy32Freq);
+  uint8_t cfg = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
+  return ok && M5.In_I2C.writeRegister8(kPy32Addr, kPy32RegLedCfg, cfg | kLedRefresh, kPy32Freq);
+}
+
+bool led_init() {
+  bool ok = M5.In_I2C.bitOn(kPy32Addr, kPy32RegModeHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.bitOff(kPy32Addr, kPy32RegPullDownHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.bitOn(kPy32Addr, kPy32RegPullUpHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.bitOff(kPy32Addr, kPy32RegDriveHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.writeRegister8(kPy32Addr, kPy32RegLedCfg, kLedCount, kPy32Freq);
+  vTaskDelay(pdMS_TO_TICKS(50));
+  return ok && led_write(0, 0, 0);
 }
 
 }  // namespace
@@ -104,6 +139,7 @@ extern "C" int board_init(board_info_t *info) {
     M5.In_I2C.bitOn(kPy32Addr, kPy32RegPullUpLow, kVmEnMask, kPy32Freq);
     info->vm_mode_after = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegModeLow, kPy32Freq);
     info->vm_out_after = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegOutLow, kPy32Freq);
+    info->led_init = led_init() ? 1 : 0;
   }
 
   // The face is drawn into a PSRAM frame and pushed whole: no flicker, no internal SRAM.
@@ -161,4 +197,17 @@ extern "C" int board_touched(void) {
   int n = M5.Touch.getCount();
   xSemaphoreGive(g_gfx_lock);
   return n > 0;
+}
+
+extern "C" int board_led(uint8_t r, uint8_t g, uint8_t b) {
+  if (!g_py32 || g_gfx_lock == nullptr) return -1;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  bool ok = led_write(r, g, b);
+  xSemaphoreGive(g_gfx_lock);
+  return ok ? 0 : -1;
+}
+
+extern "C" int board_led_cfg(void) {
+  if (!g_py32) return -1;
+  return M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
 }

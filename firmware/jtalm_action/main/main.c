@@ -22,7 +22,7 @@
 // (servo.c), which changes the face on the display (board.cpp) and moves the head. Servo
 // output is off after boot (dry-run: plans run with their timing but nothing is sent to the
 // servos). Commands: "!act <json>" (dispatch an Action JSON without the LM), "!center",
-// "!servo on" (power the servos and center the head), and, handled at once even while the
+// "!led <r> <g> <b>" (diagnostics: the base LEDs), "!servo on" (power the servos and center the head), and, handled at once even while the
 // LM is busy, "!stop" / "!servo off" (torque off and servo power off), "!relax" (torque
 // off), "!servo" (status). A touch on the screen also stops. "!wdtest" (dry-run only) runs a
 // plan that overruns its deadline, to check the watchdog. No Wi-Fi.
@@ -468,6 +468,16 @@ static void run_command(lm_t *lm, const char *line) {
     printf("JTALM {\"t\":\"ok\",\"batch_prefill\":%d}\n", lm->use_batch);
   } else if (!strncmp(line, "!act ", 5)) {
     dispatch(lm, "cmd", line + 5, strlen(line + 5));
+  } else if (!strncmp(line, "!led ", 5)) {
+    // Diagnostics: all 12 base LEDs to one color (each channel limited to 168).
+    int r = 0, g = 0, b = 0;
+    sscanf(line + 5, "%d %d %d", &r, &g, &b);
+    r = r < 0 ? 0 : r > 168 ? 168 : r;
+    g = g < 0 ? 0 : g > 168 ? 168 : g;
+    b = b < 0 ? 0 : b > 168 ? 168 : b;
+    int err = board_led((uint8_t)r, (uint8_t)g, (uint8_t)b);
+    printf("JTALM {\"t\":\"led\",\"r\":%d,\"g\":%d,\"b\":%d,\"ok\":%d,\"cfg\":%d}\n", r, g, b,
+           err == 0, board_led_cfg());
   } else if (!strcmp(line, "!center")) {
     dispatch(lm, "center", kCenter, strlen(kCenter));
   } else if (!strcmp(line, "!servo on")) {
@@ -544,9 +554,9 @@ static void boot_board(void) {
   printf(
       "JTALM {\"t\":\"board\",\"ok\":%d,\"board\":%d,\"begin_ms\":%" PRIu32
       ",\"py32\":%d,\"py32_version\":%d,\"vm_mode\":[%d,%d],\"vm_out\":[%d,%d]"
-      ",\"servo\":\"dry\"}\n",
+      ",\"led_init\":%d,\"led_cfg\":%d,\"servo\":\"dry\"}\n",
       err == 0, b.board, b.begin_ms, b.py32, b.py32_version, b.vm_mode_before,
-      b.vm_mode_after, b.vm_out_before, b.vm_out_after
+      b.vm_mode_after, b.vm_out_before, b.vm_out_after, b.led_init, board_led_cfg()
   );
   printf(
       "JTALM {\"t\":\"face\",\"seq\":0,\"expr\":\"neutral\",\"ok\":%d,\"crc\":\"%08" PRIx32
