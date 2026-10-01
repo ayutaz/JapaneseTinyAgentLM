@@ -25,6 +25,8 @@ datasets:
 
 コード（学習、評価、C の runtime、firmware）: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM)（Apache-2.0）
 
+**ブラウザで試す:** [デモ（Hugging Face Space）](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo)。インストール不要で、実機と同じ C の runtime（WebAssembly）と INT4 の重みがブラウザの中で動きます。
+
 *English summary at the end.*
 
 ## できること
@@ -280,4 +282,4 @@ hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgent
 python JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて
 ```
 
-`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (4,794 of 4,794 evaluation prompts). Training, evaluation and firmware source: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM).
+`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (4,794 of 4,794 evaluation prompts). Training, evaluation and firmware source: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM). **Try it in the browser:** [demo (Hugging Face Space)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo), no install; the same C runtime as the device (WebAssembly) with the INT4 weights runs in the page.

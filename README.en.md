@@ -3,6 +3,7 @@
 [![CI](https://github.com/ayutaz/JapaneseTinyAgentLM/actions/workflows/ci.yml/badge.svg)](https://github.com/ayutaz/JapaneseTinyAgentLM/actions/workflows/ci.yml)
 [![Code: Apache-2.0](https://img.shields.io/badge/code-Apache--2.0-blue.svg)](LICENSE)
 [![Model: CC BY-SA 4.0](https://img.shields.io/badge/model-CC%20BY--SA%204.0-lightgrey.svg)](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)
+[![Demo](https://img.shields.io/badge/%F0%9F%A4%97-demo-orange.svg)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo)
 
 [日本語](README.md)
 
@@ -36,6 +37,8 @@ INT4 + grammar + gate, mean ± standard deviation over five training seeds (the 
 Japanese only (English requests are about 5% correct). Details: [`docs/evaluation.md`](docs/evaluation.md); device measurements: [`results/v051_action/device/`](results/v051_action/device/README.md). The documents in `docs/` are written in Japanese.
 
 ## Quick start
+
+**Try it in the browser:** [demo (Hugging Face Space)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo), no install; the same C runtime as the device (WebAssembly) with the INT4 weights runs in the page.
 
 **Python (CPU is enough)**
 

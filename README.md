@@ -4,6 +4,7 @@
 [![Code: Apache-2.0](https://img.shields.io/badge/code-Apache--2.0-blue.svg)](LICENSE)
 [![Model: CC BY-SA 4.0](https://img.shields.io/badge/model-CC%20BY--SA%204.0-lightgrey.svg)](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)
 [![Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97-Action--3M-yellow.svg)](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)
+[![Demo](https://img.shields.io/badge/%F0%9F%A4%97-demo-orange.svg)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo)
 
 [English](README.en.md)
 
@@ -59,6 +60,8 @@
 - 評価セットごとの結果、誤差の範囲、版ごとの改善は [`docs/evaluation.md`](docs/evaluation.md) にあります。実機の計測は [`results/v051_action/device/`](results/v051_action/device/README.md) にあります。
 
 ## すぐに試す
+
+**ブラウザで試す:** [デモ（Hugging Face Space）](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo)。インストール不要で、実機と同じ C の runtime（WebAssembly）と INT4 の重みがブラウザの中で動きます。
 
 ### Python（PC）
 
