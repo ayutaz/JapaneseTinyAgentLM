@@ -97,8 +97,11 @@ def prepare(args: argparse.Namespace) -> Path:
         raise SystemExit("unfilled placeholder in the model card")
     (out / "README.md").write_text(card, encoding="utf-8")
     files = sorted(p for p in out.rglob("*") if p.is_file() and p.name != "SHA256SUMS")
+    for p in files:  # LF everywhere, so `sha256sum -c` works on Linux after a Windows build
+        if p.suffix in (".md", ".json"):
+            p.write_bytes(p.read_bytes().replace(b"\r\n", b"\n"))
     sums = [f"{_sha256(p)}  {p.relative_to(out).as_posix()}" for p in files]
-    (out / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8")
+    (out / "SHA256SUMS").write_bytes(("\n".join(sums) + "\n").encode())
     return out
 
 

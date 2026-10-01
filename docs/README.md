@@ -25,7 +25,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 | 利用者 | Stack-chan などに組み込んで使う**開発者**。組み込みやすさ、仕様の明確さ、再現性を重視する |
 | 入力 | **テキストのみ**。主な対象は漢字仮名交じりの日本語で、英語の命令は評価用に少量だけ扱う |
 | 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
-| 公開 | モデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz)、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate。モデルは公開の前にユーザーの確認を取る（2026-09-29 時点では、ユーザーの判断で保留中） |
+| 公開 | モデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz)、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開する。どちらも **CC BY-SA 4.0**（商用利用可）。合成データセットは public、manual gate。モデルは公開の前にユーザーの確認を取る（Action LM の 3M は 2026-10-01 に [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開した） |
 | 学習データ | Apache-2.0 のオープンモデルと、ライセンスが両立する既存データで作る。Claude Code は、コードの作成と実行だけを担当する（[`data.md`](data.md)） |
 | 期限 | 決まっていない。できるだけ早く作る |
 | 実行体制 | 実装、学習、評価、実機での計測は、すべて **Claude Code** が実行する。学習と合成データの生成は vast.ai で行う。工数は Claude Code の作業時間で見積もる（[`roadmap.md`](roadmap.md) §13） |
@@ -52,7 +52,7 @@ M5Stack CoreS3 のような **16MB Flash / 8MB PSRAM** クラスのマイコン�
 
 **公開物（Hugging Face と GitHub）**
 
-- Hugging Face（`ayousanz`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果（公開前にユーザーが確認する。2026-09-29 時点では保留中）
+- Hugging Face（`ayousanz`）: FP の checkpoint、ESP32 向けの量子化 artifact、tokenizer、モデルカード、評価結果（公開前にユーザーが確認する。Action LM の 3M は 2026-10-01 に公開した）
 - Hugging Face（`japanese-data-analyze`、dataset）: 合成データセット。public、manual gate、CC BY-SA 4.0。**2026-09-29 に公開済み**（[`data.md`](data.md) §6）
 - GitHub: 学習と評価の code、ESP32 runtime
 
@@ -237,3 +237,4 @@ Ralomi の仕様や進捗は、LM の開発の blocker にしません。
 | 2026-09-29 | 実機の runtime の構成を決める。配布は1つの `.jtlm` ファイル（設定、tokenizer、RoPE の表、重み）にし、14MB の `model` partition（0x200000）から mmap で読む。KV cache は f32 で PSRAM に、activation は内部 SRAM に置く。入力はまとめて処理し（batch prefill）、行列の計算は2つの core で分ける | [`architecture.md`](architecture.md) §5–10、[`hardware.md`](hardware.md) §11 |
 | 2026-09-29 | vast.ai での学習は compute capability 8.0〜9.0 の GPU（Ampere〜Hopper）に限る。torch の cu126 の wheel に Blackwell（sm_120）の kernel がないため | [`development.md`](development.md) §4 |
 | 2026-09-29 | モデルの公開は、ユーザーの判断で保留する。公開するときは、直前に内容を提示して確認する | [`architecture.md`](architecture.md) §13 |
+| 2026-10-01 | 評価の誤差の範囲を示した（bootstrap の 95% 区間と、5 seed の平均 ± 標準偏差。人が書いた依頼は 85.2 ± 6.4%）。Action LM の 3M（v0.5.1、seed 0）を、ユーザーの確認を取って [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開した（CC BY-SA 4.0、Community contributions は off）。model card には seed 0 が人が書いた依頼で5つの中で最も高いことと、5回の平均を書いた。GitHub のコードは private のままで、後日公開する | [`roadmap.md`](roadmap.md) §12 |

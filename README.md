@@ -1,6 +1,6 @@
 # JapaneseTinyAgentLM
 
-ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用のための**日本語の超小型言語モデルを作るプロジェクトです。完成したモデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz) で、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開します（モデルの公開は、ユーザーの判断で保留中です）。
+ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用のための**日本語の超小型言語モデルを作るプロジェクトです。完成したモデルは Hugging Face の [`ayousanz`](https://huggingface.co/ayousanz) で、合成データセットは organization [`japanese-data-analyze`](https://huggingface.co/japanese-data-analyze) で公開します。Action LM は [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開しました（2026-10-01）。
 
 ## ゴール
 
@@ -11,7 +11,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 | 入力と出力 | 入力は**テキストのみ**（漢字仮名交じりの日本語）。出力は Action の JSON、または短い日本語の応答 |
 | 作る順序 | ① **Japanese Action LM** を K151 の実機で完成させる → ② **Japanese Tiny Chat LM** に取り組む |
 | 対象の実機 | M5 スタックチャン K151（CoreS3、Flash 16MB、PSRAM 8MB、servo は Feetech SCS0009 ×2） |
-| 公開 | モデルは Hugging Face の `ayousanz`、合成データセットは `japanese-data-analyze` で公開する（モデルは公開の前にユーザーの確認を取る。2026-09-29 時点では保留中）。どちらも **CC BY-SA 4.0**（商用利用可）で、Community contributions は off |
+| 公開 | モデルは Hugging Face の `ayousanz`、合成データセットは `japanese-data-analyze` で公開する（モデルは公開の前にユーザーの確認を取る。Action LM の 3M は 2026-10-01 に [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開した）。どちらも **CC BY-SA 4.0**（商用利用可）で、Community contributions は off |
 | 期限 | 決まっていない。できるだけ早く作る |
 | 進め方 | 実装、学習、評価、実機での計測は、すべて Claude Code が実行する。学習と合成データの生成は vast.ai で行う |
 
@@ -102,7 +102,7 @@ ESP32-S3 / M5Stack CoreS3 上でネットワークなしに動く、**実用の�
 13. ~~**人が書いた文の評価セット**~~（完了。1,159件で完全一致 98.4%、誤って動くのは 1.1%）
 14. ~~**実機で首を実際に動かす確認**~~（完了。LM の出力で首と表情が動き、否定や雑談では動かないことを確認。うなずきは 14° に調整）
 15. ~~**データ v0.5 / v0.5.1 と評価セット v2（12パターン）**~~（完了。実行できない依頼で誤って動く割合 18.2% → 0.3%、人が書いた文で誤って動く割合 1.1% → 0.0%。実機の標準を v0.5.1 の 3M に置き換えた）
-16. モデルの公開（`ayousanz`）は、**ユーザーの判断で保留中**。公開するときは、直前に内容を提示して確認する
+16. モデルの公開: Action LM の 3M（v0.5.1、seed 0、INT4）を、ユーザーの確認を取って [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開した（2026-10-01、public、Community contributions は off）。GitHub のコードは後日公開する
 17. Action の完了後、Japanese Tiny Chat LM（10M。事前学習の corpus の決定から）
 
 > [!IMPORTANT]
@@ -162,4 +162,4 @@ uv run --group train pytest     # test（model の test には torch が必要�
 | 合成データセット（Hugging Face） | **CC BY-SA 4.0**（public、manual gate） |
 | 学習データ | CC BY-SA 4.0 と両立するものだけを使う（[`docs/data.md`](docs/data.md)） |
 
-モデルを公開するのは、データの出典、ライセンス、再現性、実機での評価、安全性の審査をすべて通過し、ユーザーが承認したものだけです（2026-09-29 時点では保留中）。データセットは、出典、ライセンス、再現性、規約の確認を通過して公開しました（2026-09-29）。
+モデルを公開するのは、データの出典、ライセンス、再現性、実機での評価、安全性の審査をすべて通過し、ユーザーが承認したものだけです（Action LM の 3M は 2026-10-01 に承認を得て公開しました）。データセットは、出典、ライセンス、再現性、規約の確認を通過して公開しました（2026-09-29）。

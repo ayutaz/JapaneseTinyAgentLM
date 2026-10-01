@@ -337,7 +337,7 @@ Python の実装と C runtime は、同じ評価セットと同じ条件で比�
 10. OTA / rollback / recovery partition を残したまま成立する構成。
 11. Servo safety、privacy、offline data retention の要件。
 12. 開発者が求める latency と品質の水準。
-13. Hugging Face の**モデルの** repository 名、商標、release packaging（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）。ライセンスは決定済み（重みとデータセットは CC BY-SA 4.0）。モデルの公開先は user `ayousanz` で、**公開はユーザーの判断で保留中**。
+13. Hugging Face の**モデルの** repository 名、商標、release packaging（データセットは `JapaneseTinyAgentLM-Action-Synth` で公開済み）。ライセンスは決定済み（重みとデータセットは CC BY-SA 4.0）。Action LM の 3M は [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) として 2026-10-01 に公開した（名前の衝突は公開前に確認した）。
 14. （優先度低）ひらがなだけの入力と、漢字仮名交じり文の比較。入力はテキストのみと決まったので、ひらがなは頑健性の確認用の一部として評価するだけにする。
 
 TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲外として外しました（2026-09-29）。
@@ -379,7 +379,7 @@ TTS（sanoTTS-jp）と ASR（Ralomi）に関する調査は、本計画の範囲
 | データ v0.3 / v0.4 | **完了**。3M で v0.3 は 91〜92%、v0.4 は 94.2〜94.4%（Action の目標値をすべて満たした） |
 | M6 Host C runtime | **完了**（2026-09-29）。3M / 5M の FP32 / INT8 / INT4 で、出力が PyTorch と完全に一致（[`runtime/host/README.md`](../runtime/host/README.md)） |
 | モデルサイズ | **3M INT4 に決定**（2026-09-29。下の「データ量とモデルサイズの決定」） |
-| モデルの公開 | 公開先は user `ayousanz`。**ユーザーの判断で保留中** |
+| モデルの公開 | **Action LM の 3M を公開**（2026-10-01、[`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)） |
 | vast.ai の費用（累計） | 約 $4.26（`runs/vast/*/run.json` の 20 run の合計）。M2.5〜M3 が約 $1.03、M4 が約 $0.24、M4 の後が約 $3.00（量の確認 $0.13、v0.3 の生成 $0.68・学習 $0.20、v0.4 の生成 $1.77（v0.4b を含む）・学習 $0.21）。失敗した起動や接続の不具合の分を含む |
 
 ### M1〜M3 の目的と完了条件
@@ -588,7 +588,7 @@ M4 の後に、「データの量と多様さ」「grammar」「量子化」を�
 | 5 | servo の確認（B2）: ユーザーの立ち会いのもとで行う | **完了**（2026-09-29） |
 | 6 | Action から servo を動かす dispatcher（[`hardware.md`](hardware.md) §10 の変換式、validator、可動域の制限）を `firmware/jtalm_action` に実装し、実機で首を動かす | **完了**（2026-09-30。ユーザーの立ち会いのもとで 28項目を実行。向き、表情、滑らかさ、否定・雑談で動かないこと、touch による停止を確認。うなずきは 8° が小さすぎたので 14° / 片道 280ms に変更して確かめ直した。[`hardware.md`](hardware.md) §12） |
 | 7 | 画面、servo、M5Unified と同居させたときの内部 SRAM / PSRAM と速度を測る | **完了**（3M の読み込み後の内部 SRAM 空き 116,831 B、200件の処理後 99,039 B。応答の中央値 1,222ms で、画面なしとほぼ同じ。servo を動かしても fault なし） |
-| 8 | モデルの公開（Hugging Face の user `ayousanz`、CC BY-SA 4.0、Community contributions は off） | **準備完了、ユーザーの確認待ち**（2026-10-01）。`jtalm.model.release prepare` で `runs/release/action_3m` を作った。公開は `publish --confirm` |
+| 8 | モデルの公開（Hugging Face の user `ayousanz`、CC BY-SA 4.0、Community contributions は off） | **完了**（2026-10-01）。ユーザーの確認を取って [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開した（`jtalm.model.release`）。GitHub のコードは後日公開する |
 | 9 | データ v0.5 / v0.5.1（弱点を狙った追加と、間違えやすい例の収集）と、評価セット v2（12パターン） | **完了**（2026-10-01）。実機の標準を v0.5.1 の 3M（gate 0.868）に置き換えた（下の「10. データ v0.5 / v0.5.1」） |
 | 10 | Chat LM（10M。事前学習の corpus を決める） | Action の完了後 |
 | 11 | ESP32 の INT8 KV cache（未実装）と、tokenizer の縮小（`.jtlm` の 0.27MB） | 任意 |
