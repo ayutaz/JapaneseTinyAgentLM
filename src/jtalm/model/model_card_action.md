@@ -23,6 +23,8 @@ datasets:
        {"name":"look","arguments":{"direction":"center","amount":"normal"}}]
 ```
 
+コード（学習、評価、C の runtime、firmware）: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM)（Apache-2.0）
+
 *English summary at the end.*
 
 ## できること
@@ -177,7 +179,7 @@ servo の電源が入り、首がゆっくり正面に戻ってから、依頼�
 
 - 1文の応答時間の中央値は約 1.3 秒でした（CoreS3、2コア）。300文で、PC の PyTorch と出力が完全に一致しました。
 - firmware は ESP-IDF v5.5.5 で build しました（app の sha256 `{{APP_SHA256}}`）。flash の配置は、bootloader 0x0、partition table 0x8000、app 0x10000、モデル（`{{JTLM}}`）0x200000 です。モデルだけを替えるときは、0x200000 に `.jtlm` を書き込みます。
-- firmware は Apache-2.0 です。同梱した第三者のコード（ESP-IDF、newlib、FreeRTOS、M5Unified、M5GFX など）のライセンスは [`firmware/licenses/`](firmware/licenses/README.md) にあります。firmware の source は後日 GitHub で公開する予定です。
+- firmware は Apache-2.0 です。同梱した第三者のコード（ESP-IDF、newlib、FreeRTOS、M5Unified、M5GFX など）のライセンスは [`firmware/licenses/`](firmware/licenses/README.md) にあります。firmware の source と build の手順は [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM/tree/main/firmware) にあります。
 
 ## ファイル
 
@@ -258,11 +260,11 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 
 ## 先行例との関係
 
-マイコンで動く言語モデルや、マイコンで動く tool calling のモデル（英語と欧州の言語）、外付けの NPU で動くスタックチャンの function calling には先行例があります。日本語の発話からロボットの動作呼び出し（JSON）を決める言語モデルを、ESP32-S3 単体（NPU・外部モジュール・ネットワークなし）で動かした公開事例は、2026年10月1日時点の私たちの調査では見つかりませんでした。調べた範囲と先行例の一覧は、コードの公開時に合わせて公開します。
+マイコンで動く言語モデルや、マイコンで動く tool calling のモデル（英語と欧州の言語）、外付けの NPU で動くスタックチャンの function calling には先行例があります。日本語の発話からロボットの動作呼び出し（JSON）を決める言語モデルを、ESP32-S3 単体（NPU・外部モジュール・ネットワークなし）で動かした公開事例は、2026年10月1日時点の私たちの調査では見つかりませんでした。調べた範囲と先行例の一覧は [`docs/prior_art.md`](https://github.com/ayutaz/JapaneseTinyAgentLM/blob/main/docs/prior_art.md) にあります。
 
 ## ライセンスと帰属
 
-- 重み: **CC BY-SA 4.0**。コード: Apache-2.0（`inference.py`、`firmware/`。firmware の第三者のコードは `firmware/licenses/`。学習と firmware の source は後日 GitHub で公開予定）。
+- 重み: **CC BY-SA 4.0**。コード: Apache-2.0（`inference.py`、`firmware/`。firmware の第三者のコードは `firmware/licenses/`。学習、評価、firmware の source は [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM)）。
 - 学習データに次のものを含みます: [Tatoeba](https://tatoeba.org/)（CC BY 2.0 FR）、[JESC](https://nlp.stanford.edu/projects/jesc/)（Pryzant et al., 2018、CC BY-SA 4.0）、[Amazon MASSIVE](https://github.com/alexa/massive)（FitzGerald et al., 2022、CC BY 4.0）。
 - 実装、データの生成と検査、学習、評価、firmware は Claude Code（Anthropic）が行いました。学習データと評価データの文章と正解は、上記のオープンモデル、人が書いた公開コーパス、プログラムによるもので、Claude の出力は含みません。
 
@@ -278,4 +280,4 @@ hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgent
 python JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて
 ```
 
-`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (4,794 of 4,794 evaluation prompts). The ESP32 firmware and training code will be published on GitHub later.
+`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (4,794 of 4,794 evaluation prompts). Training, evaluation and firmware source: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM).
