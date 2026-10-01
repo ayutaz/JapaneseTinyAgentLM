@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 ayutaz
-"""Action LM evaluation metrics (definitions: docs/roadmap.md section 10).
+"""Action LM evaluation metrics (definitions: docs/evaluation.md).
 
 ``evaluate`` takes cases and raw model outputs keyed by case id and returns a JSON-serializable
 report. Exact match follows TinyLM-Bench's "strict match": the canonicalized call sequence must

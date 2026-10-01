@@ -4,7 +4,7 @@
 
 An Action LM output is a JSON array of 0-2 calls such as
 ``[{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}]``.
-``[]`` means no-action. See docs/architecture.md section 7.
+``[]`` means no-action. See docs/architecture.md.
 """
 
 import json

@@ -5,7 +5,7 @@
 Keeps a generated sentence only if it is well formed, consistent with its negation category, and
 the cross-model verifier's parse equals the spec label. Adds MASSIVE ja-JP no-action negatives,
 removes duplicates and eval/train overlap, splits train/val, evaluates the rule baseline, and
-writes a manifest (docs/data.md section 5).
+writes a manifest (docs/data.md).
 """
 
 import argparse

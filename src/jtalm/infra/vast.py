@@ -2,7 +2,7 @@
 # Copyright 2026 ayutaz
 """Thin wrapper around the ``vastai`` CLI and SSH/SCP for running jobs on vast.ai.
 
-Operating rules (docs/development.md section 4): never copy ``.env`` or other credentials to a
+Operating rules (docs/training.md): never copy ``.env`` or other credentials to a
 rented host, always destroy instances, and record cost for every run.
 """
 

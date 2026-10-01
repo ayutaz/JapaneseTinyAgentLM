@@ -1,10 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 ayutaz
-"""Run the servo motion test sequence on jtalm_action (docs/hardware.md section 12).
+"""Run the servo motion test sequence on jtalm_action (docs/hardware.md).
 
 Without `--servo` everything runs in dry-run (servo output stays off; plans, timing and
 faces only). With `--servo` the script sends `!servo on` and the head MOVES: run it only
-with the user watching the robot (docs/hardware.md section 12, "Servo の動作確認").
+with someone watching the robot (docs/hardware.md).
 
     uv run --no-project --with pyserial python firmware/tools/servo_test.py \
         --port COM3 --out runs/device/a1/servo_test_dry.jsonl            # dry-run

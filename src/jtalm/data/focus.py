@@ -5,7 +5,7 @@
 The same label-first specs serve two purposes, always with different writers:
 - evaluation set v2: llm-jp-3.1 writes the sentences (eval-only writer), Qwen3 verifies;
 - training data v0.5: the seven training writers write, Qwen3 verifies.
-The slices come from the weaknesses found on the human-written set (docs/roadmap.md section 12)
+The slices come from the weaknesses found on the human-written set (docs/evaluation.md)
 and from the phrasing patterns we want to track. Spec ids are ``focus.<slice>.<detail>``.
 """
 

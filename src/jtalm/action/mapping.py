@@ -2,10 +2,10 @@
 # Copyright 2026 ayutaz
 """Map categorical Action calls to K151 servo targets (firmware dispatcher reference).
 
-Conventions (docs/architecture.md section 7, docs/hardware.md section 3):
+Conventions (docs/architecture.md, docs/hardware.md):
 - yaw: 0 is straight ahead, positive is RIGHT. The official firmware takes 0.1 degree units.
 - pitch: relative to the neutral angle, positive is UP.
-The directions were confirmed on the K151 in milestone B2 (docs/hardware.md section 10); the
+The directions were confirmed on the K151 (docs/hardware.md); the
 firmware converts degrees to raw servo positions (yaw raw decreases to the robot's right).
 """
 

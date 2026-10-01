@@ -4,7 +4,7 @@
 
 Each ``Spec`` fixes the expected output (the label) by construction. An open-weight LLM only writes
 Japanese sentences for the spec; a second model then parses each sentence, and only sentences whose
-parse equals the spec's label are kept (docs/data.md section 5).
+parse equals the spec's label are kept (docs/data.md).
 """
 
 import itertools

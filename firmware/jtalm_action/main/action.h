@@ -5,7 +5,7 @@
 // that turns validated calls into servo targets and face changes. No hardware access here.
 //
 // The angles follow src/jtalm/action/mapping.py (the canonical mapping); the raw conversion
-// and the soft limits are the ones confirmed on the K151 (docs/hardware.md sections 3, 10).
+// and the soft limits are the ones confirmed on the K151 (docs/hardware.md).
 // firmware/tools/dispatch_check.py recomputes every plan in Python and compares.
 
 #pragma once
@@ -25,7 +25,7 @@ enum { EXPR_HAPPY, EXPR_SAD, EXPR_SURPRISED, EXPR_NEUTRAL, EXPR_COUNT };
 #define ACT_YAW_LIMIT_DEG 30
 #define ACT_PITCH_LIMIT_DEG 15
 #define ACT_NOD_PITCH_DEG 14  // nod amplitude (8 was too small to notice, 2026-09-30)
-// stackchan-idf soft limits (relative to the zero position), docs/hardware.md section 10
+// stackchan-idf soft limits (relative to the zero position) (docs/hardware.md)
 #define HW_YAW_MIN_DEG (-40)
 #define HW_YAW_MAX_DEG 40
 #define HW_PITCH_MIN_DEG (-10)
