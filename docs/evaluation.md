@@ -7,7 +7,7 @@ Action LM の評価の定義、評価セット、採用モデルの結果、誤�
 
 ## 指標の定義
 
-実装は `src/jtalm/eval/metrics.py`（1件ごとの判定と集計）、`src/jtalm/model/eval_suite.py`（評価セットをまとめた表）、`src/jtalm/eval/bootstrap.py`（誤差の範囲）です。
+実装は `src/jtalm/eval/metrics.py`（1件ごとの判定と集計）、`src/jtalm/model/eval_suite.py`（評価セットをまとめた表）、`src/jtalm/eval/bootstrap.py`（誤差の範囲）、`src/jtalm/eval/consistency.py`（言い換えへの一貫性）です。
 
 | 指標 | 定義 |
 |---|---|
@@ -19,6 +19,7 @@ Action LM の評価の定義、評価セット、採用モデルの結果、誤�
 | no-action precision / recall | 「`[]` を返すべき入力」を陽性とする。precision は `[]` と答えた入力のうち正解も `[]` だった割合（動作の依頼を誤って止めない度合い）、recall は正解が `[]` の入力のうち `[]` と答えた割合 |
 | pair accuracy（対比ペア） | 否定の有無だけが違う組（「右を向いて」と「右を向かないで」など）の、両方に正解した割合 |
 | name accuracy / slot accuracy | tool 名の列の一致率と、引数（direction、amount、expression、count）の正解率（`jtalm.eval` の report に出ます） |
+| pair agreement（言い換えへの一貫性） | 同じ評価セットで正解の Action の列が同じ依頼（`[]` は除く）を言い換えの組とし、組の中の2件ずつの出力が同じだった割合（正解かどうかは問わない）。`src/jtalm/eval/consistency.py` |
 
 評価の条件は固定して結果と一緒に記録します（`comparison.json` の `conditions`）: greedy decoding、prompt 形式 `<s> <act> prompt <out>`、評価セットと tokenizer の sha256、grammar と gate の有無、gate の閾値。
 
@@ -122,6 +123,27 @@ v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decodin
 - validation の exact は 5 seed とも 98.1〜98.3% でほぼ同じで、validation では seed を選べません。
 - bootstrap の区間は評価セットの標本のばらつきだけを表し、学習の seed によるばらつきは含みません。人が書いた依頼は 62件しかないので、区間が広くなります（85.5〜98.4%）。
 
+## 言い換えへの一貫性
+
+同じ意味の依頼（正解の Action の列が同じ依頼）に、同じ出力を返すかを測りました。組の中の2件ずつの出力が一致した割合（pair agreement）と、組の出力がすべて同じだった組の割合です。正解かどうかは問わないので、そろって同じ間違いをした組も一貫していると数えます。
+
+| セット | 組 | 件数 | pair agreement: seed 0 | 5 seed の平均 ± SD | ルールベース | 出力がすべて同じ組: seed 0 | ルールベース |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| human v1 | 5 | 62 | 84.0 | 74.7 ± 9.6 | **86.3** | 60.0 | 60.0 |
+| v0 eval（LLM） | 52 | 578 | 81.2 | 81.0 ± 2.0 | 61.5 | 55.8 | 15.4 |
+| v2/amount_words | 8 | 278 | 90.6 | 89.6 ± 1.2 | 51.5 | 25.0 | 0.0 |
+| v2/long_preface | 40 | 247 | 91.3 | 92.2 ± 1.9 | 73.8 | 75.0 | 37.5 |
+| v2/order_words | 40 | 296 | 92.5 | 93.0 ± 1.0 | 70.8 | 80.0 | 42.5 |
+| v2/orthography | 12 | 255 | 70.0 | 71.4 ± 1.8 | 64.6 | 8.3 | 8.3 |
+| v2/question_forms | 19 | 203 | 85.0 | 87.4 ± 2.9 | 62.1 | 63.2 | 21.1 |
+
+出典: [`results/v051_action/paraphrase_3m.md`](../results/v051_action/paraphrase_3m.md)（seed 0）、[`results/v051_action/paraphrase_seeds_3m.md`](../results/v051_action/paraphrase_seeds_3m.md)（5 seed）。表にないセットも両ファイルにあります。
+
+- LLM が書いた評価セットでは、どのセットもルールベースより一貫しています。
+- **人が書いた依頼（5組、62件）では、ルールベース（86.3%）のほうが一貫しています。** 5 seed の平均は 74.7% で、seed による差も大きいです。人が書いた依頼が少なく、正面を向く・笑うの組に偏っているので、件数を増やしてから確かめる必要があります。
+- 表記の揺れ（orthography）は 70.0% と低く、出力がすべて同じだった組は 12組中1組だけです。exact が低いこと（82.6%）と同じ弱点です。
+- 組は評価セットの中で正解が同じ依頼をまとめたもので、言い換えとして作った組ではありません。大きい組ほど pair の数が多いので、全体の値は大きい組の影響を強く受けます。
+
 ## 版ごとの改善と設計判断
 
 ### データの版と主な結果
@@ -213,4 +235,4 @@ C runtime（PC）の出力は PyTorch と token 単位で一致し（[`results/m
 
 ## 再現の方法
 
-評価の表（`jtalm.model.evaluate`）、全評価セットの表（`jtalm.model.eval_suite`）、誤差の範囲（`jtalm.eval.bootstrap`）を作るコマンドは、[training.md](training.md) の「11. 評価」にあります。評価セットの作り方は、同じ文書の「6. 人が書いた評価セット（human v1）」「7. 評価セット v2」と [data.md](data.md) にあります（作り直すには GPU が要ります）。実機での一致の確認は、[firmware/README.md](../firmware/README.md) の「ツール」にある `lm_serial.py` で行います。
+評価の表（`jtalm.model.evaluate`）、全評価セットの表（`jtalm.model.eval_suite`）、誤差の範囲（`jtalm.eval.bootstrap`）、言い換えへの一貫性（`jtalm.eval.consistency`）を作るコマンドは、[training.md](training.md) の「11. 評価」にあります。評価セットの作り方は、同じ文書の「6. 人が書いた評価セット（human v1）」「7. 評価セット v2」と [data.md](data.md) にあります（作り直すには GPU が要ります）。実機での一致の確認は、[firmware/README.md](../firmware/README.md) の「ツール」にある `lm_serial.py` で行います。

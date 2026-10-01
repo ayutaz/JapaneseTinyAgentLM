@@ -22,7 +22,7 @@
 | 8 | 間違えやすい例の収集とデータ v0.5 / v0.5.1 | `jtalm.model.mine`、`jtalm.data.build --exclude` | `datasets/action/v0.5`、`v0.5.1` |
 | 9 | 採用したモデルの学習 | `jtalm.model.train` | `best.pt` |
 | 10 | 量子化、`.jtlm` の書き出し、C runtime との一致の確認 | `jtalm.model.quantize`、`export`、`parity` | `best_q4_g64.pt`、`3m_q4_g64.jtlm` |
-| 11 | 評価と誤差の範囲 | `jtalm.model.evaluate`、`eval_suite`、`jtalm.eval.bootstrap` | 評価の表 |
+| 11 | 評価と誤差の範囲 | `jtalm.model.evaluate`、`eval_suite`、`jtalm.eval.bootstrap`、`jtalm.eval.consistency` | 評価の表 |
 | 12 | 公開用のパッケージ | `jtalm.model.release` | 公開用のディレクトリ |
 
 表の番号は、下の見出しの番号と同じです。
@@ -319,6 +319,15 @@ uv run python -m jtalm.eval.bootstrap seeds runs/local/suite_v051_3m_q4 runs/loc
 
 - 既定は 2,000 回の resample（`--n-boot`）で、`--out` で結果を Markdown に保存できます。
 - bootstrap 区間は評価セットの標本のばらつきだけを表し、学習の seed によるばらつきは含みません。両方を見てください。公開している結果は `results/v051_action/`（`ci_3m.md`、`seeds_3m.md`、`diff_v04_v051.md`、`diff_v05_v051.md`）にあります。
+
+### 言い換えへの一貫性（`jtalm.eval.consistency`）
+
+```sh
+# seed 0。複数の suite を渡すと平均と標準偏差
+uv run python -m jtalm.eval.consistency runs/local/suite_v051_3m_q4 --out paraphrase_3m.md
+```
+
+- 評価セットごとに、正解が同じ依頼の組の中で出力がそろった割合（pair agreement）と、ルールベースの同じ値を出します。定義は [evaluation.md](evaluation.md) の「言い換えへの一貫性」にあります。結果は `results/v051_action/`（`paraphrase_3m.md`、`paraphrase_seeds_3m.md`）にあります。
 
 ## 12. 公開用のパッケージ（`jtalm.model.release`）
 
