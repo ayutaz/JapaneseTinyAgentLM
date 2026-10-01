@@ -41,6 +41,7 @@ constexpr uint8_t kPy32RegLedRam = 0x30;        // RGB565 little-endian, 2 bytes
 constexpr uint8_t kLedPinMask = 1u << (13 - 8);  // the LED data line is PY32 pin 13
 constexpr uint8_t kLedRefresh = 1u << 6;
 constexpr int kLedCount = 12;
+constexpr uint8_t kLedMax = 168;  // official firmware safe range per channel
 
 constexpr int kW = 320, kH = 240;
 
@@ -85,8 +86,10 @@ bool led_write(uint8_t r, uint8_t g, uint8_t b) {
     buf[2 * i + 1] = (uint8_t)(c >> 8);
   }
   bool ok = M5.In_I2C.writeRegister(kPy32Addr, kPy32RegLedRam, buf, sizeof(buf), kPy32Freq);
-  uint8_t cfg = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
-  return ok && M5.In_I2C.writeRegister8(kPy32Addr, kPy32RegLedCfg, cfg | kLedRefresh, kPy32Freq);
+  // Count and refresh are written together without a read first: a failed read returns 0 and
+  // would write count 0 (LEDs dark) while reporting success.
+  return ok && M5.In_I2C.writeRegister8(kPy32Addr, kPy32RegLedCfg, kLedCount | kLedRefresh,
+                                        kPy32Freq);
 }
 
 bool led_init() {
@@ -201,6 +204,9 @@ extern "C" int board_touched(void) {
 
 extern "C" int board_led(uint8_t r, uint8_t g, uint8_t b) {
   if (!g_py32 || g_gfx_lock == nullptr) return -1;
+  if (r > kLedMax) r = kLedMax;
+  if (g > kLedMax) g = kLedMax;
+  if (b > kLedMax) b = kLedMax;
   xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
   bool ok = led_write(r, g, b);
   xSemaphoreGive(g_gfx_lock);

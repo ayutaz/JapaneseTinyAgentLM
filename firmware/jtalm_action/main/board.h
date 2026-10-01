@@ -45,7 +45,7 @@ int board_servo_power_state(void);
 void board_regs(uint8_t *py32, int n_py32, uint8_t *aw9523, int n_aw9523);
 
 // The 12 RGB LEDs on the back of the base (WS2812 driven by the PY32): all set to one color,
-// each channel 0..255 (callers keep it at 168 or less, the official firmware's safe range).
+// each channel 0..168 (larger values are clamped to 168, the official firmware's safe range).
 // Returns 0 on success.
 int board_led(uint8_t r, uint8_t g, uint8_t b);
 
