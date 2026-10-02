@@ -256,7 +256,7 @@ def _drop_weights(hf_id: str) -> str:
     """
     m = f"models--{hf_id.replace('/', '--')}"
     holders = (
-        f'{{ grep -l "/{m}/" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname "*/{m}/*"; }} '
+        f'{{ grep -lF "/{m}/" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname "*/{m}/*"; }} '
         "2>/dev/null | cut -d/ -f3 | sort -u | xargs"
     )
     return (

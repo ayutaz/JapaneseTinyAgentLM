@@ -2,7 +2,11 @@
 # Copyright 2026 ayutaz
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 from jtalm.infra.jobs import JOBS, STACKCHAN_SOURCES, V1_REVERIFY_INPUTS, _drop_weights
 
@@ -102,3 +106,15 @@ def test_drop_weights_finds_the_cache_and_cannot_fail():
     for job in (JOB, V1B):
         drops = [s for s in job.steps if "rm -rf" in s]
         assert drops and all(s.endswith("; true") for s in drops)
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash not on PATH")
+@pytest.mark.parametrize("job", [JOB, V1B], ids=lambda j: j.name)
+def test_steps_parse_with_bash(job, tmp_path):
+    # Each step as the runner writes it (one line, prefixed with cd); fed on stdin so that any
+    # bash (Git Bash, WSL) can read it regardless of how it maps Windows paths.
+    script = tmp_path / f"{job.name}.sh"
+    script.write_bytes("".join(f"cd /root/work && {s}\n" for s in job.steps).encode())
+    with script.open("rb") as f:
+        r = subprocess.run([shutil.which("bash"), "-n"], stdin=f, capture_output=True)
+    assert r.returncode == 0, r.stderr.decode(errors="replace")
