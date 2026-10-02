@@ -4,7 +4,7 @@ import json
 import re
 from pathlib import Path
 
-from jtalm.infra.jobs import JOBS, STACKCHAN_SOURCES, V1_REVERIFY_INPUTS
+from jtalm.infra.jobs import JOBS, STACKCHAN_SOURCES, V1_REVERIFY_INPUTS, _drop_weights
 
 ROOT = Path(__file__).resolve().parents[1]
 JOB = JOBS["gen_action_v1"]
@@ -43,3 +43,62 @@ def test_reverify_inputs():
     inputs = step.split(" --input ")[1].split()
     assert inputs == [*V1_REVERIFY_INPUTS, STACKCHAN_SOURCES]
     assert JOB.uploads == inputs
+
+
+V1B = JOBS["gen_action_v1b"]
+V1B_DONE_FILES = [
+    "artifacts/gen_action_v1/raw1_eval/eval_gen.jsonl",
+    "artifacts/gen_action_v1/raw1_paraphrase/eval_gen.jsonl",
+    "artifacts/gen_action_v1/raw1_abeja/train_gen.jsonl",
+    "artifacts/gen_action_v1/raw1_nemoja/train_gen.jsonl",
+    "artifacts/gen_action_v1/raw1_elyza/train_gen.jsonl",
+]
+
+
+def test_v1b_registered_and_uploads():
+    assert V1B.name == "gen_action_v1b"
+    assert (V1B.disk_gb, V1B.max_hours, V1B.query) == (200, 4.0, JOB.query)
+    assert V1B.uploads == [*V1B_DONE_FILES, *V1_REVERIFY_INPUTS, STACKCHAN_SOURCES]
+
+
+def test_v1b_starts_only_calm3_and_qwen():
+    started = re.findall(r"\$VLLM serve (\S+) --port", "\n".join(V1B.steps))
+    assert started == ["cyberagent/calm3-22b-chat", "Qwen/Qwen3-30B-A3B-Instruct-2507"]
+    served = re.findall(r"--served-model-name (\w+)", "\n".join(V1B.steps))
+    assert served == ["calm3", "qwen"]
+
+
+def test_v1b_verify_after_qwen_start_and_same_tail_as_v1():
+    qwen = next(i for i, s in enumerate(V1B.steps) if "serve Qwen/" in s)
+    late = [i for i, s in enumerate(V1B.steps) if re.search(r"--phase (train-|eval-|re)verify", s)]
+    assert len(late) == 5 + 2 + 1 and min(late) > qwen
+    for w in ("abeja", "nemoja", "elyza", "calm3", "qwen"):
+        assert any(
+            f"--phase train-verify --config configs/action_v1_{w}.json" in s
+            and f"if [ -s artifacts/gen_action_v1/raw1_{w}/train_gen.jsonl ]" in s
+            for s in V1B.steps
+        )
+    v1_qwen = next(i for i, s in enumerate(JOB.steps) if "serve Qwen/" in s)
+    assert V1B.steps[qwen - 1 :] == JOB.steps[v1_qwen - 1 :]  # disk log, Qwen3 and the tail
+
+
+def test_disk_logged_before_every_model_start():
+    for job in (JOB, V1B):
+        for i, s in enumerate(job.steps):
+            if "$VLLM serve" in s:
+                assert job.steps[i - 1] == "df -h /"
+
+
+def test_drop_weights_finds_the_cache_and_cannot_fail():
+    drop = _drop_weights("cyberagent/calm3-22b-chat")
+    assert "from huggingface_hub import constants" in drop and "HF_HUB_CACHE" in drop
+    assert "HF_XET_CACHE" in drop
+    assert r"find / -xdev -maxdepth 6 \( -path /proc -o -path /sys \) -prune" in drop
+    assert '-name "$M" -prune -exec rm -rf {} +' in drop
+    assert drop.startswith("M=models--cyberagent--calm3-22b-chat;")
+    assert "/proc/[0-9]*/maps" in drop and "kill -9" in drop
+    assert "df -h /" in drop and 'du -sh "$HUB" "$XET"' in drop
+    assert drop.endswith("; true")
+    for job in (JOB, V1B):
+        drops = [s for s in job.steps if "rm -rf" in s]
+        assert drops and all(s.endswith("; true") for s in drops)

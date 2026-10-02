@@ -228,18 +228,53 @@ V04_WRITERS = [
     ("calm3", "cyberagent/calm3-22b-chat", 0.9),  # Apache-2.0, 45GB
     ("sarashina", "sbintuitions/sarashina2.2-3b-instruct-v0.1", 0.5),  # MIT, 7GB
 ]
-HF_CACHE = "$HOME/.cache/huggingface/hub"
+# Printed by the python that runs vLLM: its hub cache and hf_xet cache (HF_HOME, HF_HUB_CACHE or
+# HF_XET_CACHE may be set in the image). The constant names differ across huggingface_hub
+# versions, hence the getattr chain with the documented defaults as the last resort.
+_HF_DIRS_PY = (
+    "import os; from huggingface_hub import constants as c; "
+    "h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); "
+    "print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) "
+    "or os.path.join(h, 'hub')); "
+    "print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))"
+)
 
 
 def _drop_weights(hf_id: str) -> str:
-    """Delete a writer's weights and the hf_xet chunk cache, and log free disk space.
+    """Delete a model's weights and the hf_xet cache for real, and log where the disk went.
 
-    In gen_action_v04 the disk (200GB) still filled up after four writers, so ELYZA, calm3 and
-    Qwen3 could not be downloaded; the xet cache is now removed too and ``df`` is logged.
+    In gen_action_v04 the disk (200GB) still filled up after four writers; the xet cache was then
+    removed too. In gen_action_v1 (2026-10-02) ``df`` after each drop still grew by each model's
+    size (27G, 88G, 111G, 172G, 176G): the rm freed nothing, calm3 failed to start and Qwen3's
+    download failed with "No space left on device". The path itself looked right (vLLM named
+    /root/.cache/huggingface/hub in gen_action_v04), so the space may have been kept by files
+    that a process still held open; the cause is not confirmed. Now the step asks vLLM's python
+    for the cache locations, waits for (then kills) any process that still maps or opens the
+    model's files (deleted files keep their space while open), removes the model there, under
+    ``$HOME/.cache`` and wherever ``find`` sees it, and logs ``df``, ``du`` and the number of
+    deleted-but-open files. It always exits 0 so a failed drop never stops the job.
     """
+    m = f"models--{hf_id.replace('/', '--')}"
+    holders = (
+        f'{{ grep -l "/{m}/" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname "*/{m}/*"; }} '
+        "2>/dev/null | cut -d/ -f3 | sort -u | xargs"
+    )
     return (
-        f"rm -rf {HF_CACHE}/models--{hf_id.replace('/', '--')} $HOME/.cache/huggingface/xet; "
-        "df -h / /root 2>/dev/null | tail -n 2"
+        f"M={m}; "
+        'for py in "$(sed -n "1s/^#! *//p" "$(command -v vllm)" 2>/dev/null)" python3; do '
+        f'D="$($py -c "{_HF_DIRS_PY}" 2>/dev/null)"; [ -n "$D" ] && break; done; '
+        'HUB="$(echo "$D" | sed -n 1p)"; XET="$(echo "$D" | sed -n 2p)"; '
+        'HUB="${HUB:-$HOME/.cache/huggingface/hub}"; XET="${XET:-$HOME/.cache/huggingface/xet}"; '
+        'echo "drop $M: hub=$HUB xet=$XET"; df -h / | tail -n 1; '
+        f'for i in $(seq 1 12); do P="$({holders})"; [ -z "$P" ] && break; sleep 5; done; '
+        'if [ -n "$P" ]; then echo "still held by: $P"; ps -o pid,etime,args -p "$P"; '
+        "kill -9 $P; sleep 5; fi; "
+        'rm -rf "$HUB/$M" "$XET" "$HOME/.cache/huggingface/hub/$M" "$HOME/.cache/huggingface/xet"; '
+        "find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune "
+        '-o -type d -name "$M" -prune -exec rm -rf {} + 2>/dev/null; '
+        'df -h / | tail -n 1; du -sh "$HUB" "$XET" $HOME/.cache/* 2>/dev/null; '
+        'echo "deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c "(deleted)")"; '
+        "true"
     )
 
 
@@ -611,22 +646,31 @@ V1_REVERIFY_INPUTS = [
 ]  # fmt: skip
 
 
-def _v1_steps() -> list[str]:
-    steps = ["nvidia-smi > artifacts/nvidia_smi.txt", "df -h /", sync(), f"mkdir -p {V1_RAW}"]
-    steps += [
-        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
-        generate("eval-gen", "configs/eval_v3.json", f"{V1_RAW}/raw1_eval"),
-        generate("eval-gen", "configs/stackchan_v1_paraphrase.json", f"{V1_RAW}/raw1_paraphrase"),
-        f"{STOP_VLLM}; {_drop_weights(EVAL_MODEL)}",
-    ]
-    for name, hf_id, mem in V1_WRITERS:
+DISK_LOG = "df -h /"  # logged before every model start in the v1 jobs (no failure)
+
+
+def _v1_head() -> list[str]:
+    return ["nvidia-smi > artifacts/nvidia_smi.txt", DISK_LOG, sync(), f"mkdir -p {V1_RAW}"]
+
+
+def _v1_writer_steps(writers: list[tuple[str, str, float]]) -> list[str]:
+    """Each writer starts, writes its training sentences and is dropped; a failure is logged."""
+    steps = []
+    for name, hf_id, mem in writers:
         start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
         gen = generate("train-gen", f"configs/action_v1_{name}.json", f"{V1_RAW}/raw1_{name}")
         steps += [
+            DISK_LOG,
             f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
             f"{STOP_VLLM}; {_drop_weights(hf_id)}",
         ]
-    steps += [
+    return steps
+
+
+def _v1_tail() -> list[str]:
+    """Qwen3 writes, verifies all five writers and the eval sets, and re-parses (reverify)."""
+    steps = [
+        DISK_LOG,
         start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
         generate("train-gen", "configs/action_v1_qwen.json", f"{V1_RAW}/raw1_qwen"),
     ]
@@ -646,6 +690,17 @@ def _v1_steps() -> list[str]:
     return steps
 
 
+def _v1_steps() -> list[str]:
+    steps = _v1_head() + [
+        DISK_LOG,
+        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
+        generate("eval-gen", "configs/eval_v3.json", f"{V1_RAW}/raw1_eval"),
+        generate("eval-gen", "configs/stackchan_v1_paraphrase.json", f"{V1_RAW}/raw1_paraphrase"),
+        f"{STOP_VLLM}; {_drop_weights(EVAL_MODEL)}",
+    ]
+    return steps + _v1_writer_steps(V1_WRITERS) + _v1_tail()
+
+
 GEN_ACTION_V1 = JobSpec(
     name="gen_action_v1",
     description=(
@@ -658,6 +713,34 @@ GEN_ACTION_V1 = JobSpec(
     max_hours=6.0,
     steps=_v1_steps(),
     uploads=[*V1_REVERIFY_INPUTS, STACKCHAN_SOURCES],
+)
+
+# v1b: finish gen_action_v1 after the disk ran out (2026-10-02, see _drop_weights). llm-jp (eval v3,
+# paraphrases), ABEJA, Mistral-Nemo-JA and ELYZA finished; their files are uploaded to the same
+# paths and only verified. calm3 and Qwen3 write again; the tail is the same as gen_action_v1's,
+# so build_v1 and stackchan_eval read the outputs unchanged. Before running, copy the finished
+# files from the failed run (artifacts/ is gitignored; uploads must be project files):
+#   r=runs/vast/gen_action_v1-20261001T235118Z/artifacts/gen_action_v1
+#   for f in raw1_eval/eval_gen.jsonl raw1_paraphrase/eval_gen.jsonl raw1_abeja/train_gen.jsonl \
+#     raw1_nemoja/train_gen.jsonl raw1_elyza/train_gen.jsonl; do
+#     mkdir -p artifacts/gen_action_v1/$(dirname $f); cp $r/$f artifacts/gen_action_v1/$f; done
+V1B_DONE = [
+    *[f"{V1_RAW}/raw1_{d}/eval_gen.jsonl" for d in ("eval", "paraphrase")],
+    *[f"{V1_RAW}/raw1_{w}/train_gen.jsonl" for w in ("abeja", "nemoja", "elyza")],
+]
+V1B_WRITERS = [w for w in V1_WRITERS if w[0] == "calm3"]
+GEN_ACTION_V1B = JobSpec(
+    name="gen_action_v1b",
+    description=(
+        "Data v1.0 (finish): calm3 and Qwen3 write, Qwen3 verifies all five writers and the eval "
+        "sets and re-parses v0.5.1 and the older eval sets under schema v1"
+    ),
+    query=GEN_ACTION_V1.query,
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=4.0,
+    steps=_v1_head() + _v1_writer_steps(V1B_WRITERS) + _v1_tail(),
+    uploads=[*V1B_DONE, *V1_REVERIFY_INPUTS, STACKCHAN_SOURCES],
 )
 
 # Schema v1 (Task 13): 3M x5 seeds on data v1.0. Only validation is used on the instance; the
@@ -705,6 +788,7 @@ JOBS: dict[str, JobSpec] = {
         TRAIN_ACTION_V051,
         TRAIN_ACTION_V051_SEEDS,
         GEN_ACTION_V1,
+        GEN_ACTION_V1B,
         TRAIN_ACTION_V1,
     )
 }
