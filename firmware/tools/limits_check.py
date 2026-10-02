@@ -20,6 +20,7 @@ plan. The next plan's sync_ms (non-zero: the head drifted while limp) is printed
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -29,7 +30,20 @@ from lm_serial import Device
 STEP_DEG = 5
 TOLERANCE_DEG = 2.0  # tested axis: present vs target; more means the head did not get there
 OTHER_AXIS_TOLERANCE_DEG = 4.0  # untouched axis: gravity/backlash drift (2.8 deg seen on the K151)
+FLOOR_REST_DEG = 3.0  # at the lower pitch limit the head rests on the floor (~+2.5 deg seen)
 YAW_RAW_ZERO, PITCH_RAW_ZERO, DEG_PER_RAW = 460, 620, 5 / 16
+ACTION_H = Path(__file__).resolve().parents[1] / "jtalm_action" / "main" / "action.h"
+
+
+def pitch_min_deg(path: Path = ACTION_H) -> int:
+    """The firmware's lower pitch limit (ACT_PITCH_MIN_DEG; 0 on the K151, 2026-10-02)."""
+    m = re.search(r"^#define ACT_PITCH_MIN_DEG \(?(-?\d+)\)?", path.read_text("utf-8"), re.M)
+    if m is None:
+        raise RuntimeError(f"ACT_PITCH_MIN_DEG not found in {path}")
+    return int(m.group(1))
+
+
+PITCH_MIN_DEG = pitch_min_deg()
 
 
 def poses(axis: str, limit: int) -> list[tuple[int, int]]:
@@ -37,16 +51,24 @@ def poses(axis: str, limit: int) -> list[tuple[int, int]]:
         right = list(range(30, limit + 1, STEP_DEG))
         return [(y, 0) for y in right] + [(0, 0)] + [(-y, 0) for y in right] + [(0, 0)]
     up = list(range(15, limit + 1, STEP_DEG))
-    return [(0, p) for p in up] + [(0, -10), (0, 0)]
+    low = [(0, PITCH_MIN_DEG)] + ([(0, 0)] if PITCH_MIN_DEG != 0 else [])
+    return [(0, p) for p in up] + low
 
 
 def judge(
     axis: str, got: tuple[float, float], target: tuple[int, int]
 ) -> tuple[bool, float, float]:
-    """(ng, tested-axis offset, other-axis offset) in degrees."""
+    """(ng, tested-axis offset, other-axis offset) in degrees.
+
+    On the pitch axis at the lower limit, a head up to FLOOR_REST_DEG above the target counts as
+    there: it rests on the floor (pitch raw ~628 for a target of 0 on the K151, 2026-10-02).
+    """
     d_yaw, d_pitch = abs(got[0] - target[0]), abs(got[1] - target[1])
     tested, other = (d_yaw, d_pitch) if axis == "yaw" else (d_pitch, d_yaw)
-    return tested > TOLERANCE_DEG or other > OTHER_AXIS_TOLERANCE_DEG, tested, other
+    tol = TOLERANCE_DEG
+    if axis == "pitch" and target[1] == PITCH_MIN_DEG and got[1] > target[1]:
+        tol = FLOOR_REST_DEG
+    return tested > tol or other > OTHER_AXIS_TOLERANCE_DEG, tested, other
 
 
 def main() -> int:

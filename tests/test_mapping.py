@@ -5,6 +5,7 @@ import pytest
 from jtalm.action import AMOUNTS
 from jtalm.action.mapping import (
     BOW_HOLD_MS,
+    BOW_LIFT_DEG,
     DEFAULT_LIMITS,
     PITCH_LIMIT_DEG,
     YAW_LIMIT_DEG,
@@ -71,6 +72,8 @@ def test_nod_is_around_the_current_pitch_and_accepts_integral_floats() -> None:
     assert [t.pitch_deg for t in up] == [10 - NOD_PITCH_DEG, 10] * 2
     near_limit = nod_targets(1, base_pitch=0, pitch_min=-10, pitch_max=15)
     assert [t.pitch_deg for t in near_limit] == [-10, -10 + NOD_PITCH_DEG]  # full swing, shifted
+    floor = nod_targets(1, base_pitch=0, pitch_min=0, pitch_max=85)  # the K151 limits
+    assert [t.pitch_deg for t in floor] == [0, NOD_PITCH_DEG]  # from the floor: upward
     capped = nod_targets(1, base_pitch=-10, pitch_min=-10, pitch_max=2)
     assert [t.pitch_deg for t in capped] == [-10, 2]
 
@@ -107,12 +110,33 @@ def test_turn_is_relative_to_the_current_pose_and_carries_between_calls() -> Non
 def test_shake_bow_and_nod() -> None:
     assert moves(plan_v1([c("shake", count=2)], (40, 0))) == [(45, 0), (25, 0), (45, 0), (25, 0),
                                                             (40, 0)]  # fmt: skip
-    bow = plan_v1([c("bow")], (0, 10))
-    assert moves(bow) == [(0, -10), (0, 10)]
-    assert {"kind": "pause", "ms": BOW_HOLD_MS} in bow
-    assert moves(plan_v1([c("nod", count=1)], (0, 0))) == [(0, -10), (0, 4), (0, 0)]
+    # from the floor (pitch 0) the swing keeps its amplitude by going up, then returns
+    assert moves(plan_v1([c("nod", count=1)], (0, 0))) == [(0, 0), (0, 14), (0, 0)]
+    assert moves(plan_v1([c("nod", count=1)], (0, 10))) == [(0, 0), (0, 14), (0, 10)]
     # the final return is added only when the last target differs from the start (v0 firmware)
-    assert moves(plan_v1([c("nod", count=1)], (0, 10))) == [(0, -4), (0, 10)]
+    assert moves(plan_v1([c("nod", count=1)], (0, 20))) == [(0, 6), (0, 20)]
+
+
+def test_bow_lifts_first_when_below_the_lift_pitch() -> None:
+    pause = {"kind": "pause", "ms": BOW_HOLD_MS}
+    assert BOW_LIFT_DEG == 20
+    # from the floor: lift, down to the floor, hold; the base equals the floor, so no return
+    assert plan_v1([c("bow")], (0, 0)) == [
+        {"kind": "move", "yaw": 0, "pitch": 20, "clamped": False},
+        {"kind": "move", "yaw": 0, "pitch": 0, "clamped": False},
+        pause,
+    ]
+    # already at or above the lift pitch: straight down, hold, back
+    assert plan_v1([c("bow")], (0, 30)) == [
+        {"kind": "move", "yaw": 0, "pitch": 0, "clamped": False},
+        pause,
+        {"kind": "move", "yaw": 0, "pitch": 30, "clamped": False},
+    ]
+    assert moves(plan_v1([c("bow")], (0, 20))) == [(0, 0), (0, 20)]
+    # below the lift pitch: the yaw stays
+    bow = plan_v1([c("bow")], (10, 10))
+    assert moves(bow) == [(10, 20), (10, 0), (10, 10)]
+    assert bow[2] == pause
 
 
 def test_state_steps() -> None:
@@ -128,5 +152,6 @@ def test_state_steps() -> None:
     ]
 
 
-def test_default_limits_match_the_spec_target() -> None:
-    assert DEFAULT_LIMITS == Limits(-45, 45, -10, 85)
+def test_default_limits_are_the_k151_measurement() -> None:
+    # 2026-10-02: the head rests on the floor at about +2.5 deg, so pitch stops at 0
+    assert DEFAULT_LIMITS == Limits(-45, 45, 0, 85)

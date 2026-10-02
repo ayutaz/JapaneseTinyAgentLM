@@ -15,7 +15,7 @@
 #include <stdint.h>
 
 #define ACT_MAX_CALLS 2
-#define ACT_MAX_STEPS 24  // nod 5 and nod 5.0: 2 x (10 swings + 1 return)
+#define ACT_MAX_STEPS 24  // nod 5 and nod 5.0: 2 x (10 swings + 1 return); bow: 4 at most
 #define ACT_NONE 0xFF      // act_call_t.amount when the call has a number instead
 
 // The order of the names in jtalm.action.schema (TOOL_NAMES, DIRECTIONS, ...).
@@ -32,15 +32,18 @@ enum { ADJ_UP, ADJ_DOWN, ADJ_COUNT };
 
 // Soft limits of the head in degrees from the neutral pose (right / up positive). F2 widened
 // them from the v0 values (yaw -30..+30, pitch -10..+15) towards the official firmware's
-// recommended range, checked on the K151 with someone watching (docs/hardware.md).
+// recommended range, checked on the K151 with someone watching (2026-10-02, docs/hardware.md):
+// yaw +-45 and pitch +85 are reached; below horizontal the head rests on the floor (about
+// +2.5 deg, raw ~628), so pitch stops at 0.
 // mapping.DEFAULT_LIMITS holds the same values (firmware/tools/dispatch_check.py checks it).
 #define ACT_YAW_MIN_DEG (-45)
 #define ACT_YAW_MAX_DEG 45
-#define ACT_PITCH_MIN_DEG (-10)
+#define ACT_PITCH_MIN_DEG 0
 #define ACT_PITCH_MAX_DEG 85
 #define ACT_NOD_PITCH_DEG 14  // nod amplitude (8 was too small to notice, 2026-09-30)
-// mapping.py: SHAKE_YAW_DEG, BOW_HOLD_MS, ADJUST_STEP, BRIGHTNESS_MIN
+// mapping.py: SHAKE_YAW_DEG, BOW_LIFT_DEG, BOW_HOLD_MS, ADJUST_STEP, BRIGHTNESS_MIN
 #define ACT_SHAKE_YAW_DEG 15
+#define ACT_BOW_LIFT_DEG 20  // a bow from below this pitch lifts the head here first
 #define ACT_BOW_HOLD_MS 500
 #define ACT_ADJUST_SLIGHT 10
 #define ACT_ADJUST_NORMAL 20

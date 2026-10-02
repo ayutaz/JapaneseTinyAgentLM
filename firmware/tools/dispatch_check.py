@@ -75,6 +75,7 @@ class Policy:
         assert self.limits == mapping.DEFAULT_LIMITS, (self.limits, mapping.DEFAULT_LIMITS)
         assert d["ACT_NOD_PITCH_DEG"] == mapping.NOD_PITCH_DEG
         assert d["ACT_SHAKE_YAW_DEG"] == mapping.SHAKE_YAW_DEG
+        assert d["ACT_BOW_LIFT_DEG"] == mapping.BOW_LIFT_DEG
         assert d["ACT_BOW_HOLD_MS"] == mapping.BOW_HOLD_MS
         assert d["ACT_BRIGHTNESS_MIN"] == mapping.BRIGHTNESS_MIN
         steps = [d["ACT_ADJUST_SLIGHT"], d["ACT_ADJUST_NORMAL"], d["ACT_ADJUST_LARGE"]]

@@ -515,7 +515,10 @@ void act_plan(act_plan_t *p, int yaw, int pitch) {
         break;
       }
       case ACT_BOW: {
+        // mapping.plan_v1: from below ACT_BOW_LIFT_DEG (near the floor) a bow would barely move, so
+        // the head lifts there first; then down to the lower limit, a hold, and back.
         int start = pitch;
+        if (pitch < ACT_BOW_LIFT_DEG) add_move(p, c, yaw, ACT_BOW_LIFT_DEG, &yaw, &pitch, 0);
         add_move(p, c, yaw, PITCH_MIN, &yaw, &pitch, 0);
         s = add_step(p, c, STEP_PAUSE, yaw, pitch);
         if (s) {

@@ -82,7 +82,7 @@ yaw_raw   = round(460 − yaw_deg   × 16 / 5)    # yaw_deg は右が正
 pitch_raw = round(620 + pitch_deg × 16 / 5)    # pitch_deg は上が正
 ```
 
-可動域（下の soft limit）の中では、yaw raw は 364〜556、pitch raw は 588〜668 です。
+可動域（下の soft limit）の中では、yaw raw は 316〜604、pitch raw は 620〜892 です。
 
 ## Dispatcher
 
@@ -93,10 +93,11 @@ LM の出力を首の動きと表情に変える部分です（`firmware/jtalm_a
 | 流れ | LM の task（core 1）が `gen` の行を出した後、確信度の gate（confidence gate）をかけた後の出力を検査し、今の姿勢から計画を立てて `act` の行を出し、待ち行列（4件）に入れる。dispatcher の task（core 0）が計画の手順を順に実行する。LM はその間に次の依頼を処理できる |
 | 検査（validator） | JSON を Python の `json.loads` と同じ規則で読み（同じ key が重なると後の値、`2.0` も整数）、Action schema v0 と重複の禁止を検査する。`jtalm.action.parse_output(...).schema_valid` と同じものだけを通す。通らない出力と `[]` は何もしない |
 | 角度 | `src/jtalm/action/mapping.py` と同じ。yaw は slight 10° / normal 20° / large 30°、pitch は slight 5° / normal 10° / large 15°。`left` / `right` は yaw だけ、`up` / `down` は pitch だけを変え、もう一方の軸はそのまま。`center` は両軸を 0° にする |
-| Soft limit | mapping.py の上限（yaw ±30°、pitch ±15°）と stackchan-idf の soft limit（yaw −40〜+40°、pitch −10〜+25°）の重なり、つまり **yaw −30〜+30°、pitch −10〜+15°**。`down` の `large`（−15°）は −10° になり、`act` の行に `clamped` が付く |
+| Soft limit | **yaw −45〜+45°、pitch 0〜+85°**（2026-10-02 に K151 の実機で確かめた。下は頭が床に当たるため水平まで。`firmware/tools/limits_check.py`）。範囲を超える指示は端で止め、`act` の行に `clamped` が付く（`down` は水平より下へ行かないので、正面からの `down` は動かない） |
 | 滑らかさ | 1回の移動は cosine の加減速（始めと終わりの速度が 0）。最大速度 90°/s と最大加速度 360°/s² を超えない最短の時間を 20ms 単位に切り上げる（10° で 380ms、20° で 540ms、30° で 660ms、60° で 1,060ms）。20ms ごとに目標位置を送り、SCS の goal time を 20ms にする |
 | 2つの call | 書かれた順に実行し、間に 200ms 置く |
-| うなずき（`nod`） | **今の pitch から** 14° 下へ振って戻す往復を `count` 回くり返し、最後は始めの pitch に戻る。下の限界（−10°）に近いときは、振れ幅を保ったまま上へずらす（low = max(基準 − 14, −10)、high = min(low + 14, +15)。正面からなら −10° と +4° の間）。上を向いているときは、上を向いたままうなずく。往復だけは最大速度 150°/s、最大加速度 900°/s² で、14° の片道は 280ms（ピーク約 79°/s） |
+| うなずき（`nod`） | **今の pitch から** 14° 下へ振って戻す往復を `count` 回くり返し、最後は始めの pitch に戻る。下の限界（0°、床）に近いときは、振れ幅を保ったまま上へずらす（low = max(基準 − 14, 0)、high = min(low + 14, +85)）。正面（床）からは 0° と +14° の間で上へ振る。上を向いているときは、上を向いたままうなずく。往復だけは最大速度 150°/s、最大加速度 900°/s² で、14° の片道は 280ms（ピーク約 79°/s） |
+| お辞儀（`bow`） | 今の pitch が 20° より下なら、まず 20° まで上げる（yaw はそのまま）。そこから下の限界（0°、床）まで下げ、0.5 秒止めてから、始めの pitch に戻る（始めの pitch が床なら戻る動きはない）。20° 以上を向いているときは、上げずにそのまま下げる。速度と加速度は通常の移動と同じ |
 | Torque | 計画を始める直前に、今の位置を目標にしてから torque を入れる（跳ねない）。今の位置が計画の始点から 1° 以上ずれていれば、まず始点へ同じ滑らかさで動く。計画が終わって 0.5 秒後に torque を切る |
 | 起動時（dry-run） | **servo の出力は起動時に off**。計画は時間どおりに実行されるが、servo には何も送らず、UART も開かない。`!servo on` で電源を入れ、今の位置から正面へゆっくり戻ってから、首が動くようになる |
 | 停止 | `!stop` / `!servo off`、**画面へのタッチ**、servo の通信の error、watchdog で、実行中と待ち行列の計画を捨て、torque を切り（broadcast と各 ID）、`VM_EN` を切って dry-run に戻る。`!relax` は torque だけを切る。serial の読み取りは別の task なので、LM の処理中でもすぐに効く |

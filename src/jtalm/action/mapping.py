@@ -47,8 +47,9 @@ def nod_targets(
 
     This matches firmware/jtalm_action: the swing starts from the current pitch, so a nod while
     looking up stays looking up. Near the lower limit the swing keeps its full amplitude by
-    moving up (base 0 with a -10 limit swings between -10 and +4); the firmware then returns to
-    ``base_pitch``. The schema accepts an integral float count (2.0); it is read as the integer.
+    moving up (from the floor, base 0 with a 0 limit, it swings between 0 and +14); the firmware
+    then returns to ``base_pitch``. The schema accepts an integral float count (2.0); it is read
+    as the integer.
     """
     low = base_pitch - NOD_PITCH_DEG
     if pitch_min is not None:
@@ -83,12 +84,13 @@ class Limits:
 
     yaw_min: float = -45
     yaw_max: float = 45
-    pitch_min: float = -10
+    pitch_min: float = 0  # the K151 head rests on the floor at about +2.5 deg (2026-10-02)
     pitch_max: float = 85
 
 
-DEFAULT_LIMITS = Limits()  # the spec's target; the final values are set on the device (F2)
+DEFAULT_LIMITS = Limits()  # measured on the K151 (F2, 2026-10-02; docs/hardware.md)
 SHAKE_YAW_DEG = 15
+BOW_LIFT_DEG = 20  # a bow from below this pitch first lifts the head here, then lowers it
 BOW_HOLD_MS = 500
 ADJUST_STEP = {"slight": 10, "normal": 20, "large": 30}
 BRIGHTNESS_MIN = 5  # the firmware floor; level 0 would hide the face
@@ -164,6 +166,8 @@ def plan_v1(
             back_to(base, pitch)
         elif name == "bow":
             base = pitch
+            if pitch < BOW_LIFT_DEG:  # from the floor a bow would not move: lift first
+                move(yaw, BOW_LIFT_DEG)
             move(yaw, limits.pitch_min)
             steps.append({"kind": "pause", "ms": BOW_HOLD_MS})
             back_to(yaw, base)

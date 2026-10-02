@@ -30,3 +30,21 @@ def test_other_axis_beyond_4deg_is_ng():
 
 def test_other_axis_ok_for_pitch_axis_with_yaw_drift():
     assert not limits_check.judge("pitch", (-3.5, 29.0), (0, 30))[0]
+
+
+def test_pitch_poses_end_at_the_firmware_lower_limit():
+    from jtalm.action.mapping import DEFAULT_LIMITS
+
+    assert limits_check.PITCH_MIN_DEG == DEFAULT_LIMITS.pitch_min == 0
+    pitch = limits_check.poses("pitch", 85)
+    assert pitch[0] == (0, 15) and pitch[-2:] == [(0, 85), (0, 0)]
+    assert pitch.count((0, 0)) == 1  # the floor is also the center: the run ends there
+    assert min(p for _, p in pitch) == limits_check.PITCH_MIN_DEG
+
+
+def test_floor_pose_on_the_k151_is_ok():
+    # 2026-10-02: the head rests on the floor at raw 626..629 (+1.9..+2.8 deg) for pitch 0
+    for got in ((-0.31, 2.5), (-0.31, 1.88), (0.0, 2.81)):
+        assert not limits_check.judge("pitch", got, (0, 0))[0]
+    assert limits_check.judge("pitch", (0.0, 3.5), (0, 0))[0]  # more than the floor explains
+    assert limits_check.judge("pitch", (0.0, 32.5), (0, 30))[0]  # not at the floor: strict
