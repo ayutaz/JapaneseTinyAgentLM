@@ -100,6 +100,18 @@ def test_empty_rows_relabel_only_to_device_commands() -> None:
     assert dropped == {"relabel_from_empty": 2}
 
 
+def test_correction_rows_are_never_relabeled() -> None:
+    nod = [{"name": "nod", "arguments": {"count": 2}}]
+    shake_nod = [{"name": "shake", "arguments": {"count": 1}}, *nod]
+    rows = [
+        row("a", "首振りはやめて、2回うなずいてよ", nod, shake_nod, "correction"),
+        row("b", "首振りはやめて、2回うなずいてよ", nod, nod, "correction"),
+    ]
+    cases, changed, dropped = relabel(rows)
+    assert [(c.id, c.expected, c.category) for c in cases] == [("b", nod, "correction")]
+    assert changed == [] and dropped == {"relabel_correction": 1}
+
+
 def test_old_eval_keeps_v0_label_when_relabel_lacks_evidence(tmp_path: Path) -> None:
     src = tmp_path / "old.jsonl"
     slight_up = [{"name": "look", "arguments": {"direction": "up", "amount": "slight"}}]

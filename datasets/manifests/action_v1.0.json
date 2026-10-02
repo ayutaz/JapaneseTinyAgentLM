@@ -1,14 +1,15 @@
 {
-  "created": "2026-10-02T12:39:10+00:00",
+  "created": "2026-10-02T12:42:11+00:00",
   "relabel_v0_eval": {
     "n": 1189,
     "reverify_rows": 1189,
     "changed": 5,
     "overridden": 0,
-    "relabel_no_evidence": 105,
+    "relabel_no_evidence": 100,
     "verified_invalid": 4,
     "verifier_disagrees_v0": 36,
-    "relabel_from_empty": 5
+    "relabel_from_empty": 5,
+    "relabel_correction": 5
   },
   "relabel_human_v1": {
     "n": 1157,
@@ -40,7 +41,7 @@
     "reverify_rows": 44,
     "changed": 0,
     "overridden": 0,
-    "relabel_no_evidence": 11,
+    "relabel_correction": 11,
     "verifier_disagrees_v0": 4
   },
   "relabel_eval_v2_english": {
@@ -139,24 +140,26 @@
   },
   "stackchan_eval_included": true,
   "inherited_train": {
-    "n": 58725,
+    "n": 58705,
     "reverify_rows": 66800,
-    "relabeled": 354,
+    "relabeled": 334,
     "overlap_or_dup": 46,
-    "relabel_no_evidence": 4934,
+    "relabel_no_evidence": 4405,
     "verifier_disagrees_v0": 2366,
     "relabel_from_empty": 687,
     "relabel_negation": 3,
+    "relabel_correction": 549,
     "verified_invalid": 39
   },
   "inherited_val": {
-    "n": 3099,
+    "n": 3097,
     "reverify_rows": 3515,
-    "relabeled": 20,
+    "relabeled": 18,
     "overlap_or_dup": 5,
-    "relabel_no_evidence": 244,
+    "relabel_no_evidence": 218,
     "verifier_disagrees_v0": 129,
     "relabel_from_empty": 34,
+    "relabel_correction": 28,
     "verified_invalid": 4
   },
   "new": {
@@ -185,25 +188,25 @@
     "multi_action:malformed": 12
   },
   "train": {
-    "n": 89025,
+    "n": 89005,
     "by_category": {
       "single": 27597,
       "multi_action": 23467,
       "negation": 10378,
-      "correction": 4951,
+      "correction": 4931,
       "no_action": 22632
     },
-    "sha256": "9be97ffa9637e90be0269ec0489facfbb4a400e06e9717359bb8af5c55b333c4"
+    "sha256": "0fde99995d34da51135669bdc1236c98bc19c1cec655fe90fd7cb6202d4627b6"
   },
   "val": {
-    "n": 4694,
+    "n": 4692,
     "by_category": {
       "single": 1443,
       "multi_action": 1253,
       "negation": 551,
-      "correction": 249,
+      "correction": 247,
       "no_action": 1198
     },
-    "sha256": "0dda7f519e1a07575cc370dcf5a71f7b9b9507d5503579bd4080b276ce3d6cd8"
+    "sha256": "3fb3e7eedcd483882de7c7ac27f3ef082a78d14b39180c719277854273913d37"
   }
 }

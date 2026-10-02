@@ -9,6 +9,7 @@
    (degrees, turn, a new tool...), the prompt has a word for every v1-only element of that
    answer (checks.v1_evidence), the prompt passes the negation check for the new category, and
    a v0 [] row becomes only device commands (LED, volume, brightness); dropped otherwise.
+   Correction rows are never relabeled.
 2. New sentences of the v1 writers: kept when Qwen3's parse equals the spec label (as in v0).
 3. Evaluation set v3 (llm-jp writes, Qwen3 verifies): same rule as 2.
 4. v0 eval, human v1 and eval v2: relabeled by rule 1 into datasets/action/relabel_v1/, with a
@@ -72,6 +73,9 @@ def relabel(rows: list[dict]) -> tuple[list[EvalCase], list[dict], Counter]:
         if new != old:
             if not v1_only:
                 dropped["verifier_disagrees_v0"] += 1
+                continue
+            if r["category"] == "correction":  # R17: negated parts are read as requests
+                dropped["relabel_correction"] += 1
                 continue
             # R16: v0's verifier judged a [] row a non-request; only device commands may follow
             if not old and any(c["name"] not in DEVICE_TOOLS for c in new):
