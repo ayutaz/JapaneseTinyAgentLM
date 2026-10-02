@@ -2,7 +2,8 @@
 # Copyright 2026 ayutaz
 """Train and compare SentencePiece tokenizers for the Action LM (M4 step 2).
 
-    uv run --group train python -m jtalm.model.tokenizer \n        --data datasets/action/v1.0 --vocab 2048 --name action_v1
+    uv run --group train python -m jtalm.model.tokenizer
+        --data datasets/action/v1.0 --vocab 2048 --name action_v1
 
 Training text: train + validation prompts, their targets (``jtalm.model.format.target_json``),
 and the MASSIVE ja-JP ``train`` partition (CC BY 4.0). The evaluation set is not used.
