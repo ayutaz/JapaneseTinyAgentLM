@@ -102,6 +102,7 @@ def write_manifest(out_dir: Path, stats: dict, manifest: Path) -> None:
     sources, over = _read(out_dir / "sources.jsonl"), _read(out_dir / "overrides.jsonl")
     cases = _read(out_dir / "eval.jsonl")
     data = {
+        "sources_n": len(sources),
         "sources_sha256": hashlib.sha256((out_dir / "sources.jsonl").read_bytes()).hexdigest(),
         "eval_sha256": hashlib.sha256((out_dir / "eval.jsonl").read_bytes()).hexdigest(),
         "n": len(cases),

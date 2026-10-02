@@ -2,7 +2,7 @@
 # Copyright 2026 ayutaz
 """Train and compare SentencePiece tokenizers for the Action LM (M4 step 2).
 
-    uv run --group train python -m jtalm.model.tokenizer --vocab 2048 4096 8192
+    uv run --group train python -m jtalm.model.tokenizer \n        --data datasets/action/v1.0 --vocab 2048 --name action_v1
 
 Training text: train + validation prompts, their targets (``jtalm.model.format.target_json``),
 and the MASSIVE ja-JP ``train`` partition (CC BY 4.0). The evaluation set is not used.
@@ -107,11 +107,12 @@ def report(model: Path, data_dir: Path, massive_rows: list[dict]) -> dict[str, A
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--data", type=Path, default=PROJECT_ROOT / "datasets/action/v0")
+    parser.add_argument("--data", type=Path, default=PROJECT_ROOT / "datasets/action/v1.0")
     parser.add_argument(
         "--massive-dir", type=Path, default=PROJECT_ROOT / "datasets/downloads/massive"
     )
     parser.add_argument("--vocab", type=int, nargs="+", default=[2048, 4096, 8192])
+    parser.add_argument("--name", default="action_v1", help="model file prefix")
     parser.add_argument("--out", type=Path, default=PROJECT_ROOT / "tokenizer/out")
     parser.add_argument("--record", type=Path, default=None, help="also write the report here")
     args = parser.parse_args(argv)
@@ -120,14 +121,14 @@ def main(argv: list[str] | None = None) -> None:
     lines = train_text(args.data, rows)
     results = []
     for v in args.vocab:
-        model = train(lines, v, args.out / f"action_v0_sp{v}")
+        model = train(lines, v, args.out / f"{args.name}_sp{v}")
         results.append(report(model, args.data, rows))
         print(json.dumps(results[-1], ensure_ascii=False))
     out = {
         "training_text": {
             "lines": len(lines),
             "sources": [
-                "datasets/action/v0 train+val prompts and targets",
+                f"{args.data} train+val prompts and targets",
                 "MASSIVE ja-JP train utterances (CC BY 4.0)",
             ],
         },
