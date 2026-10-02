@@ -5,11 +5,10 @@
     uv run python -m jtalm.data.build_v1 --raw artifacts/gen_action_v1
 
 1. Inherited rows (data v0.5.1 train/val, re-parsed by Qwen3 under schema v1, ``reverify``):
-   kept with their label when Qwen3 agrees; relabeled when Qwen3's answer needs schema v1
-   (degrees, turn, a new tool...), the prompt has a word for every v1-only element of that
-   answer (checks.v1_evidence), the prompt passes the negation check for the new category, and
-   a v0 [] row becomes only device commands (LED, volume, brightness); dropped otherwise.
-   Correction rows are never relabeled.
+   kept with their label when Qwen3 agrees. A v0 [] row is relabeled only to device commands
+   (LED, volume, brightness) whose device the prompt names (checks.device_evidence) and only
+   when the prompt passes the negation check for the new category; a row with a v0 action is
+   never relabeled. Rows Qwen3 disagrees with are dropped otherwise, as are correction rows.
 2. New sentences of the v1 writers: kept when Qwen3's parse equals the spec label (as in v0).
 3. Evaluation set v3 (llm-jp writes, Qwen3 verifies): same rule as 2.
 4. v0 eval, human v1 and eval v2: relabeled by rule 1 into datasets/action/relabel_v1/, with a
@@ -28,13 +27,11 @@ from pathlib import Path
 
 from jtalm.action.schema import canonicalize, to_json, uses_v1_only, validate
 from jtalm.data.build import _case, _filter, _load
-from jtalm.data.checks import dedup_key, negation_consistent, v1_evidence
+from jtalm.data.checks import DEVICE_TOOLS, dedup_key, device_evidence, negation_consistent
 from jtalm.eval.cases import EvalCase, load_cases, write_cases
 
 VAL_FRACTION = 0.05
 V1_WRITER_NAMES = ("qwen", "abeja", "calm3", "elyza", "nemoja")  # configs/action_v1_<name>.json
-# MASSIVE-style device commands: the only relabel allowed for a row whose v0 label was []
-DEVICE_TOOLS = ("set_led", "set_volume", "adjust_volume", "set_brightness", "adjust_brightness")
 INHERITED = ("datasets/action/v0.5.1/train.jsonl", "datasets/action/v0.5.1/val.jsonl")
 OLD_EVAL = {
     "v0_eval": "datasets/action/v0/eval.jsonl",
@@ -74,14 +71,17 @@ def relabel(rows: list[dict]) -> tuple[list[EvalCase], list[dict], Counter]:
             if not v1_only:
                 dropped["verifier_disagrees_v0"] += 1
                 continue
+            if old:  # R18: lexical patterns cannot tell the senses of v0 actions apart
+                dropped["relabel_from_action"] += 1
+                continue
             if r["category"] == "correction":  # R17: negated parts are read as requests
                 dropped["relabel_correction"] += 1
                 continue
             # R16: v0's verifier judged a [] row a non-request; only device commands may follow
-            if not old and any(c["name"] not in DEVICE_TOOLS for c in new):
+            if any(c["name"] not in DEVICE_TOOLS for c in new):
                 dropped["relabel_from_empty"] += 1
                 continue
-            if v1_evidence(r["text"], new):  # R15: the verifier is noisy with 11 tools
+            if device_evidence(r["text"], new):  # R18: the prompt must name the device
                 dropped["relabel_no_evidence"] += 1
                 continue
             category = _category(new, r["category"])
@@ -179,6 +179,17 @@ def relabel_old_eval(
     return eval_keys
 
 
+def dedup(cases: list[EvalCase], seen: set[str]) -> list[EvalCase]:
+    """Cases whose prompt is not in ``seen`` nor repeats an earlier case; ``seen`` is updated."""
+    kept = []
+    for c in cases:
+        key = dedup_key(c.prompt)
+        if key not in seen:
+            seen.add(key)
+            kept.append(c)
+    return kept
+
+
 def _by_file(rows: list[dict]) -> dict[str, list[dict]]:
     out: dict[str, list[dict]] = {}
     for r in rows:
@@ -232,13 +243,13 @@ def main() -> None:
     seen: set[str] = set(eval_keys)
     for path, split in zip(INHERITED, (train, val), strict=True):
         cases, changed, dropped = relabel(rev.get(path, []))
-        kept = [c for c in cases if dedup_key(c.prompt) not in seen]
-        seen |= {dedup_key(c.prompt) for c in kept}
+        kept = dedup(cases, seen)
         split.extend(kept)
         stats[f"inherited_{Path(path).stem}"] = {
             "n": len(kept),
             "reverify_rows": len(rev[path]),
             "relabeled": len(changed),
+            "relabeled_kept": sum(c.source.endswith("+relabel:v1") for c in kept),
             "overlap_or_dup": len(cases) - len(kept),
             **dropped,
         }

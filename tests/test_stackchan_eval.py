@@ -2,6 +2,8 @@
 # Copyright 2026 ayutaz
 import json
 
+import pytest
+
 from jtalm.data.stackchan_eval import build
 from jtalm.eval.cases import load_cases
 
@@ -47,5 +49,36 @@ def test_build_merges_sources_paraphrases_and_overrides(tmp_path) -> None:
     assert cases["sc-001"].expected == look and cases["sc-001"].source == "verbatim:u"
     assert cases["sc-002"].expected == [] and cases["sc-002"].category == "no_action"
     assert len([c for c in cases.values() if c.source.startswith("paraphrase:")]) == 1
-    assert stats == {"verbatim": 2, "user": 0, "paraphrase": 1, "overridden": 1}
+    assert stats == {"verbatim": 2, "user": 0, "paraphrase": 1, "overridden": 1, "excluded": 0}
     assert "寝室のライトをつけて。" in (out / "review.md").read_text("utf-8")
+
+
+def _setup(tmp_path):
+    src = tmp_path / "sources.jsonl"
+    texts = {"sc-001": "左に頭を回して。", "sc-002": "うなずいて。"}
+    write(src, [{"id": i, "text": t, "source_url": "u", "license": "MIT", "kind": "verbatim"}
+                for i, t in texts.items()])  # fmt: skip
+    look = [{"name": "look", "arguments": {"direction": "left", "amount": "normal"}}]
+    rev = tmp_path / "rev.jsonl"
+    write(rev, [{"id": i, "file": str(src), "verified": look} for i in ("sc-001", "sc-002")])
+    return src, rev, tmp_path / "para.jsonl", tmp_path / "over.jsonl", tmp_path / "out"
+
+
+def test_build_excludes_cases_named_in_overrides(tmp_path) -> None:
+    src, rev, para, over, out = _setup(tmp_path)
+    write(over, [{"id": "sc-002", "exclude": True}])
+    stats = build(src, rev, para, over, out)
+    assert [c.id for c in load_cases(out / "eval.jsonl")] == ["sc-001"]
+    assert stats == {"verbatim": 1, "user": 0, "paraphrase": 0, "overridden": 0, "excluded": 1}
+    assert "うなずいて。" not in (out / "review.md").read_text("utf-8")
+
+
+@pytest.mark.parametrize(
+    "line", [{"id": "sc-404", "exclude": True}, {"id": "sc-404", "expected": []}]
+)
+def test_build_rejects_unknown_override_ids(tmp_path, line) -> None:
+    src, rev, para, over, out = _setup(tmp_path)
+    write(over, [line])
+    with pytest.raises(ValueError, match="sc-404"):
+        build(src, rev, para, over, out)
+    assert not (out / "eval.jsonl").exists()

@@ -1,31 +1,31 @@
 {
-  "created": "2026-10-02T12:42:11+00:00",
+  "created": "2026-10-02T13:00:16+00:00",
   "relabel_v0_eval": {
     "n": 1189,
     "reverify_rows": 1189,
-    "changed": 5,
-    "overridden": 0,
-    "relabel_no_evidence": 100,
+    "changed": 2,
+    "overridden": 5,
+    "relabel_from_action": 105,
     "verified_invalid": 4,
     "verifier_disagrees_v0": 36,
     "relabel_from_empty": 5,
-    "relabel_correction": 5
+    "relabel_no_evidence": 3
   },
   "relabel_human_v1": {
     "n": 1157,
     "reverify_rows": 1159,
-    "changed": 4,
-    "overridden": 0,
+    "changed": 3,
+    "overridden": 4,
     "verifier_disagrees_v0": 9,
     "relabel_from_empty": 8,
-    "relabel_no_evidence": 1
+    "relabel_no_evidence": 2
   },
   "relabel_eval_v2_amount_words": {
     "n": 278,
     "reverify_rows": 278,
     "changed": 0,
     "overridden": 0,
-    "relabel_no_evidence": 118,
+    "relabel_from_action": 118,
     "verified_invalid": 1
   },
   "relabel_eval_v2_center_phrasing": {
@@ -34,14 +34,14 @@
     "changed": 0,
     "overridden": 0,
     "verifier_disagrees_v0": 2,
-    "relabel_no_evidence": 4
+    "relabel_from_action": 4
   },
   "relabel_eval_v2_correction": {
     "n": 44,
     "reverify_rows": 44,
     "changed": 0,
     "overridden": 0,
-    "relabel_correction": 11,
+    "relabel_from_action": 11,
     "verifier_disagrees_v0": 4
   },
   "relabel_eval_v2_english": {
@@ -49,7 +49,7 @@
     "reverify_rows": 70,
     "changed": 0,
     "overridden": 0,
-    "relabel_no_evidence": 10,
+    "relabel_from_action": 10,
     "verifier_disagrees_v0": 4
   },
   "relabel_eval_v2_fragments": {
@@ -65,7 +65,7 @@
     "reverify_rows": 247,
     "changed": 0,
     "overridden": 0,
-    "relabel_no_evidence": 25,
+    "relabel_from_action": 25,
     "verifier_disagrees_v0": 8
   },
   "relabel_eval_v2_negation_forms": {
@@ -79,25 +79,25 @@
   "relabel_eval_v2_numbers": {
     "n": 167,
     "reverify_rows": 167,
-    "changed": 1,
-    "overridden": 0,
-    "relabel_no_evidence": 27,
+    "changed": 0,
+    "overridden": 1,
+    "relabel_from_action": 28,
     "verifier_disagrees_v0": 2
   },
   "relabel_eval_v2_order_words": {
     "n": 296,
     "reverify_rows": 296,
-    "changed": 1,
-    "overridden": 0,
-    "relabel_no_evidence": 19,
+    "changed": 0,
+    "overridden": 1,
+    "relabel_from_action": 20,
     "verifier_disagrees_v0": 2
   },
   "relabel_eval_v2_orthography": {
     "n": 282,
     "reverify_rows": 282,
-    "changed": 1,
-    "overridden": 0,
-    "relabel_no_evidence": 11,
+    "changed": 0,
+    "overridden": 1,
+    "relabel_from_action": 12,
     "verifier_disagrees_v0": 4
   },
   "relabel_eval_v2_question_forms": {
@@ -105,14 +105,14 @@
     "reverify_rows": 203,
     "changed": 0,
     "overridden": 0,
-    "relabel_no_evidence": 53,
+    "relabel_from_action": 53,
     "verifier_disagrees_v0": 2
   },
   "relabel_eval_v2_unexecutable": {
     "n": 286,
     "reverify_rows": 286,
     "changed": 1,
-    "overridden": 0,
+    "overridden": 1,
     "verifier_disagrees_v0": 6,
     "relabel_from_empty": 44,
     "verified_invalid": 1
@@ -140,34 +140,36 @@
   },
   "stackchan_eval_included": true,
   "inherited_train": {
-    "n": 58705,
+    "n": 58431,
     "reverify_rows": 66800,
-    "relabeled": 334,
-    "overlap_or_dup": 46,
-    "relabel_no_evidence": 4405,
+    "relabeled": 66,
+    "relabeled_kept": 60,
+    "overlap_or_dup": 52,
+    "relabel_from_action": 5159,
     "verifier_disagrees_v0": 2366,
     "relabel_from_empty": 687,
     "relabel_negation": 3,
-    "relabel_correction": 549,
+    "relabel_no_evidence": 63,
     "verified_invalid": 39
   },
   "inherited_val": {
-    "n": 3097,
+    "n": 3083,
     "reverify_rows": 3515,
-    "relabeled": 18,
-    "overlap_or_dup": 5,
-    "relabel_no_evidence": 218,
+    "relabeled": 3,
+    "relabeled_kept": 3,
+    "overlap_or_dup": 4,
+    "relabel_from_action": 253,
     "verifier_disagrees_v0": 129,
     "relabel_from_empty": 34,
-    "relabel_correction": 28,
-    "verified_invalid": 4
+    "verified_invalid": 4,
+    "relabel_no_evidence": 8
   },
   "new": {
-    "n": 31895,
+    "n": 31897,
     "single:verifier_disagrees": 7373,
-    "single:kept": 12290,
+    "single:kept": 12292,
     "single:negation_mismatch": 92,
-    "single:duplicate": 202,
+    "single:duplicate": 200,
     "multi_action:kept": 12272,
     "multi_action:verifier_disagrees": 2517,
     "multi_action:negation_mismatch": 114,
@@ -188,25 +190,25 @@
     "multi_action:malformed": 12
   },
   "train": {
-    "n": 89005,
+    "n": 88733,
     "by_category": {
-      "single": 27597,
-      "multi_action": 23467,
-      "negation": 10378,
-      "correction": 4931,
-      "no_action": 22632
+      "single": 27433,
+      "multi_action": 23385,
+      "negation": 10374,
+      "correction": 4926,
+      "no_action": 22615
     },
-    "sha256": "0fde99995d34da51135669bdc1236c98bc19c1cec655fe90fd7cb6202d4627b6"
+    "sha256": "40f1f09d300dc1241e5022ff54f7f3b53343a9fdfb3e3af879e54e50ab4dea5b"
   },
   "val": {
-    "n": 4692,
+    "n": 4678,
     "by_category": {
-      "single": 1443,
-      "multi_action": 1253,
-      "negation": 551,
-      "correction": 247,
-      "no_action": 1198
+      "single": 1437,
+      "multi_action": 1224,
+      "negation": 555,
+      "correction": 252,
+      "no_action": 1210
     },
-    "sha256": "3fb3e7eedcd483882de7c7ac27f3ef082a78d14b39180c719277854273913d37"
+    "sha256": "8bfc8bdce77a0b18107415ffc819c9681393608279a6b1a1840b8b7a0d3543ea"
   }
 }

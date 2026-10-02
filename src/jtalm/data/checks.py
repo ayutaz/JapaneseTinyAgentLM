@@ -5,8 +5,9 @@
 Deliberately NOT lexical label checks: requiring action keywords would keep only sentences that a
 keyword rule can parse and would inflate the rule-based baseline. Labels are confirmed by the
 cross-model verifier instead; these checks only remove malformed text and obvious negation mismatch.
-The one exception is ``v1_evidence``: it guards relabels of old (v0) rows, where the verifier's
-answer is the only source of the new label (ruling R15), not the label-first new sentences.
+The one exception is ``device_evidence``: it guards relabels of old (v0) [] rows, where the
+verifier's answer is the only source of the new label (ruling R18), not the label-first new
+sentences.
 """
 
 import re
@@ -54,69 +55,37 @@ def negation_consistent(text: str, category: str, language: str) -> bool:
     return True
 
 
-# Ruling R15: a relabel of a v0 row into schema v1 is accepted only when every v1-only element of
-# the new label has a word for it in the prompt. Matched against normalize(text).lower() (NFKC
-# folds full-width digits/letters and half-width kana). v0 elements need no evidence.
-_KANJI_DIGITS = "一二三四五六七八九十百"
-V1_EVIDENCE = {
-    "turn": (
-        r"もう(?!一度|いちど|すぐ)|さらに|もっと|そこから|今の向きから|今の位置から"
-        r"|あと(?:少し|ちょっと)|追加で|続けて"
+# Ruling R18: a v0 [] row may be relabeled only to device commands, and only when the prompt names
+# the device of every call. Matched against normalize(text).lower() (NFKC folds full-width letters
+# such as ＬＥＤ and half-width kana). Bare 音/声/光 or 明るく are not evidence: they also occur in
+# narrative sentences and in requests the device commands cannot serve (音楽, 部屋を明るく).
+DEVICE_EVIDENCE = {
+    "led": r"led|ライト|ランプ",
+    "volume": (
+        r"音量|ボリューム|ミュート|消音|静かに|しずかに|うるさ"
+        r"|音を(?:大きく|小さく|上げ|下げ)|声を(?:大きく|小さく)"
     ),
-    # a number run then 度/°, but not a lone 一度 ("once") unless the prompt talks of 角度
-    "degrees": (
-        rf"(?<![0-9{_KANJI_DIGITS}])(?!一度)[0-9{_KANJI_DIGITS}]+[^0-9{_KANJI_DIGITS}]{{0,3}}?"
-        r"(?:度|°)|^(?=.*角度).*一度"
-    ),
-    "diagonal": r"右上|左上|右下|左下|斜め|ななめ",
-    "set_led": r"led|ライト|光|ひかり|点灯|消灯|ランプ",
-    "volume": r"音量|ボリューム|音|声|静か|しずか|うるさ|ミュート|消音",
-    "brightness": r"明るさ|明るく|暗く|画面|まぶし|眩し",
-    "shake": r"首を(?:横に)?振|首振|横に振|いやいや|イヤイヤ|ぶんぶん|ふるふる|かぶりを",
-    "bow": r"お辞儀|おじぎ|オジギ|礼|一礼|頭を下げ",
-    "set_expression:angry": r"怒|おこ|ぷんぷん|むっ|ムッ",
-    "set_expression:sleepy": r"眠|ねむ|あくび|うとうと",
-    "set_expression:doubt": (
-        r"不思議|ふしぎ|困|はてな|ハテナ|首をかしげ|首を傾げ|きょとん|[?？]顔|疑問"
-    ),
-    "nod:count=4": r"4|四",
-    "nod:count=5": r"5|五",
+    "brightness": r"画面|明るさ",
 }
-_EVIDENCE_RE = {k: re.compile(v, re.DOTALL) for k, v in V1_EVIDENCE.items()}
-_DIAGONALS = ("up_left", "up_right", "down_left", "down_right")
+_EVIDENCE_RE = {k: re.compile(v) for k, v in DEVICE_EVIDENCE.items()}
+DEVICE_TOOLS = {
+    "set_led": "led",
+    "set_volume": "volume",
+    "adjust_volume": "volume",
+    "set_brightness": "brightness",
+    "adjust_brightness": "brightness",
+}
 
 
-def _v1_elements(call: dict) -> list[tuple[str, str]]:
-    """(element reported when missing, V1_EVIDENCE key) for each v1-only element of one call."""
-    name, args = call["name"], call.get("arguments") or {}
-    out: list[tuple[str, str]] = []
-    if name == "turn":
-        out.append(("turn", "turn"))
-    if name in ("look", "turn"):
-        if "degrees" in args:
-            out.append(("degrees", "degrees"))
-        if args.get("direction") in _DIAGONALS:
-            out.append(("diagonal", "diagonal"))
-    elif name in ("set_led", "shake", "bow"):
-        out.append((name, name))
-    elif name in ("set_volume", "adjust_volume"):
-        out.append((name, "volume"))
-    elif name in ("set_brightness", "adjust_brightness"):
-        out.append((name, "brightness"))
-    elif name == "set_expression" and args.get("expression") in ("angry", "sleepy", "doubt"):
-        key = f"set_expression:{args['expression']}"
-        out.append((key, key))
-    elif name == "nod" and str(args.get("count")) in ("4", "5"):
-        out.append(("nod:count", f"nod:count={args['count']}"))
-    return out
+def device_evidence(text: str, calls: list[dict]) -> list[str]:
+    """The device calls of ``calls`` whose device the prompt does not name ([] = accept).
 
-
-def v1_evidence(text: str, calls: list[dict]) -> list[str]:
-    """The v1-only elements of ``calls`` that have no lexical evidence in ``text`` ([] = accept)."""
+    Calls to other tools are not checked: only device commands may relabel a [] row.
+    """
     folded = normalize(text).lower()
     missing: list[str] = []
     for call in calls:
-        for element, key in _v1_elements(call):
-            if not _EVIDENCE_RE[key].search(folded) and element not in missing:
-                missing.append(element)
+        key = DEVICE_TOOLS.get(call["name"])
+        if key and not _EVIDENCE_RE[key].search(folded) and call["name"] not in missing:
+            missing.append(call["name"])
     return missing
