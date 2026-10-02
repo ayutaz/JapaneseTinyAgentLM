@@ -60,9 +60,14 @@ def negation_consistent(text: str, category: str, language: str) -> bool:
 _KANJI_DIGITS = "一二三四五六七八九十百"
 V1_EVIDENCE = {
     "turn": (
-        r"もう|さらに|もっと|そこから|今の向きから|今の位置から|あと(?:少し|ちょっと)|追加で|続けて"
+        r"もう(?!一度|いちど|すぐ)|さらに|もっと|そこから|今の向きから|今の位置から"
+        r"|あと(?:少し|ちょっと)|追加で|続けて"
     ),
-    "degrees": rf"[0-9{_KANJI_DIGITS}][^0-9{_KANJI_DIGITS}]{{0,3}}?(?:度|°)",
+    # a number run then 度/°, but not a lone 一度 ("once") unless the prompt talks of 角度
+    "degrees": (
+        rf"(?<![0-9{_KANJI_DIGITS}])(?!一度)[0-9{_KANJI_DIGITS}]+[^0-9{_KANJI_DIGITS}]{{0,3}}?"
+        r"(?:度|°)|^(?=.*角度).*一度"
+    ),
     "diagonal": r"右上|左上|右下|左下|斜め|ななめ",
     "set_led": r"led|ライト|光|ひかり|点灯|消灯|ランプ",
     "volume": r"音量|ボリューム|音|声|静か|しずか|うるさ|ミュート|消音",
@@ -77,7 +82,7 @@ V1_EVIDENCE = {
     "nod:count=4": r"4|四",
     "nod:count=5": r"5|五",
 }
-_EVIDENCE_RE = {k: re.compile(v) for k, v in V1_EVIDENCE.items()}
+_EVIDENCE_RE = {k: re.compile(v, re.DOTALL) for k, v in V1_EVIDENCE.items()}
 _DIAGONALS = ("up_left", "up_right", "down_left", "down_right")
 
 

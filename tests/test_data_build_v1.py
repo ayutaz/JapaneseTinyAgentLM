@@ -71,6 +71,35 @@ def test_relabel_drops_v1_labels_without_lexical_evidence() -> None:
     assert dropped == {"relabel_no_evidence": 2}
 
 
+def test_relabel_must_pass_the_negation_check_for_the_new_category() -> None:
+    slight_right = [{"name": "look", "arguments": {"direction": "right", "amount": "slight"}}]
+    shake = [{"name": "shake", "arguments": {"count": 1}}]
+    rows = [
+        row("a", "もうちょっと右に向けないで", [], TURN, "negation"),
+        row("b", "もうちょっと右に向けないで", slight_right, TURN, "single"),
+        row("c", "首を振って", slight_right, shake, "single"),
+    ]
+    cases, _, dropped = relabel(rows)
+    assert [c.id for c in cases] == ["c"]
+    assert dropped == {"relabel_from_empty": 1, "relabel_negation": 1}
+
+
+def test_empty_rows_relabel_only_to_device_commands() -> None:
+    angry = [{"name": "set_expression", "arguments": {"expression": "angry"}}]
+    led = [{"name": "set_led", "arguments": {"color": "red"}}]
+    volume = [{"name": "set_volume", "arguments": {"level": 0}}]
+    rows = [
+        row("a", "彼は怒っていた", [], angry, "no_action"),
+        row("b", "LEDを赤にして", [], led, "no_action"),
+        row("c", "静かにして", [], volume, "no_action"),
+        row("d", "LEDを赤にして怒って", [], [*led, *angry], "no_action"),
+    ]
+    cases, _, dropped = relabel(rows)
+    assert [c.id for c in cases] == ["b", "c"]
+    assert {c.category for c in cases} == {"single"}
+    assert dropped == {"relabel_from_empty": 2}
+
+
 def test_old_eval_keeps_v0_label_when_relabel_lacks_evidence(tmp_path: Path) -> None:
     src = tmp_path / "old.jsonl"
     slight_up = [{"name": "look", "arguments": {"direction": "up", "amount": "slight"}}]

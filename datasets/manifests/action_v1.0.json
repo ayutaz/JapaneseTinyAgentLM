@@ -1,13 +1,14 @@
 {
-  "created": "2026-10-02T12:32:56+00:00",
+  "created": "2026-10-02T12:39:10+00:00",
   "relabel_v0_eval": {
     "n": 1189,
     "reverify_rows": 1189,
-    "changed": 7,
+    "changed": 5,
     "overridden": 0,
-    "relabel_no_evidence": 108,
+    "relabel_no_evidence": 105,
     "verified_invalid": 4,
-    "verifier_disagrees_v0": 36
+    "verifier_disagrees_v0": 36,
+    "relabel_from_empty": 5
   },
   "relabel_human_v1": {
     "n": 1157,
@@ -15,7 +16,8 @@
     "changed": 4,
     "overridden": 0,
     "verifier_disagrees_v0": 9,
-    "relabel_no_evidence": 9
+    "relabel_from_empty": 8,
+    "relabel_no_evidence": 1
   },
   "relabel_eval_v2_amount_words": {
     "n": 278,
@@ -55,7 +57,7 @@
     "changed": 0,
     "overridden": 0,
     "verifier_disagrees_v0": 3,
-    "relabel_no_evidence": 1
+    "relabel_from_empty": 1
   },
   "relabel_eval_v2_long_preface": {
     "n": 247,
@@ -71,7 +73,7 @@
     "changed": 0,
     "overridden": 0,
     "verifier_disagrees_v0": 10,
-    "relabel_no_evidence": 4
+    "relabel_from_empty": 4
   },
   "relabel_eval_v2_numbers": {
     "n": 167,
@@ -111,7 +113,7 @@
     "changed": 1,
     "overridden": 0,
     "verifier_disagrees_v0": 6,
-    "relabel_no_evidence": 44,
+    "relabel_from_empty": 44,
     "verified_invalid": 1
   },
   "eval_v3": {
@@ -137,29 +139,32 @@
   },
   "stackchan_eval_included": true,
   "inherited_train": {
-    "n": 58803,
+    "n": 58725,
     "reverify_rows": 66800,
-    "relabeled": 432,
+    "relabeled": 354,
     "overlap_or_dup": 46,
-    "relabel_no_evidence": 5546,
+    "relabel_no_evidence": 4934,
     "verifier_disagrees_v0": 2366,
+    "relabel_from_empty": 687,
+    "relabel_negation": 3,
     "verified_invalid": 39
   },
   "inherited_val": {
-    "n": 3102,
+    "n": 3099,
     "reverify_rows": 3515,
-    "relabeled": 23,
+    "relabeled": 20,
     "overlap_or_dup": 5,
-    "relabel_no_evidence": 275,
+    "relabel_no_evidence": 244,
     "verifier_disagrees_v0": 129,
+    "relabel_from_empty": 34,
     "verified_invalid": 4
   },
   "new": {
-    "n": 31894,
+    "n": 31895,
     "single:verifier_disagrees": 7373,
-    "single:kept": 12289,
+    "single:kept": 12290,
     "single:negation_mismatch": 92,
-    "single:duplicate": 203,
+    "single:duplicate": 202,
     "multi_action:kept": 12272,
     "multi_action:verifier_disagrees": 2517,
     "multi_action:negation_mismatch": 114,
@@ -180,25 +185,25 @@
     "multi_action:malformed": 12
   },
   "train": {
-    "n": 89102,
+    "n": 89025,
     "by_category": {
-      "single": 27616,
-      "multi_action": 23515,
-      "negation": 10371,
-      "correction": 4959,
-      "no_action": 22641
+      "single": 27597,
+      "multi_action": 23467,
+      "negation": 10378,
+      "correction": 4951,
+      "no_action": 22632
     },
-    "sha256": "fc039a1eae25247f372593b96f658e00d3995d65979785ac39ecff7951d6559e"
+    "sha256": "9be97ffa9637e90be0269ec0489facfbb4a400e06e9717359bb8af5c55b333c4"
   },
   "val": {
-    "n": 4697,
+    "n": 4694,
     "by_category": {
-      "single": 1463,
-      "multi_action": 1244,
-      "negation": 558,
-      "correction": 243,
-      "no_action": 1189
+      "single": 1443,
+      "multi_action": 1253,
+      "negation": 551,
+      "correction": 249,
+      "no_action": 1198
     },
-    "sha256": "5aa4298aacd62cb6906390be481f0c6d4c5e645e867a8d1e9cff763123bf9412"
+    "sha256": "0dda7f519e1a07575cc370dcf5a71f7b9b9507d5503579bd4080b276ce3d6cd8"
   }
 }

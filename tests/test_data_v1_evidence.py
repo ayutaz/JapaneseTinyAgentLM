@@ -108,3 +108,23 @@ def test_v1_evidence_rejects(text: str, calls: list, missing: list) -> None:
 )
 def test_v0_elements_need_no_evidence(calls: list) -> None:
     assert v1_evidence("こんにちは", calls) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "calls", "missing"),
+    [
+        ("もう一度右を向いて", [TURN], ["turn"]),
+        ("もういちど右", [TURN], ["turn"]),
+        ("もうすぐ左向いて", [TURN], ["turn"]),
+        ("もう一度、もう少し右", [TURN], []),
+        ("もう一度右を向いて", [c("look", direction="right", degrees=1)], ["degrees"]),
+        ("一度だけ右に", [c("look", direction="right", degrees=1)], ["degrees"]),
+        ("もう一度右に30度", [c("look", direction="right", degrees=30)], []),
+        ("十一度右に", [c("look", direction="right", degrees=11)], []),
+        ("1度右に", [c("look", direction="right", degrees=1)], []),
+        ("右に一°", [c("look", direction="right", degrees=1)], []),
+        ("角度を一度だけ右に", [c("look", direction="right", degrees=1)], []),
+    ],
+)
+def test_once_and_soon_are_not_evidence(text: str, calls: list, missing: list) -> None:
+    assert v1_evidence(text, calls) == missing
