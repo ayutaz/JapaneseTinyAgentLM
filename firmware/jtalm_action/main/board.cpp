@@ -247,6 +247,9 @@ extern "C" int board_volume(int level, int beep) {
 // the touch controller and the PY32, hence the lock.
 extern "C" int board_brightness(int level) {
   if (g_gfx_lock == nullptr) return -1;
+  // The floor is kept here, whatever the caller passes: 0 would switch DLDO1 off (no backlight).
+  if (level < ACT_BRIGHTNESS_MIN) level = ACT_BRIGHTNESS_MIN;
+  if (level > ACT_LEVEL_MAX) level = ACT_LEVEL_MAX;
   xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
   M5.Display.setBrightness((uint8_t)lround(level * 255.0 / 100.0));
   xSemaphoreGive(g_gfx_lock);

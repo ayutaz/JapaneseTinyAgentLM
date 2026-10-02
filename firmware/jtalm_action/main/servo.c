@@ -375,7 +375,10 @@ static void run_plan(const msg_t *m) {
       }
       default:  // a step kind this dispatcher does not know: nothing is done
         out_lock();
-        printf("JTALM {\"t\":\"error\",\"msg\":\"unknown step kind %d\"}\n", s->kind);
+        printf(
+            "JTALM {\"t\":\"error\",\"seq\":%" PRIu32 ",\"msg\":\"unknown step kind %d\"}\n",
+            m->seq, s->kind
+        );
         out_unlock();
         break;
     }
@@ -401,13 +404,14 @@ static void run_plan(const msg_t *m) {
       r.err ? "\"" : "", g_yaw, g_pitch, present[0], present[1]
   );
   out_unlock();
-  // NVS is written after the plan, outside its watchdog deadline.
+  // A fault first: torque off and VM_EN low never wait for the NVS write (a page erase can
+  // take tens of ms). NVS is written after the plan, outside its watchdog deadline.
+  if (r.err) fault(r.err);
   if (changed && settings_save(&g_settings) != 0) {
     out_lock();
     printf("JTALM {\"t\":\"error\",\"msg\":\"settings save failed\"}\n");
     out_unlock();
   }
-  if (r.err) fault(r.err);
 }
 
 // VM_EN on, then ping both servos every POWER_POLL_MS until they answer (the SCS0009 needs

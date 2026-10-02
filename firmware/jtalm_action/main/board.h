@@ -56,7 +56,8 @@ int board_led_cfg(void);
 // Returns 0, or -1 when the speaker did not start (the volume is still kept).
 int board_volume(int level, int beep);
 
-// Backlight 0..100 (M5.Display 0..255).
+// Backlight 0..100 (M5.Display 0..255), clamped here to ACT_BRIGHTNESS_MIN..100: the screen
+// is never turned dark (0 would switch the backlight supply off).
 int board_brightness(int level);
 
 // The present backlight as 0..100 (the boot default when NVS has none).

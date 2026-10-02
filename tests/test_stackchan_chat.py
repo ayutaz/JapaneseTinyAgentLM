@@ -60,6 +60,14 @@ def test_show_setting_records(capsys: pytest.CaptureFixture[str]) -> None:
     show({"t": "setting", "seq": 4, "what": "led", "color": "off", "ok": 0}, False)
     show({"t": "setting", "seq": 5}, False)
     show({"t": "setting", "what": "speed", "level": 3}, False)
+    show({"t": "setting", "seq": 6, "what": "led", "ok": 1}, False)
     lines = capsys.readouterr().out.splitlines()
-    assert lines[:4] == ["  音量: 50", "  画面の明るさ: 5", "  LED: 青", "  LED: 消灯（失敗）"]
-    assert len(lines) == 6
+    assert lines == [
+        "  音量: 50",
+        "  画面の明るさ: 5",
+        "  LED: 青",
+        "  LED: 消灯（失敗）",
+        "  ?: ?",
+        "  speed: 3",
+        "  LED: ?",
+    ]

@@ -105,9 +105,10 @@ def show(rec: dict, verbose: bool) -> None:
         # The device's record (servo.c): "what" is volume / brightness (with "level") or led
         # (with "color"). Anything else is printed as it came, never raised in the reader.
         kind = rec.get("what")
-        what = {"volume": "音量", "brightness": "画面の明るさ", "led": "LED"}.get(kind, kind)
+        what = {"volume": "音量", "brightness": "画面の明るさ", "led": "LED"}.get(kind, kind or "?")
         if kind == "led":
-            value = COLOR_JA.get(rec.get("color"), "消灯")
+            color = rec.get("color")
+            value = "消灯" if color == "off" else COLOR_JA.get(color, color or "?")
         else:
             value = rec.get("level", rec.get("color", "?"))
         failed = "" if rec.get("ok", 1) else "（失敗）"
