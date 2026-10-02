@@ -19,6 +19,8 @@ the head is centered and servo output is turned off (`!servo off`).
 `--section` picks a part: act (v0 head moves and faces), setting (v1 faces, LED, volume and
 brightness, no motion; the device's `setting` records must show the expected values), motion
 (v1 head moves: degrees, turn, diagonals, shake, bow), lm (utterances through the LM), all.
+`--stop-during-bow` (with `--servo`) sends `!stop` in the middle of the bow hold and checks
+the abort from `act_done` (aborted, within 500 ms, `vm_off` 0); it runs no other items.
 """
 
 import argparse
@@ -237,6 +239,11 @@ def main() -> int:
     ap.add_argument("--section", choices=["act", "lm", "setting", "motion", "all"], default="all")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between items")
     ap.add_argument("--only", help="run only the items whose label or line contains this")
+    ap.add_argument(
+        "--stop-during-bow",
+        action="store_true",
+        help="send !stop while the bow holds; checks that the stop is immediate",
+    )
     ap.add_argument("--out", type=Path, required=True)
     args = ap.parse_args()
 
@@ -273,6 +280,23 @@ def main() -> int:
                 # wait_for("servo") has already passed it; wait for its completion instead.
                 dev.wait_for("act_done", 15.0, keep)
                 check(keep)
+            if args.stop_during_bow:
+                dev.send(act([tool("bow")]))
+                a = dev.wait_for("act", 10.0, keep)
+                down_ms = a["steps"][0]["ms"]
+                time.sleep((down_ms + 250) / 1000)  # in the 500 ms hold
+                t0 = time.monotonic()
+                dev.send("!stop")
+                stop = dev.wait_for("stop", 2.0, keep)
+                done = dev.wait_for("act_done", 2.0, keep)
+                ms = (time.monotonic() - t0) * 1000
+                print(
+                    f"stop: {stop}\nact_done: aborted={done['aborted']} in {ms:.0f} ms",
+                    flush=True,
+                )
+                if not done["aborted"] or stop.get("vm_off") != 0 or ms > 500:
+                    raise Stopped("bow was not stopped at once")
+                items = []
             for i, (label, line, expect, want) in enumerate(items):
                 print(f"[{i + 1}/{len(items)}]", end=" ", flush=True)
                 run_item(dev, label, line, expect, f, keep, want)
