@@ -232,6 +232,38 @@ def run_item(
     )
 
 
+def stop_during_bow(dev, keep: list, now=time.monotonic, sleep=time.sleep) -> dict:
+    """Sends a bow, `!stop` in the middle of its hold; checks the stop was immediate.
+
+    The firmware may print `stop` and `act_done` in either order, so both are waited for and
+    the latency is taken at the later one. Raises Stopped when the bow was not stopped at once
+    (not aborted, servo power not cut, over 500 ms, or the stop did not land in the hold).
+    """
+    dev.send(act([tool("bow")]))
+    a = dev.wait_for("act", 10.0, keep)
+    first = a["steps"][0]
+    if first["k"] != "move":
+        raise Stopped(f"bow plan does not start with the down move: {first}")
+    down_ms = first["ms"]
+    sleep((down_ms + 250) / 1000)  # in the 500 ms hold
+    t0 = now()
+    dev.send("!stop")
+    seen: list[dict] = []
+    # wait_for passes over (and records in `seen`) any other record, so an act_done printed
+    # before the stop record is still found.
+    stop = dev.wait_for("stop", 2.0, seen)
+    done = next((r for r in seen if r.get("t") == "act_done"), None)
+    if done is None:
+        done = dev.wait_for("act_done", 2.0, seen)
+    ms = (now() - t0) * 1000
+    print(f"stop: {stop}\nact_done: aborted={done['aborted']} in {ms:.0f} ms", flush=True)
+    if not done["aborted"] or stop.get("vm_off") != 0 or ms > 500:
+        raise Stopped("bow was not stopped at once")
+    if not (done["ms"] < done["planned_ms"] and down_ms <= done["ms"] < down_ms + 500):
+        raise Stopped(f"the stop did not land in the bow hold: {done}, down {down_ms} ms")
+    return {"stop": stop, "act_done": done, "ms": ms}
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True, help="serial port, e.g. COM3 or /dev/ttyACM0")
@@ -281,21 +313,9 @@ def main() -> int:
                 dev.wait_for("act_done", 15.0, keep)
                 check(keep)
             if args.stop_during_bow:
-                dev.send(act([tool("bow")]))
-                a = dev.wait_for("act", 10.0, keep)
-                down_ms = a["steps"][0]["ms"]
-                time.sleep((down_ms + 250) / 1000)  # in the 500 ms hold
-                t0 = time.monotonic()
-                dev.send("!stop")
-                stop = dev.wait_for("stop", 2.0, keep)
-                done = dev.wait_for("act_done", 2.0, keep)
-                ms = (time.monotonic() - t0) * 1000
-                print(
-                    f"stop: {stop}\nact_done: aborted={done['aborted']} in {ms:.0f} ms",
-                    flush=True,
-                )
-                if not done["aborted"] or stop.get("vm_off") != 0 or ms > 500:
-                    raise Stopped("bow was not stopped at once")
+                stop_during_bow(dev, keep)
+                keep.clear()  # the stop record is expected here; check() must not raise on it
+                print("bow stop OK", flush=True)
                 items = []
             for i, (label, line, expect, want) in enumerate(items):
                 print(f"[{i + 1}/{len(items)}]", end=" ", flush=True)
