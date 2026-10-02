@@ -27,7 +27,8 @@ from pathlib import Path
 from lm_serial import Device
 
 STEP_DEG = 5
-TOLERANCE_DEG = 2.0  # present vs target; more means the head did not get there
+TOLERANCE_DEG = 2.0  # tested axis: present vs target; more means the head did not get there
+OTHER_AXIS_TOLERANCE_DEG = 4.0  # untouched axis: gravity/backlash drift (2.8 deg seen on the K151)
 YAW_RAW_ZERO, PITCH_RAW_ZERO, DEG_PER_RAW = 460, 620, 5 / 16
 
 
@@ -37,6 +38,15 @@ def poses(axis: str, limit: int) -> list[tuple[int, int]]:
         return [(y, 0) for y in right] + [(0, 0)] + [(-y, 0) for y in right] + [(0, 0)]
     up = list(range(15, limit + 1, STEP_DEG))
     return [(0, p) for p in up] + [(0, -10), (0, 0)]
+
+
+def judge(
+    axis: str, got: tuple[float, float], target: tuple[int, int]
+) -> tuple[bool, float, float]:
+    """(ng, tested-axis offset, other-axis offset) in degrees."""
+    d_yaw, d_pitch = abs(got[0] - target[0]), abs(got[1] - target[1])
+    tested, other = (d_yaw, d_pitch) if axis == "yaw" else (d_pitch, d_yaw)
+    return tested > TOLERANCE_DEG or other > OTHER_AXIS_TOLERANCE_DEG, tested, other
 
 
 def main() -> int:
@@ -82,11 +92,13 @@ def main() -> int:
                     raise RuntimeError(f"servo position unreadable: {done}")
                 got = ((YAW_RAW_ZERO - py) * DEG_PER_RAW, (pp - PITCH_RAW_ZERO) * DEG_PER_RAW)
                 target = a["steps"][0]["yaw"], a["steps"][0]["pitch"]
-                off = max(abs(got[0] - target[0]), abs(got[1] - target[1]))
-                note = "" if off <= TOLERANCE_DEG else "  NG: did not reach the target"
+                ng, _, other = judge(args.axis, got, target)
+                other_name = "pitch" if args.axis == "yaw" else "yaw"
+                note = "  NG: did not reach the target" if ng else ""
                 clamp = " (clamped)" if a["steps"][0]["clamped"] else ""
                 print(f"yaw {target[0]:+d} pitch {target[1]:+d}{clamp}: present "
-                      f"({got[0]:+.1f}, {got[1]:+.1f}){note}", flush=True)  # fmt: skip
+                      f"({got[0]:+.1f}, {got[1]:+.1f}) "
+                      f"{other_name} off {other:.1f}{note}", flush=True)  # fmt: skip
                 recs.append({"target": target, "present_deg": got, "act": a, "done": done})
                 if note:
                     raise RuntimeError(f"NG at {target}: the head did not reach the target")
