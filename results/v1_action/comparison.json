@@ -1,0 +1,3020 @@
+{
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "gate": [
+    {
+      "threshold": 0.88506,
+      "val_exact_no_gate": 0.9828986746472852,
+      "val_exact_gated": 0.9779820436083797
+    },
+    {
+      "threshold": 0.90821,
+      "val_exact_no_gate": 0.9820436083796494,
+      "val_exact_gated": 0.9771269773407439
+    },
+    {
+      "threshold": 0.86172,
+      "val_exact_no_gate": 0.9811885421120137,
+      "val_exact_gated": 0.9762719110731082
+    },
+    {
+      "threshold": 0.93985,
+      "val_exact_no_gate": 0.9820436083796494,
+      "val_exact_gated": 0.9771269773407439
+    },
+    {
+      "threshold": 0.90449,
+      "val_exact_no_gate": 0.9811885421120137,
+      "val_exact_gated": 0.9762719110731082
+    }
+  ],
+  "criterion1_user_sentences": {
+    "sc-u1": {
+      "prompt": "LEDライトの色を青にして",
+      "expected": [
+        {
+          "name": "set_led",
+          "arguments": {
+            "color": "blue"
+          }
+        }
+      ],
+      "exact_per_seed": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "seed0_output": "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]",
+      "seed0_raw_output": "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]",
+      "seed0_min_prob": 0.99974,
+      "outputs_per_seed": [
+        "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]",
+        "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]",
+        "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]",
+        "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]",
+        "[{\"name\":\"set_led\",\"arguments\":{\"color\":\"blue\"}}]"
+      ]
+    },
+    "sc-u2": {
+      "prompt": "音声の音量を50にして",
+      "expected": [
+        {
+          "name": "set_volume",
+          "arguments": {
+            "level": 50
+          }
+        }
+      ],
+      "exact_per_seed": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "seed0_output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]",
+      "seed0_raw_output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]",
+      "seed0_min_prob": 0.99996,
+      "outputs_per_seed": [
+        "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]",
+        "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]",
+        "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]",
+        "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]",
+        "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]"
+      ]
+    },
+    "sc-u3": {
+      "prompt": "頭を90度上に向けて",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "up",
+            "degrees": 90
+          }
+        }
+      ],
+      "exact_per_seed": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "seed0_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]",
+      "seed0_raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]",
+      "seed0_min_prob": 0.99992,
+      "outputs_per_seed": [
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]"
+      ]
+    },
+    "sc-u4": {
+      "prompt": "顔を右に45度向いて",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "right",
+            "degrees": 45
+          }
+        }
+      ],
+      "exact_per_seed": [
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "seed0_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]",
+      "seed0_raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]",
+      "seed0_min_prob": 0.99977,
+      "outputs_per_seed": [
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]",
+        "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]"
+      ]
+    }
+  },
+  "criterion2_stackchan": {
+    "per_seed": [
+      {
+        "exact": 0.9285714285714286,
+        "n": 140,
+        "n_empty": 65,
+        "false_actions": 0,
+        "false_action_ids": [],
+        "by_source": {
+          "verbatim": {
+            "n": 97,
+            "exact": 0.9484536082474226
+          },
+          "user": {
+            "n": 4,
+            "exact": 1.0
+          },
+          "paraphrase": {
+            "n": 39,
+            "exact": 0.8717948717948718
+          }
+        },
+        "by_tool": {
+          "look": {
+            "n": 52,
+            "exact": 0.8653846153846154
+          },
+          "turn": {
+            "n": 0,
+            "exact": null
+          }
+        },
+        "numeric_gated_rate": 0.09090909090909091
+      },
+      {
+        "exact": 0.9428571428571428,
+        "n": 140,
+        "n_empty": 65,
+        "false_actions": 0,
+        "false_action_ids": [],
+        "by_source": {
+          "verbatim": {
+            "n": 97,
+            "exact": 0.9484536082474226
+          },
+          "user": {
+            "n": 4,
+            "exact": 1.0
+          },
+          "paraphrase": {
+            "n": 39,
+            "exact": 0.9230769230769231
+          }
+        },
+        "by_tool": {
+          "look": {
+            "n": 52,
+            "exact": 0.9230769230769231
+          },
+          "turn": {
+            "n": 0,
+            "exact": null
+          }
+        },
+        "numeric_gated_rate": 0.09090909090909091
+      },
+      {
+        "exact": 0.95,
+        "n": 140,
+        "n_empty": 65,
+        "false_actions": 0,
+        "false_action_ids": [],
+        "by_source": {
+          "verbatim": {
+            "n": 97,
+            "exact": 0.9381443298969072
+          },
+          "user": {
+            "n": 4,
+            "exact": 1.0
+          },
+          "paraphrase": {
+            "n": 39,
+            "exact": 0.9743589743589743
+          }
+        },
+        "by_tool": {
+          "look": {
+            "n": 52,
+            "exact": 0.9423076923076923
+          },
+          "turn": {
+            "n": 0,
+            "exact": null
+          }
+        },
+        "numeric_gated_rate": 0.0
+      },
+      {
+        "exact": 0.95,
+        "n": 140,
+        "n_empty": 65,
+        "false_actions": 0,
+        "false_action_ids": [],
+        "by_source": {
+          "verbatim": {
+            "n": 97,
+            "exact": 0.9381443298969072
+          },
+          "user": {
+            "n": 4,
+            "exact": 1.0
+          },
+          "paraphrase": {
+            "n": 39,
+            "exact": 0.9743589743589743
+          }
+        },
+        "by_tool": {
+          "look": {
+            "n": 52,
+            "exact": 0.9423076923076923
+          },
+          "turn": {
+            "n": 0,
+            "exact": null
+          }
+        },
+        "numeric_gated_rate": 0.09090909090909091
+      },
+      {
+        "exact": 0.95,
+        "n": 140,
+        "n_empty": 65,
+        "false_actions": 0,
+        "false_action_ids": [],
+        "by_source": {
+          "verbatim": {
+            "n": 97,
+            "exact": 0.9484536082474226
+          },
+          "user": {
+            "n": 4,
+            "exact": 1.0
+          },
+          "paraphrase": {
+            "n": 39,
+            "exact": 0.9487179487179487
+          }
+        },
+        "by_tool": {
+          "look": {
+            "n": 52,
+            "exact": 0.9423076923076923
+          },
+          "turn": {
+            "n": 0,
+            "exact": null
+          }
+        },
+        "numeric_gated_rate": 0.09090909090909091
+      }
+    ],
+    "exact": {
+      "mean": 0.9442857142857143,
+      "sd": 0.009313146293146607,
+      "per_seed": [
+        0.9285714285714286,
+        0.9428571428571428,
+        0.95,
+        0.95,
+        0.95
+      ]
+    },
+    "false_actions": {
+      "mean": 0.0,
+      "sd": 0.0,
+      "per_seed": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "by_source": {
+      "verbatim": {
+        "mean": 0.9443298969072165,
+        "sd": 0.00564662430417695,
+        "per_seed": [
+          0.9484536082474226,
+          0.9484536082474226,
+          0.9381443298969072,
+          0.9381443298969072,
+          0.9484536082474226
+        ]
+      },
+      "user": {
+        "mean": 1.0,
+        "sd": 0.0,
+        "per_seed": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "paraphrase": {
+        "mean": 0.9384615384615385,
+        "sd": 0.04290564238636283,
+        "per_seed": [
+          0.8717948717948718,
+          0.9230769230769231,
+          0.9743589743589743,
+          0.9743589743589743,
+          0.9487179487179487
+        ]
+      }
+    },
+    "by_tool": {
+      "look": {
+        "mean": 0.9230769230769231,
+        "sd": 0.03330866937632454,
+        "per_seed": [
+          0.8653846153846154,
+          0.9230769230769231,
+          0.9423076923076923,
+          0.9423076923076923,
+          0.9423076923076923
+        ]
+      },
+      "turn": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      }
+    }
+  },
+  "stackchan_seed0_errors": [
+    {
+      "id": "sc-002",
+      "prompt": "左に頭を回して。",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "left",
+            "amount": "normal"
+          }
+        }
+      ],
+      "output": "[]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+      "min_prob": 0.65209,
+      "gated": true,
+      "wrong_in_seeds": 1
+    },
+    {
+      "id": "sc-021",
+      "prompt": "首をかしげて",
+      "expected": [
+        {
+          "name": "set_expression",
+          "arguments": {
+            "expression": "doubt"
+          }
+        }
+      ],
+      "output": "[]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"down\",\"amount\":\"normal\"}}]",
+      "min_prob": 0.84919,
+      "gated": true,
+      "wrong_in_seeds": 5
+    },
+    {
+      "id": "sc-025",
+      "prompt": "少し大きくして",
+      "expected": [
+        {
+          "name": "adjust_volume",
+          "arguments": {
+            "direction": "up",
+            "amount": "slight"
+          }
+        }
+      ],
+      "output": "[]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"amount\":\"large\"}}]",
+      "min_prob": 0.76676,
+      "gated": true,
+      "wrong_in_seeds": 5
+    },
+    {
+      "id": "sc-048",
+      "prompt": "頭を左に18度動かして",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "left",
+            "degrees": 18
+          }
+        }
+      ],
+      "output": "[]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"degrees\":180}}]",
+      "min_prob": 0.50689,
+      "gated": true,
+      "wrong_in_seeds": 5
+    },
+    {
+      "id": "sc-052",
+      "prompt": "興味津々な顔して",
+      "expected": [
+        {
+          "name": "set_expression",
+          "arguments": {
+            "expression": "doubt"
+          }
+        }
+      ],
+      "output": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"surprised\"}}]",
+      "raw_output": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"surprised\"}}]",
+      "min_prob": 0.95559,
+      "gated": false,
+      "wrong_in_seeds": 5
+    },
+    {
+      "id": "sc-p-d4c660290552",
+      "prompt": "左下方向に少し首を傾けてもらえますか。",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "down_left",
+            "amount": "slight"
+          }
+        }
+      ],
+      "output": "[]",
+      "raw_output": "[{\"name\":\"turn\",\"arguments\":{\"direction\":\"down_left\",\"amount\":\"slight\"}}]",
+      "min_prob": 0.67316,
+      "gated": true,
+      "wrong_in_seeds": 1
+    },
+    {
+      "id": "sc-p-ffdbf47c2082",
+      "prompt": "ひだりうえをむく",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "up_left",
+            "amount": "normal"
+          }
+        }
+      ],
+      "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+      "min_prob": 0.99701,
+      "gated": false,
+      "wrong_in_seeds": 2
+    },
+    {
+      "id": "sc-p-5ec50c040fd7",
+      "prompt": "左下の方へちょっとだけ首を動かしてごらん。",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "down_left",
+            "amount": "slight"
+          }
+        }
+      ],
+      "output": "[{\"name\":\"turn\",\"arguments\":{\"direction\":\"down_left\",\"amount\":\"slight\"}}]",
+      "raw_output": "[{\"name\":\"turn\",\"arguments\":{\"direction\":\"down_left\",\"amount\":\"slight\"}}]",
+      "min_prob": 0.99956,
+      "gated": false,
+      "wrong_in_seeds": 5
+    },
+    {
+      "id": "sc-p-c0a9f466af98",
+      "prompt": "左上をちょっと眺める感じで動かしてみて",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "up_left",
+            "amount": "slight"
+          }
+        }
+      ],
+      "output": "[]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up_left\",\"amount\":\"slight\"}}]",
+      "min_prob": 0.82254,
+      "gated": true,
+      "wrong_in_seeds": 1
+    },
+    {
+      "id": "sc-p-a4290ee88d51",
+      "prompt": "ひだりうえをむいて",
+      "expected": [
+        {
+          "name": "look",
+          "arguments": {
+            "direction": "up_left",
+            "amount": "normal"
+          }
+        }
+      ],
+      "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+      "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"amount\":\"normal\"}}]",
+      "min_prob": 0.99725,
+      "gated": false,
+      "wrong_in_seeds": 2
+    }
+  ],
+  "criterion3_human_negatives": {
+    "n": 1092,
+    "false_action_rate": {
+      "mean": 0.0014652014652014652,
+      "sd": 0.0010441166896512253,
+      "per_seed": [
+        0.0027472527472527475,
+        0.0009157509157509158,
+        0.0018315018315018315,
+        0.0018315018315018315,
+        0.0
+      ]
+    },
+    "false_actions_per_seed": [
+      3,
+      1,
+      2,
+      2,
+      0
+    ],
+    "seed0_false_actions": [
+      {
+        "id": "human-39062fdddcb0",
+        "source": "human:yj_ambig",
+        "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"amount\":\"slight\"}}]"
+      },
+      {
+        "id": "human-3fe44f3e2396",
+        "source": "human:jcre3",
+        "output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]"
+      },
+      {
+        "id": "human-415740180240",
+        "source": "human:jcre3",
+        "output": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"sad\"}}]"
+      }
+    ]
+  },
+  "criterion4_human_positives": {
+    "n": 65,
+    "exact": {
+      "mean": 0.916923076923077,
+      "sd": 0.020640627484613427,
+      "per_seed": [
+        0.9384615384615385,
+        0.9384615384615385,
+        0.8923076923076924,
+        0.9076923076923077,
+        0.9076923076923077
+      ]
+    },
+    "v051_reference": {
+      "mean": 0.852,
+      "sd": 0.064
+    },
+    "seed0_errors": [
+      {
+        "id": "human-86c1770b2c92",
+        "source": "human:jesc",
+        "expected": [
+          {
+            "name": "look",
+            "arguments": {
+              "direction": "center",
+              "amount": "normal"
+            }
+          }
+        ],
+        "output": "[]",
+        "raw_output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"down\",\"amount\":\"normal\"}}]",
+        "min_prob": 0.50929
+      },
+      {
+        "id": "human-657c7ccdbe1a",
+        "source": "human:jesc",
+        "expected": [
+          {
+            "name": "set_expression",
+            "arguments": {
+              "expression": "happy"
+            }
+          }
+        ],
+        "output": "[]",
+        "raw_output": "[{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"happy\"}}]",
+        "min_prob": 0.7702
+      },
+      {
+        "id": "human-b2a162d9aa43",
+        "source": "human:jesc",
+        "expected": [
+          {
+            "name": "look",
+            "arguments": {
+              "direction": "center",
+              "amount": "normal"
+            }
+          }
+        ],
+        "output": "[]",
+        "raw_output": "[]",
+        "min_prob": 0.55432
+      },
+      {
+        "id": "human-76c46889282f",
+        "source": "human:yj_ambig+relabel:v1",
+        "expected": [
+          {
+            "name": "adjust_volume",
+            "arguments": {
+              "direction": "up",
+              "amount": "normal"
+            }
+          }
+        ],
+        "output": "[]",
+        "raw_output": "[{\"name\":\"adjust_volume\",\"arguments\":{\"direction\":\"up\",\"amount\":\"large\"}}]",
+        "min_prob": 0.60895
+      }
+    ]
+  },
+  "sets": {
+    "Stack-chan v1": {
+      "exact": {
+        "mean": 0.9442857142857143,
+        "sd": 0.009313146293146607,
+        "per_seed": [
+          0.9285714285714286,
+          0.9428571428571428,
+          0.95,
+          0.95,
+          0.95
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.896,
+        "sd": 0.01738453974720703,
+        "per_seed": [
+          0.8666666666666667,
+          0.8933333333333333,
+          0.9066666666666666,
+          0.9066666666666666,
+          0.9066666666666666
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "per_seed": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": 0.07272727272727272,
+        "sd": 0.040655781409087086,
+        "per_seed": [
+          0.09090909090909091,
+          0.09090909090909091,
+          0.0,
+          0.09090909090909091,
+          0.09090909090909091
+        ]
+      },
+      "n": 140,
+      "n_empty": 65
+    },
+    "eval v3 (LLM)": {
+      "exact": {
+        "mean": 0.9526431718061674,
+        "sd": 0.00460715873642113,
+        "per_seed": [
+          0.9520925110132159,
+          0.947136563876652,
+          0.9598017621145375,
+          0.9531938325991189,
+          0.9509911894273128
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.9330689928628073,
+        "sd": 0.006743014010937744,
+        "per_seed": [
+          0.9318001586042823,
+          0.9254559873116575,
+          0.943695479777954,
+          0.9341792228390167,
+          0.9302141157811261
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.002882882882882883,
+        "sd": 0.0009868874910002993,
+        "per_seed": [
+          0.0018018018018018018,
+          0.0036036036036036037,
+          0.0036036036036036037,
+          0.0036036036036036037,
+          0.0018018018018018018
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": 0.03253886010362694,
+        "sd": 0.005314354986511124,
+        "per_seed": [
+          0.035233160621761656,
+          0.0383419689119171,
+          0.025906735751295335,
+          0.035233160621761656,
+          0.027979274611398965
+        ]
+      },
+      "n": 1816,
+      "n_empty": 555
+    },
+    "v0 eval (LLM)": {
+      "exact": {
+        "mean": 0.9187552565180824,
+        "sd": 0.005935165269765291,
+        "per_seed": [
+          0.9091673675357443,
+          0.9201009251471826,
+          0.9243061396131202,
+          0.9175777964676198,
+          0.9226240538267452
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.8386986301369863,
+        "sd": 0.009716617095281568,
+        "per_seed": [
+          0.8236301369863014,
+          0.8424657534246576,
+          0.8493150684931506,
+          0.8356164383561644,
+          0.8424657534246576
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.003966942148760331,
+        "sd": 0.00300262845034462,
+        "per_seed": [
+          0.008264462809917356,
+          0.0049586776859504135,
+          0.003305785123966942,
+          0.003305785123966942,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 1189,
+      "n_empty": 605
+    },
+    "human v1": {
+      "exact": {
+        "mean": 0.9939498703543648,
+        "sd": 0.0013665849871081837,
+        "per_seed": [
+          0.9939498703543648,
+          0.9956784788245462,
+          0.9922212618841832,
+          0.993085566119274,
+          0.9948141745894555
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.916923076923077,
+        "sd": 0.020640627484613427,
+        "per_seed": [
+          0.9384615384615385,
+          0.9384615384615385,
+          0.8923076923076924,
+          0.9076923076923077,
+          0.9076923076923077
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.0014652014652014652,
+        "sd": 0.0010441166896512253,
+        "per_seed": [
+          0.0027472527472527475,
+          0.0009157509157509158,
+          0.0018315018315018315,
+          0.0018315018315018315,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 1157,
+      "n_empty": 1092
+    },
+    "v2/amount_words": {
+      "exact": {
+        "mean": 0.8575539568345324,
+        "sd": 0.02044355717752924,
+        "per_seed": [
+          0.8489208633093526,
+          0.8812949640287769,
+          0.8633093525179856,
+          0.8273381294964028,
+          0.8669064748201439
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.8575539568345324,
+        "sd": 0.02044355717752924,
+        "per_seed": [
+          0.8489208633093526,
+          0.8812949640287769,
+          0.8633093525179856,
+          0.8273381294964028,
+          0.8669064748201439
+        ]
+      },
+      "false_action_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 278,
+      "n_empty": 0
+    },
+    "v2/center_phrasing": {
+      "exact": {
+        "mean": 0.9408071748878923,
+        "sd": 0.02273325893387728,
+        "per_seed": [
+          0.9461883408071748,
+          0.9641255605381166,
+          0.905829596412556,
+          0.9327354260089686,
+          0.9551569506726457
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.9408071748878923,
+        "sd": 0.02273325893387728,
+        "per_seed": [
+          0.9461883408071748,
+          0.9641255605381166,
+          0.905829596412556,
+          0.9327354260089686,
+          0.9551569506726457
+        ]
+      },
+      "false_action_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 223,
+      "n_empty": 0
+    },
+    "v2/correction": {
+      "exact": {
+        "mean": 0.8590909090909091,
+        "sd": 0.019015000603047155,
+        "per_seed": [
+          0.8409090909090909,
+          0.8636363636363636,
+          0.8636363636363636,
+          0.8863636363636364,
+          0.8409090909090909
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.8590909090909091,
+        "sd": 0.019015000603047155,
+        "per_seed": [
+          0.8409090909090909,
+          0.8636363636363636,
+          0.8636363636363636,
+          0.8863636363636364,
+          0.8409090909090909
+        ]
+      },
+      "false_action_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 44,
+      "n_empty": 0
+    },
+    "v2/english": {
+      "exact": {
+        "mean": 0.4714285714285714,
+        "sd": 0.03350296971302449,
+        "per_seed": [
+          0.4857142857142857,
+          0.5,
+          0.4714285714285714,
+          0.4142857142857143,
+          0.4857142857142857
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.06842105263157894,
+        "sd": 0.04780500559101302,
+        "per_seed": [
+          0.10526315789473684,
+          0.13157894736842105,
+          0.02631578947368421,
+          0.02631578947368421,
+          0.05263157894736842
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.05,
+        "sd": 0.05229125165837972,
+        "per_seed": [
+          0.0625,
+          0.0625,
+          0.0,
+          0.125,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 70,
+      "n_empty": 32
+    },
+    "v2/fragments": {
+      "exact": {
+        "mean": 1.0,
+        "sd": 0.0,
+        "per_seed": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "requests_exact": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "per_seed": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 182,
+      "n_empty": 182
+    },
+    "v2/long_preface": {
+      "exact": {
+        "mean": 0.8785425101214575,
+        "sd": 0.017176682943802753,
+        "per_seed": [
+          0.8744939271255061,
+          0.8906882591093117,
+          0.8906882591093117,
+          0.8502024291497976,
+          0.8866396761133604
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.8785425101214575,
+        "sd": 0.017176682943802753,
+        "per_seed": [
+          0.8744939271255061,
+          0.8906882591093117,
+          0.8906882591093117,
+          0.8502024291497976,
+          0.8866396761133604
+        ]
+      },
+      "false_action_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 247,
+      "n_empty": 0
+    },
+    "v2/negation_forms": {
+      "exact": {
+        "mean": 1.0,
+        "sd": 0.0,
+        "per_seed": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      },
+      "requests_exact": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "per_seed": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 168,
+      "n_empty": 168
+    },
+    "v2/numbers": {
+      "exact": {
+        "mean": 0.8526946107784431,
+        "sd": 0.02859242248218761,
+        "per_seed": [
+          0.874251497005988,
+          0.8143712574850299,
+          0.8862275449101796,
+          0.8383233532934131,
+          0.8502994011976048
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.6253968253968254,
+        "sd": 0.07579261197659251,
+        "per_seed": [
+          0.6825396825396826,
+          0.5238095238095238,
+          0.7142857142857143,
+          0.5873015873015873,
+          0.6190476190476191
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.009615384615384616,
+        "sd": 0.0,
+        "per_seed": [
+          0.009615384615384616,
+          0.009615384615384616,
+          0.009615384615384616,
+          0.009615384615384616,
+          0.009615384615384616
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 167,
+      "n_empty": 104
+    },
+    "v2/order_words": {
+      "exact": {
+        "mean": 0.9655405405405406,
+        "sd": 0.011050964347159565,
+        "per_seed": [
+          0.9459459459459459,
+          0.9695945945945946,
+          0.972972972972973,
+          0.9695945945945946,
+          0.9695945945945946
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.9655405405405406,
+        "sd": 0.011050964347159565,
+        "per_seed": [
+          0.9459459459459459,
+          0.9695945945945946,
+          0.972972972972973,
+          0.9695945945945946,
+          0.9695945945945946
+        ]
+      },
+      "false_action_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 296,
+      "n_empty": 0
+    },
+    "v2/orthography": {
+      "exact": {
+        "mean": 0.8290780141843972,
+        "sd": 0.012883618528074452,
+        "per_seed": [
+          0.8404255319148937,
+          0.8333333333333334,
+          0.8404255319148937,
+          0.8120567375886525,
+          0.8191489361702128
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.8109803921568627,
+        "sd": 0.014247766372223476,
+        "per_seed": [
+          0.8235294117647058,
+          0.8156862745098039,
+          0.8235294117647058,
+          0.792156862745098,
+          0.8
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "per_seed": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 282,
+      "n_empty": 27
+    },
+    "v2/question_forms": {
+      "exact": {
+        "mean": 0.8620689655172413,
+        "sd": 0.0034832846363869684,
+        "per_seed": [
+          0.8620689655172413,
+          0.8669950738916257,
+          0.8620689655172413,
+          0.8571428571428571,
+          0.8620689655172413
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.8620689655172413,
+        "sd": 0.0034832846363869684,
+        "per_seed": [
+          0.8620689655172413,
+          0.8669950738916257,
+          0.8620689655172413,
+          0.8571428571428571,
+          0.8620689655172413
+        ]
+      },
+      "false_action_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 203,
+      "n_empty": 0
+    },
+    "v2/unexecutable": {
+      "exact": {
+        "mean": 0.990909090909091,
+        "sd": 0.003127367800699006,
+        "per_seed": [
+          0.993006993006993,
+          0.986013986013986,
+          0.9895104895104895,
+          0.993006993006993,
+          0.993006993006993
+        ]
+      },
+      "requests_exact": {
+        "mean": 0.0,
+        "sd": 0.0,
+        "per_seed": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      "false_action_rate": {
+        "mean": 0.005614035087719299,
+        "sd": 0.0031383410210523363,
+        "per_seed": [
+          0.0035087719298245615,
+          0.010526315789473684,
+          0.007017543859649123,
+          0.0035087719298245615,
+          0.0035087719298245615
+        ]
+      },
+      "numeric_gated_rate": {
+        "mean": null,
+        "sd": null,
+        "per_seed": [
+          null,
+          null,
+          null,
+          null,
+          null
+        ]
+      },
+      "n": 286,
+      "n_empty": 285
+    }
+  },
+  "eval_v3_spec_join_missing": 0,
+  "supplementary_val_numeric": {
+    "n": 736,
+    "notation_by_prompt": {
+      "ASCII digits": {
+        "n": 548,
+        "exact": {
+          "mean": 0.9806569343065693,
+          "sd": 0.004580255619712094,
+          "per_seed": [
+            0.9872262773722628,
+            0.9799270072992701,
+            0.9817518248175182,
+            0.9744525547445255,
+            0.9799270072992701
+          ]
+        },
+        "gated": {
+          "mean": 0.015693430656934307,
+          "sd": 0.003997974872300483,
+          "per_seed": [
+            0.010948905109489052,
+            0.014598540145985401,
+            0.016423357664233577,
+            0.021897810218978103,
+            0.014598540145985401
+          ]
+        }
+      },
+      "full-width digits": {
+        "n": 62,
+        "exact": {
+          "mean": 0.9903225806451613,
+          "sd": 0.008834234798470413,
+          "per_seed": [
+            0.9838709677419355,
+            0.9838709677419355,
+            0.9838709677419355,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0064516129032258064,
+          "sd": 0.008834234798470422,
+          "per_seed": [
+            0.0,
+            0.016129032258064516,
+            0.016129032258064516,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "hiragana / words (no digit or kanji)": {
+        "n": 2,
+        "exact": {
+          "mean": 0.5,
+          "sd": 0.0,
+          "per_seed": [
+            0.5,
+            0.5,
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "gated": {
+          "mean": 0.4,
+          "sd": 0.22360679774997896,
+          "per_seed": [
+            0.5,
+            0.5,
+            0.0,
+            0.5,
+            0.5
+          ]
+        }
+      },
+      "kanji numerals (other)": {
+        "n": 29,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "kanji numerals + 度/%": {
+        "n": 95,
+        "exact": {
+          "mean": 0.96,
+          "sd": 0.008806947647727138,
+          "per_seed": [
+            0.968421052631579,
+            0.9473684210526315,
+            0.9578947368421052,
+            0.968421052631579,
+            0.9578947368421052
+          ]
+        },
+        "gated": {
+          "mean": 0.029473684210526315,
+          "sd": 0.011531001210635076,
+          "per_seed": [
+            0.031578947368421054,
+            0.042105263157894736,
+            0.010526315789473684,
+            0.031578947368421054,
+            0.031578947368421054
+          ]
+        }
+      }
+    },
+    "notation_by_spec_style": {
+      "% (s3)": {
+        "n": 16,
+        "exact": {
+          "mean": 0.9375,
+          "sd": 0.04419417382415922,
+          "per_seed": [
+            0.9375,
+            0.9375,
+            1.0,
+            0.9375,
+            0.875
+          ]
+        },
+        "gated": {
+          "mean": 0.0375,
+          "sd": 0.03423265984407288,
+          "per_seed": [
+            0.0625,
+            0.0625,
+            0.0,
+            0.0,
+            0.0625
+          ]
+        }
+      },
+      "ASCII (s0)": {
+        "n": 176,
+        "exact": {
+          "mean": 0.9829545454545454,
+          "sd": 0.008035304331665286,
+          "per_seed": [
+            0.9943181818181818,
+            0.9886363636363636,
+            0.9772727272727273,
+            0.9772727272727273,
+            0.9772727272727273
+          ]
+        },
+        "gated": {
+          "mean": 0.017045454545454544,
+          "sd": 0.008035304331665313,
+          "per_seed": [
+            0.005681818181818182,
+            0.011363636363636364,
+            0.022727272727272728,
+            0.022727272727272728,
+            0.022727272727272728
+          ]
+        }
+      },
+      "full-width (s2)": {
+        "n": 115,
+        "exact": {
+          "mean": 0.9843478260869566,
+          "sd": 0.00727530457855719,
+          "per_seed": [
+            0.9826086956521739,
+            0.9826086956521739,
+            0.9739130434782609,
+            0.991304347826087,
+            0.991304347826087
+          ]
+        },
+        "gated": {
+          "mean": 0.0052173913043478265,
+          "sd": 0.007777627747825356,
+          "per_seed": [
+            0.0,
+            0.008695652173913044,
+            0.017391304347826087,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "kanji (s1)": {
+        "n": 108,
+        "exact": {
+          "mean": 0.9648148148148148,
+          "sd": 0.012072597046671579,
+          "per_seed": [
+            0.9722222222222222,
+            0.9444444444444444,
+            0.9722222222222222,
+            0.9629629629629629,
+            0.9722222222222222
+          ]
+        },
+        "gated": {
+          "mean": 0.025925925925925925,
+          "sd": 0.017810540797843836,
+          "per_seed": [
+            0.027777777777777776,
+            0.046296296296296294,
+            0.0,
+            0.037037037037037035,
+            0.018518518518518517
+          ]
+        }
+      },
+      "no style hint": {
+        "n": 57,
+        "exact": {
+          "mean": 0.9333333333333333,
+          "sd": 0.026021749077528633,
+          "per_seed": [
+            0.9649122807017544,
+            0.9473684210526315,
+            0.9298245614035088,
+            0.8947368421052632,
+            0.9298245614035088
+          ]
+        },
+        "gated": {
+          "mean": 0.05614035087719298,
+          "sd": 0.028827503026587688,
+          "per_seed": [
+            0.03508771929824561,
+            0.03508771929824561,
+            0.05263157894736842,
+            0.10526315789473684,
+            0.05263157894736842
+          ]
+        }
+      }
+    },
+    "unit_by_prompt": {
+      "%": {
+        "n": 14,
+        "exact": {
+          "mean": 0.8857142857142857,
+          "sd": 0.06388765649999402,
+          "per_seed": [
+            0.9285714285714286,
+            0.8571428571428571,
+            0.9285714285714286,
+            0.9285714285714286,
+            0.7857142857142857
+          ]
+        },
+        "gated": {
+          "mean": 0.07142857142857142,
+          "sd": 0.050507627227610534,
+          "per_seed": [
+            0.07142857142857142,
+            0.14285714285714285,
+            0.07142857142857142,
+            0.0,
+            0.07142857142857142
+          ]
+        }
+      },
+      "none": {
+        "n": 222,
+        "exact": {
+          "mean": 0.9801801801801802,
+          "sd": 0.009868874910002991,
+          "per_seed": [
+            0.9864864864864865,
+            0.9864864864864865,
+            0.9774774774774775,
+            0.963963963963964,
+            0.9864864864864865
+          ]
+        },
+        "gated": {
+          "mean": 0.018018018018018018,
+          "sd": 0.010563999459061777,
+          "per_seed": [
+            0.013513513513513514,
+            0.009009009009009009,
+            0.018018018018018018,
+            0.036036036036036036,
+            0.013513513513513514
+          ]
+        }
+      },
+      "°": {
+        "n": 7,
+        "exact": {
+          "mean": 0.9714285714285714,
+          "sd": 0.06388765649999402,
+          "per_seed": [
+            1.0,
+            1.0,
+            0.8571428571428571,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.02857142857142857,
+          "sd": 0.06388765649999399,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.14285714285714285,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "度": {
+        "n": 493,
+        "exact": {
+          "mean": 0.9801217038539554,
+          "sd": 0.0039017006210286856,
+          "per_seed": [
+            0.9837728194726166,
+            0.973630831643002,
+            0.9817444219066938,
+            0.9817444219066938,
+            0.9797160243407708
+          ]
+        },
+        "gated": {
+          "mean": 0.015010141987829614,
+          "sd": 0.003954074784912358,
+          "per_seed": [
+            0.012170385395537525,
+            0.02028397565922921,
+            0.010141987829614604,
+            0.016227180527383367,
+            0.016227180527383367
+          ]
+        }
+      }
+    },
+    "numeric_by_tool_arg": {
+      "adjust_brightness.by (in correction)": {
+        "n": 2,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "adjust_brightness.by (single)": {
+        "n": 24,
+        "exact": {
+          "mean": 0.9833333333333334,
+          "sd": 0.022821773229381902,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            0.9583333333333334,
+            0.9583333333333334
+          ]
+        },
+        "gated": {
+          "mean": 0.016666666666666666,
+          "sd": 0.02282177322938192,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.041666666666666664,
+            0.041666666666666664
+          ]
+        }
+      },
+      "adjust_volume.by (single)": {
+        "n": 28,
+        "exact": {
+          "mean": 0.9357142857142857,
+          "sd": 0.04656573146573323,
+          "per_seed": [
+            0.9642857142857143,
+            0.9642857142857143,
+            0.9285714285714286,
+            0.8571428571428571,
+            0.9642857142857143
+          ]
+        },
+        "gated": {
+          "mean": 0.05714285714285714,
+          "sd": 0.054163396028939645,
+          "per_seed": [
+            0.03571428571428571,
+            0.0,
+            0.07142857142857142,
+            0.14285714285714285,
+            0.03571428571428571
+          ]
+        }
+      },
+      "look.degrees (in correction)": {
+        "n": 7,
+        "exact": {
+          "mean": 0.8285714285714285,
+          "sd": 0.11952286093343935,
+          "per_seed": [
+            0.7142857142857143,
+            0.7142857142857143,
+            0.8571428571428571,
+            1.0,
+            0.8571428571428571
+          ]
+        },
+        "gated": {
+          "mean": 0.14285714285714285,
+          "sd": 0.10101525445522107,
+          "per_seed": [
+            0.2857142857142857,
+            0.14285714285714285,
+            0.14285714285714285,
+            0.0,
+            0.14285714285714285
+          ]
+        }
+      },
+      "look.degrees (in multi_action)": {
+        "n": 116,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "look.degrees (single)": {
+        "n": 256,
+        "exact": {
+          "mean": 0.990625,
+          "sd": 0.007096055517415996,
+          "per_seed": [
+            0.9921875,
+            0.98046875,
+            0.98828125,
+            0.9921875,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.00859375,
+          "sd": 0.007513821899090369,
+          "per_seed": [
+            0.00390625,
+            0.01953125,
+            0.01171875,
+            0.0078125,
+            0.0
+          ]
+        }
+      },
+      "set_brightness.level (in multi_action)": {
+        "n": 39,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "set_brightness.level (single)": {
+        "n": 21,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "set_volume.level (in correction)": {
+        "n": 7,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "set_volume.level (in multi_action)": {
+        "n": 88,
+        "exact": {
+          "mean": 0.9840909090909091,
+          "sd": 0.006224119971649609,
+          "per_seed": [
+            0.9886363636363636,
+            0.9772727272727273,
+            0.9886363636363636,
+            0.9772727272727273,
+            0.9886363636363636
+          ]
+        },
+        "gated": {
+          "mean": 0.01590909090909091,
+          "sd": 0.006224119971649615,
+          "per_seed": [
+            0.011363636363636364,
+            0.022727272727272728,
+            0.011363636363636364,
+            0.022727272727272728,
+            0.011363636363636364
+          ]
+        }
+      },
+      "set_volume.level (single)": {
+        "n": 33,
+        "exact": {
+          "mean": 0.9151515151515152,
+          "sd": 0.02535333413739626,
+          "per_seed": [
+            0.9393939393939394,
+            0.9090909090909091,
+            0.9090909090909091,
+            0.9393939393939394,
+            0.8787878787878788
+          ]
+        },
+        "gated": {
+          "mean": 0.06060606060606061,
+          "sd": 0.021427478217774167,
+          "per_seed": [
+            0.06060606060606061,
+            0.09090909090909091,
+            0.06060606060606061,
+            0.030303030303030304,
+            0.06060606060606061
+          ]
+        }
+      },
+      "turn.degrees (in correction)": {
+        "n": 5,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "turn.degrees (single)": {
+        "n": 110,
+        "exact": {
+          "mean": 0.9454545454545454,
+          "sd": 0.01437398936440173,
+          "per_seed": [
+            0.9636363636363636,
+            0.9545454545454546,
+            0.9454545454545454,
+            0.9363636363636364,
+            0.9272727272727272
+          ]
+        },
+        "gated": {
+          "mean": 0.03636363636363636,
+          "sd": 0.01700753357624519,
+          "per_seed": [
+            0.02727272727272727,
+            0.02727272727272727,
+            0.01818181818181818,
+            0.05454545454545454,
+            0.05454545454545454
+          ]
+        }
+      }
+    },
+    "out_of_range_rows": [
+      {
+        "prompt": "音量を210%に設定してください、よろしくお願いします。",
+        "expected": [
+          {
+            "name": "set_volume",
+            "arguments": {
+              "level": 100
+            }
+          }
+        ],
+        "outputs": [
+          "[{\"name\":\"set_volume\",\"arguments\":{\"level\":100}}]",
+          "[]",
+          "[]",
+          "[{\"name\":\"set_volume\",\"arguments\":{\"level\":100}}]",
+          "[{\"name\":\"set_volume\",\"arguments\":{\"level\":20}}]"
+        ]
+      },
+      {
+        "prompt": "画面の明るさを150%にしてほしい。",
+        "expected": [
+          {
+            "name": "set_brightness",
+            "arguments": {
+              "level": 100
+            }
+          }
+        ],
+        "outputs": [
+          "[{\"name\":\"set_brightness\",\"arguments\":{\"level\":100}}]",
+          "[{\"name\":\"set_brightness\",\"arguments\":{\"level\":100}}]",
+          "[{\"name\":\"set_brightness\",\"arguments\":{\"level\":100}}]",
+          "[{\"name\":\"set_brightness\",\"arguments\":{\"level\":100}}]",
+          "[{\"name\":\"set_brightness\",\"arguments\":{\"level\":100}}]"
+        ]
+      }
+    ]
+  },
+  "review_focus_eval_v3": {
+    "notation_by_prompt": {
+      "ASCII digits": {
+        "n": 930,
+        "exact": {
+          "mean": 0.9423655913978495,
+          "sd": 0.003097819417395256,
+          "per_seed": [
+            0.9397849462365592,
+            0.9408602150537635,
+            0.946236559139785,
+            0.9451612903225807,
+            0.9397849462365592
+          ]
+        },
+        "gated": {
+          "mean": 0.032903225806451615,
+          "sd": 0.005869825403852121,
+          "per_seed": [
+            0.03655913978494624,
+            0.03978494623655914,
+            0.025806451612903226,
+            0.034408602150537634,
+            0.02795698924731183
+          ]
+        }
+      },
+      "full-width digits": {
+        "n": 8,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "hiragana / words (no digit or kanji)": {
+        "n": 3,
+        "exact": {
+          "mean": 0.26666666666666666,
+          "sd": 0.14907119849998599,
+          "per_seed": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333,
+            0.0,
+            0.3333333333333333
+          ]
+        },
+        "gated": {
+          "mean": 0.26666666666666666,
+          "sd": 0.2788866755113585,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.3333333333333333,
+            0.6666666666666666,
+            0.3333333333333333
+          ]
+        }
+      },
+      "kanji numerals + 度/%": {
+        "n": 24,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "unit_by_prompt": {
+      "none": {
+        "n": 51,
+        "exact": {
+          "mean": 0.9176470588235294,
+          "sd": 0.02556549962824568,
+          "per_seed": [
+            0.9411764705882353,
+            0.9019607843137255,
+            0.9411764705882353,
+            0.8823529411764706,
+            0.9215686274509803
+          ]
+        },
+        "gated": {
+          "mean": 0.043137254901960784,
+          "sd": 0.029083131321943775,
+          "per_seed": [
+            0.0,
+            0.058823529411764705,
+            0.0392156862745098,
+            0.0784313725490196,
+            0.0392156862745098
+          ]
+        }
+      },
+      "度": {
+        "n": 914,
+        "exact": {
+          "mean": 0.9435448577680525,
+          "sd": 0.003336531877894296,
+          "per_seed": [
+            0.9398249452954048,
+            0.9431072210065645,
+            0.9463894967177243,
+            0.9474835886214442,
+            0.9409190371991247
+          ]
+        },
+        "gated": {
+          "mean": 0.03194748358862144,
+          "sd": 0.005546517223473337,
+          "per_seed": [
+            0.037199124726477024,
+            0.037199124726477024,
+            0.02516411378555799,
+            0.03282275711159737,
+            0.02735229759299781
+          ]
+        }
+      }
+    },
+    "notation_by_spec_style": {
+      "ASCII (s0)": {
+        "n": 262,
+        "exact": {
+          "mean": 0.9198473282442748,
+          "sd": 0.012658873245631318,
+          "per_seed": [
+            0.9007633587786259,
+            0.9198473282442748,
+            0.9312977099236641,
+            0.9312977099236641,
+            0.916030534351145
+          ]
+        },
+        "gated": {
+          "mean": 0.0450381679389313,
+          "sd": 0.01916015327940631,
+          "per_seed": [
+            0.07251908396946564,
+            0.05725190839694656,
+            0.026717557251908396,
+            0.03435114503816794,
+            0.03435114503816794
+          ]
+        }
+      },
+      "full-width (s2)": {
+        "n": 253,
+        "exact": {
+          "mean": 0.9652173913043478,
+          "sd": 0.00330695662661688,
+          "per_seed": [
+            0.9604743083003953,
+            0.9683794466403162,
+            0.9644268774703557,
+            0.9644268774703557,
+            0.9683794466403162
+          ]
+        },
+        "gated": {
+          "mean": 0.018972332015810278,
+          "sd": 0.007070570679841233,
+          "per_seed": [
+            0.019762845849802372,
+            0.019762845849802372,
+            0.019762845849802372,
+            0.02766798418972332,
+            0.007905138339920948
+          ]
+        }
+      },
+      "kanji (s1)": {
+        "n": 245,
+        "exact": {
+          "mean": 0.9510204081632653,
+          "sd": 0.0064536278778946415,
+          "per_seed": [
+            0.9591836734693877,
+            0.9551020408163265,
+            0.9428571428571428,
+            0.9510204081632653,
+            0.9469387755102041
+          ]
+        },
+        "gated": {
+          "mean": 0.022040816326530613,
+          "sd": 0.006190102403307388,
+          "per_seed": [
+            0.012244897959183673,
+            0.02040816326530612,
+            0.024489795918367346,
+            0.024489795918367346,
+            0.02857142857142857
+          ]
+        }
+      }
+    },
+    "numeric_by_tool_arg": {
+      "adjust_brightness.by (in correction)": {
+        "n": 2,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "look.degrees (in multi_action)": {
+        "n": 158,
+        "exact": {
+          "mean": 0.9316455696202531,
+          "sd": 0.009387593021640089,
+          "per_seed": [
+            0.9367088607594937,
+            0.9177215189873418,
+            0.9430379746835443,
+            0.930379746835443,
+            0.930379746835443
+          ]
+        },
+        "gated": {
+          "mean": 0.05063291139240506,
+          "sd": 0.010007207785342974,
+          "per_seed": [
+            0.0379746835443038,
+            0.056962025316455694,
+            0.04430379746835443,
+            0.06329113924050633,
+            0.05063291139240506
+          ]
+        }
+      },
+      "look.degrees (single)": {
+        "n": 546,
+        "exact": {
+          "mean": 0.9765567765567765,
+          "sd": 0.01217638837992281,
+          "per_seed": [
+            0.9560439560439561,
+            0.9761904761904762,
+            0.9798534798534798,
+            0.9871794871794872,
+            0.9835164835164835
+          ]
+        },
+        "gated": {
+          "mean": 0.015384615384615385,
+          "sd": 0.008251926978804988,
+          "per_seed": [
+            0.029304029304029304,
+            0.016483516483516484,
+            0.01098901098901099,
+            0.009157509157509158,
+            0.01098901098901099
+          ]
+        }
+      },
+      "set_brightness.level (in correction)": {
+        "n": 8,
+        "exact": {
+          "mean": 0.975,
+          "sd": 0.05590169943749474,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            0.875
+          ]
+        },
+        "gated": {
+          "mean": 0.025,
+          "sd": 0.05590169943749474,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.125
+          ]
+        }
+      },
+      "set_brightness.level (in multi_action)": {
+        "n": 23,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "set_volume.level (in correction)": {
+        "n": 5,
+        "exact": {
+          "mean": 0.76,
+          "sd": 0.16733200530681513,
+          "per_seed": [
+            0.8,
+            0.6,
+            1.0,
+            0.6,
+            0.8
+          ]
+        },
+        "gated": {
+          "mean": 0.12000000000000001,
+          "sd": 0.17888543819998318,
+          "per_seed": [
+            0.0,
+            0.4,
+            0.0,
+            0.2,
+            0.0
+          ]
+        }
+      },
+      "set_volume.level (in multi_action)": {
+        "n": 4,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "turn.degrees (in correction)": {
+        "n": 5,
+        "exact": {
+          "mean": 0.64,
+          "sd": 0.08944271909999162,
+          "per_seed": [
+            0.8,
+            0.6,
+            0.6,
+            0.6,
+            0.6
+          ]
+        },
+        "gated": {
+          "mean": 0.12000000000000001,
+          "sd": 0.10954451150103323,
+          "per_seed": [
+            0.2,
+            0.2,
+            0.0,
+            0.2,
+            0.0
+          ]
+        }
+      },
+      "turn.degrees (single)": {
+        "n": 214,
+        "exact": {
+          "mean": 0.8644859813084113,
+          "sd": 0.02191783065338052,
+          "per_seed": [
+            0.897196261682243,
+            0.8738317757009346,
+            0.8598130841121495,
+            0.8504672897196262,
+            0.8411214953271028
+          ]
+        },
+        "gated": {
+          "mean": 0.06355140186915888,
+          "sd": 0.012625472977669434,
+          "per_seed": [
+            0.0514018691588785,
+            0.07476635514018691,
+            0.056074766355140186,
+            0.0794392523364486,
+            0.056074766355140186
+          ]
+        }
+      }
+    },
+    "stackchan_notation": {
+      "ASCII digits": {
+        "n": 8,
+        "exact": {
+          "mean": 0.85,
+          "sd": 0.05590169943749474,
+          "per_seed": [
+            0.875,
+            0.875,
+            0.875,
+            0.875,
+            0.75
+          ]
+        },
+        "gated": {
+          "mean": 0.1,
+          "sd": 0.05590169943749474,
+          "per_seed": [
+            0.125,
+            0.125,
+            0.0,
+            0.125,
+            0.125
+          ]
+        }
+      },
+      "hiragana / words (no digit or kanji)": {
+        "n": 3,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "stackchan_numeric_by_tool_arg": {
+      "look.degrees (single)": {
+        "n": 6,
+        "exact": {
+          "mean": 0.8,
+          "sd": 0.07453559924999302,
+          "per_seed": [
+            0.8333333333333334,
+            0.8333333333333334,
+            0.8333333333333334,
+            0.8333333333333334,
+            0.6666666666666666
+          ]
+        },
+        "gated": {
+          "mean": 0.13333333333333333,
+          "sd": 0.07453559924999299,
+          "per_seed": [
+            0.16666666666666666,
+            0.16666666666666666,
+            0.0,
+            0.16666666666666666,
+            0.16666666666666666
+          ]
+        }
+      },
+      "set_volume.level (single)": {
+        "n": 5,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      }
+    },
+    "stackchan_numeric_rows_seed0": [
+      {
+        "id": "sc-001",
+        "prompt": "音量を 80% に設定して。",
+        "exact": true,
+        "output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":80}}]"
+      },
+      {
+        "id": "sc-027",
+        "prompt": "音量を半分にして",
+        "exact": true,
+        "output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]"
+      },
+      {
+        "id": "sc-028",
+        "prompt": "消音して",
+        "exact": true,
+        "output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":0}}]"
+      },
+      {
+        "id": "sc-029",
+        "prompt": "静かにして",
+        "exact": true,
+        "output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":0}}]"
+      },
+      {
+        "id": "sc-048",
+        "prompt": "頭を左に18度動かして",
+        "exact": false,
+        "output": "[]"
+      },
+      {
+        "id": "sc-u2",
+        "prompt": "音声の音量を50にして",
+        "exact": true,
+        "output": "[{\"name\":\"set_volume\",\"arguments\":{\"level\":50}}]"
+      },
+      {
+        "id": "sc-u3",
+        "prompt": "頭を90度上に向けて",
+        "exact": true,
+        "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"up\",\"degrees\":90}}]"
+      },
+      {
+        "id": "sc-u4",
+        "prompt": "顔を右に45度向いて",
+        "exact": true,
+        "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"degrees\":45}}]"
+      },
+      {
+        "id": "sc-p-f2bc8d0fe109",
+        "prompt": "ロボットちゃん、左に15度向くことはできるかな?",
+        "exact": true,
+        "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"degrees\":15}}]"
+      },
+      {
+        "id": "sc-p-3e80a13b8081",
+        "prompt": "左に15度、こちらを向いていただけますか?",
+        "exact": true,
+        "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"degrees\":15}}]"
+      },
+      {
+        "id": "sc-p-65e353149f47",
+        "prompt": "ロボット、左10度くらいをむいて。",
+        "exact": true,
+        "output": "[{\"name\":\"look\",\"arguments\":{\"direction\":\"left\",\"degrees\":10}}]"
+      }
+    ],
+    "out_of_range": {},
+    "look_vs_turn_single": {
+      "look (single)": {
+        "n": 603,
+        "exact": {
+          "mean": 0.9744610281923715,
+          "sd": 0.013194244962465053,
+          "per_seed": [
+            0.9519071310116086,
+            0.9734660033167496,
+            0.9817578772802653,
+            0.9834162520729685,
+            0.9817578772802653
+          ]
+        },
+        "gated": {
+          "mean": 0.0175787728026534,
+          "sd": 0.008585193436513955,
+          "per_seed": [
+            0.03150912106135987,
+            0.01990049751243781,
+            0.009950248756218905,
+            0.013266998341625208,
+            0.013266998341625208
+          ]
+        }
+      },
+      "turn (single)": {
+        "n": 274,
+        "exact": {
+          "mean": 0.843065693430657,
+          "sd": 0.01965388615742522,
+          "per_seed": [
+            0.8759124087591241,
+            0.843065693430657,
+            0.8394160583941606,
+            0.8321167883211679,
+            0.8248175182481752
+          ]
+        },
+        "gated": {
+          "mean": 0.08029197080291971,
+          "sd": 0.016321664069341532,
+          "per_seed": [
+            0.06934306569343066,
+            0.09124087591240876,
+            0.08394160583941605,
+            0.09854014598540146,
+            0.058394160583941604
+          ]
+        }
+      }
+    },
+    "look_vs_turn_any": {
+      "look (any)": {
+        "n": 840,
+        "exact": {
+          "mean": 0.9633333333333334,
+          "sd": 0.011084861282842648,
+          "per_seed": [
+            0.9476190476190476,
+            0.955952380952381,
+            0.9738095238095238,
+            0.9702380952380952,
+            0.969047619047619
+          ]
+        },
+        "gated": {
+          "mean": 0.024285714285714285,
+          "sd": 0.0055583892999660715,
+          "per_seed": [
+            0.03214285714285714,
+            0.02619047619047619,
+            0.017857142857142856,
+            0.025,
+            0.02023809523809524
+          ]
+        }
+      },
+      "look+turn": {
+        "n": 5,
+        "exact": {
+          "mean": 1.0,
+          "sd": 0.0,
+          "per_seed": [
+            1.0,
+            1.0,
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        "gated": {
+          "mean": 0.0,
+          "sd": 0.0,
+          "per_seed": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "turn (any)": {
+        "n": 347,
+        "exact": {
+          "mean": 0.8639769452449567,
+          "sd": 0.019481779574819072,
+          "per_seed": [
+            0.8962536023054755,
+            0.8587896253602305,
+            0.8645533141210374,
+            0.8559077809798271,
+            0.8443804034582133
+          ]
+        },
+        "gated": {
+          "mean": 0.07089337175792507,
+          "sd": 0.01391068401861345,
+          "per_seed": [
+            0.06051873198847262,
+            0.08645533141210375,
+            0.069164265129683,
+            0.08357348703170028,
+            0.05475504322766571
+          ]
+        }
+      }
+    },
+    "look_turn_confusion": [
+      {
+        "look->turn": 6,
+        "turn->look": 14,
+        "n_look": 603,
+        "n_turn": 274
+      },
+      {
+        "look->turn": 2,
+        "turn->look": 18,
+        "n_look": 603,
+        "n_turn": 274
+      },
+      {
+        "look->turn": 3,
+        "turn->look": 21,
+        "n_look": 603,
+        "n_turn": 274
+      },
+      {
+        "look->turn": 2,
+        "turn->look": 17,
+        "n_look": 603,
+        "n_turn": 274
+      },
+      {
+        "look->turn": 1,
+        "turn->look": 31,
+        "n_look": 603,
+        "n_turn": 274
+      }
+    ],
+    "look_turn_confusion_stackchan": [
+      {
+        "look->turn": 1,
+        "turn->look": 0,
+        "n_look": 52,
+        "n_turn": 0
+      },
+      {
+        "look->turn": 1,
+        "turn->look": 0,
+        "n_look": 52,
+        "n_turn": 0
+      },
+      {
+        "look->turn": 1,
+        "turn->look": 0,
+        "n_look": 52,
+        "n_turn": 0
+      },
+      {
+        "look->turn": 1,
+        "turn->look": 0,
+        "n_look": 52,
+        "n_turn": 0
+      },
+      {
+        "look->turn": 1,
+        "turn->look": 0,
+        "n_look": 52,
+        "n_turn": 0
+      }
+    ],
+    "out_of_range_seed0_rows": []
+  }
+}

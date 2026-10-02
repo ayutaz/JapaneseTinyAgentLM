@@ -1,0 +1,80 @@
+{
+  "job": {
+    "name": "train_action_v1",
+    "description": "Train 3M x5 seeds on data v1.0 (schema v1) in parallel",
+    "query": "gpu_ram>=24 compute_cap>=800 compute_cap<=900 num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=120 rentable=true direct_port_count>=1 verified=true",
+    "image": "vllm/vllm-openai:v0.30.0",
+    "disk_gb": 80,
+    "max_hours": 4.0,
+    "steps": [
+      "nvidia-smi > artifacts/nvidia_smi.txt",
+      "for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 0 --out artifacts/v1/3m-s0 > artifacts/v1-3m-s0.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 1 --out artifacts/v1/3m-s1 > artifacts/v1-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 2 --out artifacts/v1/3m-s2 > artifacts/v1-3m-s2.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 3 --out artifacts/v1/3m-s3 > artifacts/v1-3m-s3.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 4 --out artifacts/v1/3m-s4 > artifacts/v1-3m-s4.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v1/3m-s0/best.pt artifacts/v1/3m-s1/best.pt artifacts/v1/3m-s2/best.pt artifacts/v1/3m-s3/best.pt artifacts/v1/3m-s4/best.pt --tokenizer tokenizer/out/action_v1_sp2048.model --cases datasets/action/v1.0/val.jsonl --out artifacts/v1/eval"
+    ],
+    "fetch": [
+      "artifacts"
+    ],
+    "uploads": [
+      "datasets/action/v1.0/train.jsonl",
+      "datasets/action/v1.0/val.jsonl",
+      "tokenizer/out/action_v1_sp2048.model"
+    ]
+  },
+  "started_utc": "20261002T133903Z",
+  "uploads": {
+    "datasets/action/v1.0/train.jsonl": "fefed90c1eeed8bc4bd937ddf4d60082bfd0e8c67922faec7e391a5c234d6ee5",
+    "datasets/action/v1.0/val.jsonl": "8bfc8bdce77a0b18107415ffc819c9681393608279a6b1a1840b8b7a0d3543ea",
+    "tokenizer/out/action_v1_sp2048.model": "80eae3c8ef151273cddafe45f4f5432c2bafefac07b294bbd0cc6f19558b7314"
+  },
+  "commit": "0c16459b5e60b94c39509b54774599be58e03e1a",
+  "offer": {
+    "id": 48606736,
+    "gpu_name": "RTX 3090",
+    "gpu_ram": 24576,
+    "dph_total": 0.21425925925925926,
+    "geolocation": "Nevada, US"
+  },
+  "instance_id": 53865959,
+  "driver_version": "595.84",
+  "cuda_max_good": 13.2,
+  "steps": [
+    {
+      "cmd": "curl -LsSf https://astral.sh/uv/0.12.20/install.sh | sh",
+      "exit": 0,
+      "sec": 29
+    },
+    {
+      "cmd": "mkdir -p /root/work && tar -xf /root/code.tar -C /root/work",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "mkdir -p /root/work/artifacts",
+      "exit": 0,
+      "sec": 29
+    },
+    {
+      "cmd": "cd /root/work && nvidia-smi > artifacts/nvidia_smi.txt",
+      "exit": 0,
+      "sec": 28
+    },
+    {
+      "cmd": "cd /root/work && for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "exit": 0,
+      "sec": 97
+    },
+    {
+      "cmd": "cd /root/work && pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 0 --out artifacts/v1/3m-s0 > artifacts/v1-3m-s0.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 1 --out artifacts/v1/3m-s1 > artifacts/v1-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 2 --out artifacts/v1/3m-s2 > artifacts/v1-3m-s2.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 3 --out artifacts/v1/3m-s3 > artifacts/v1-3m-s3.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 --size 3m --lr 1e-3 --epochs 12 --seed 4 --out artifacts/v1/3m-s4 > artifacts/v1-3m-s4.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "exit": 0,
+      "sec": 835
+    }
+  ],
+  "status": "failed: write() argument must be str, not None",
+  "destroyed": true,
+  "hours": 0.426,
+  "failed_starts": [],
+  "cost_usd_estimate": 0.091,
+  "note": "status 'failed' comes from the local runner (jtalm.infra.vast.run_detached got None after a cp932 UnicodeDecodeError while reading the remote log); all 5 runs finished training and evaluation on the instance, artifacts were fetched and the instance was destroyed. Checkpoints stay in this run directory.",
+  "run_dir": "runs/vast/train_action_v1-20261002T133903Z"
+}
