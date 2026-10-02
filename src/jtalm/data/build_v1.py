@@ -6,7 +6,8 @@
 
 1. Inherited rows (data v0.5.1 train/val, re-parsed by Qwen3 under schema v1, ``reverify``):
    kept with their label when Qwen3 agrees; relabeled when Qwen3's answer needs schema v1
-   (degrees, turn, a new tool...); dropped otherwise.
+   (degrees, turn, a new tool...) and the prompt has a word for every v1-only element of that
+   answer (checks.v1_evidence); dropped otherwise.
 2. New sentences of the v1 writers: kept when Qwen3's parse equals the spec label (as in v0).
 3. Evaluation set v3 (llm-jp writes, Qwen3 verifies): same rule as 2.
 4. v0 eval, human v1 and eval v2: relabeled by rule 1 into datasets/action/relabel_v1/, with a
@@ -25,7 +26,7 @@ from pathlib import Path
 
 from jtalm.action.schema import canonicalize, to_json, uses_v1_only, validate
 from jtalm.data.build import _case, _filter, _load
-from jtalm.data.checks import dedup_key
+from jtalm.data.checks import dedup_key, v1_evidence
 from jtalm.eval.cases import EvalCase, load_cases, write_cases
 
 VAL_FRACTION = 0.05
@@ -68,6 +69,9 @@ def relabel(rows: list[dict]) -> tuple[list[EvalCase], list[dict], Counter]:
         if new != old:
             if not v1_only:
                 dropped["verifier_disagrees_v0"] += 1
+                continue
+            if v1_evidence(r["text"], new):  # R15: the verifier is noisy with 11 tools
+                dropped["relabel_no_evidence"] += 1
                 continue
             changed.append({**r, "old": old, "new": new})
             source += "+relabel:v1"

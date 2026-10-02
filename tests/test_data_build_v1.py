@@ -57,6 +57,35 @@ def test_relabel_keeps_agreeing_rows_and_relabels_only_into_v1() -> None:
     assert dropped == {"verifier_disagrees_v0": 1, "verify_failed": 1}
 
 
+def test_relabel_drops_v1_labels_without_lexical_evidence() -> None:
+    slight_up = [{"name": "look", "arguments": {"direction": "up", "amount": "slight"}}]
+    turn_up = [{"name": "turn", "arguments": {"direction": "up", "amount": "slight"}}]
+    led = [{"name": "set_led", "arguments": {"color": "off"}}]
+    rows = [
+        row("a", "ちょこっと上向いてくれる?", slight_up, turn_up),
+        row("b", "笑いはやめて、ちょっと待って", [], led, "no_action"),
+        row("c", "もう少し上", slight_up, turn_up),
+    ]
+    cases, changed, dropped = relabel(rows)
+    assert [c.id for c in cases] == ["c"] and [r["id"] for r in changed] == ["c"]
+    assert dropped == {"relabel_no_evidence": 2}
+
+
+def test_old_eval_keeps_v0_label_when_relabel_lacks_evidence(tmp_path: Path) -> None:
+    src = tmp_path / "old.jsonl"
+    slight_up = [{"name": "look", "arguments": {"direction": "up", "amount": "slight"}}]
+    turn_up = [{"name": "turn", "arguments": {"direction": "up", "amount": "slight"}}]
+    write_cases(
+        src, [EvalCase(id="a", prompt="ちょこっと上", expected=slight_up, category="single")]
+    )
+    rev = {src.as_posix(): [row("a", "ちょこっと上", slight_up, turn_up)]}
+    stats: dict = {}
+    relabel_old_eval(rev, {"s": src.as_posix()}, tmp_path / "out", stats)
+    assert load_cases(tmp_path / "out" / "s.jsonl")[0].expected == slight_up
+    assert stats["relabel_s"]["changed"] == 0
+    assert stats["relabel_s"]["relabel_no_evidence"] == 1
+
+
 def _setup(tmp_path: Path) -> tuple[dict, dict, Path]:
     src = tmp_path / "old.jsonl"
     write_cases(
@@ -131,11 +160,14 @@ def test_invalid_override_raises(tmp_path: Path) -> None:
 
 def test_old_eval_keeps_pair_id_and_checks_overrides_before_writing(tmp_path: Path) -> None:
     src = tmp_path / "old.jsonl"
-    write_cases(src, [EvalCase(id="b", prompt="p", expected=LOOK, category="single", pair_id="P1")])
-    rev = {src.as_posix(): [row("b", "p", LOOK, DEG)]}
+    write_cases(
+        src, [EvalCase(id="b", prompt="左に90度", expected=LOOK, category="single", pair_id="P1")]
+    )
+    rev = {src.as_posix(): [row("b", "左に90度", LOOK, DEG)]}
     out = tmp_path / "out"
     relabel_old_eval(rev, {"s": src.as_posix()}, out, {})
-    assert load_cases(out / "s.jsonl")[0].pair_id == "P1"
+    case = load_cases(out / "s.jsonl")[0]
+    assert case.pair_id == "P1" and case.expected == DEG
     out2 = tmp_path / "out2"
     out2.mkdir()
     (out2 / "overrides.jsonl").write_text(
