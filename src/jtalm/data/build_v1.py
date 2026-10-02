@@ -27,7 +27,13 @@ from pathlib import Path
 
 from jtalm.action.schema import canonicalize, to_json, uses_v1_only, validate
 from jtalm.data.build import _case, _filter, _load
-from jtalm.data.checks import DEVICE_TOOLS, dedup_key, device_evidence, negation_consistent
+from jtalm.data.checks import (
+    DEVICE_TOOLS,
+    dedup_key,
+    device_evidence,
+    negation_consistent,
+    relabel_doubtful,
+)
 from jtalm.eval.cases import EvalCase, load_cases, write_cases
 
 VAL_FRACTION = 0.05
@@ -83,6 +89,9 @@ def relabel(rows: list[dict]) -> tuple[list[EvalCase], list[dict], Counter]:
                 continue
             if device_evidence(r["text"], new):  # R18: the prompt must name the device
                 dropped["relabel_no_evidence"] += 1
+                continue
+            if relabel_doubtful(r["text"], new):  # R20
+                dropped["relabel_doubtful"] += 1
                 continue
             category = _category(new, r["category"])
             if not negation_consistent(r["text"], category, r.get("language", "ja")):  # R16

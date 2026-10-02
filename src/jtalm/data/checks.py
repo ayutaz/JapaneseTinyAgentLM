@@ -89,3 +89,29 @@ def device_evidence(text: str, calls: list[dict]) -> list[str]:
         if key and not _EVIDENCE_RE[key].search(folded) and call["name"] not in missing:
             missing.append(call["name"])
     return missing
+
+
+# Ruling R20: among relabels of v0 [] rows to device commands, drop those whose label is doubtful
+# even though the device is named: another device is the target, a target level read as a step,
+# an unmute (the level to restore is a guess), a guessed direction, or several calls.
+OTHER_DEVICE = re.compile(
+    r"テレビ|プレーヤー|プレイヤー|ラジオ|シャワー|スマホ|携帯|エアコン|照明|電気|冷蔵庫|洗濯機"
+)
+UNMUTE = re.compile(r"ミュート解除|ミュートを(?:外|解除)|アンミュート")
+ADJUST_WORD = re.compile(r"調節|調整")
+DIRECTION_WORD = re.compile(r"上げ|下げ|大きく|小さく|明るく|暗く")
+
+
+def relabel_doubtful(text: str, calls: list[dict]) -> bool:
+    """True when a device relabel of a v0 [] row must be dropped (R20)."""
+    folded = normalize(text)
+    if OTHER_DEVICE.search(folded) or UNMUTE.search(folded):
+        return True
+    if ADJUST_WORD.search(folded) and not DIRECTION_WORD.search(folded):
+        return True
+    if len(calls) > 1:
+        return True
+    return any(
+        c["name"] in ("adjust_volume", "adjust_brightness") and "by" in c.get("arguments", {})
+        for c in calls
+    )

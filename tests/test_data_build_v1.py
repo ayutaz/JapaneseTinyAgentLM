@@ -244,3 +244,28 @@ def test_dedup_drops_repeats_within_a_split_and_seen_prompts() -> None:
     seen = {dedup_key("うなずいて")}
     assert [c.id for c in dedup(cases, seen)] == ["a", "c"]
     assert seen == {dedup_key(t) for t in ("うなずいて", "右を向いて", "左を向いて")}
+
+
+def test_doubtful_device_relabels_are_dropped_r20() -> None:
+    down = [{"name": "adjust_volume", "arguments": {"direction": "down", "amount": "normal"}}]
+    up = [{"name": "adjust_volume", "arguments": {"direction": "up", "amount": "normal"}}]
+    by = [{"name": "adjust_volume", "arguments": {"direction": "up", "by": 90}}]
+    unmute = [{"name": "set_volume", "arguments": {"level": 50}}]
+    two = [
+        {"name": "set_led", "arguments": {"color": "white"}},
+        {"name": "set_brightness", "arguments": {"level": 50}},
+    ]
+    rows = [
+        row("ok", "音量を下げてください", [], down, "no_action"),
+        row("tv", "テレビの音量を下げて", [], down, "no_action"),
+        row("player", "プレーヤーの音量を下げて", [], down, "no_action"),
+        row("by", "音楽の音量を九十に上げる", [], by, "no_action"),
+        row("unmute", "ミュート解除", [], unmute, "no_action"),
+        row("unmute2", "ミュートを外して", [], unmute, "no_action"),
+        row("adjust", "音量を調節して", [], up, "no_action"),
+        row("adjust_ok", "音量を調整して少し下げて", [], down, "no_action"),
+        row("two", "ライトを点けて画面の明るさも", [], two, "no_action"),
+    ]
+    cases, changed, dropped = relabel(rows)
+    assert [c.id for c in cases] == ["ok", "adjust_ok"] == [r["id"] for r in changed]
+    assert dropped == {"relabel_doubtful": 7}

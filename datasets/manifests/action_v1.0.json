@@ -1,5 +1,5 @@
 {
-  "created": "2026-10-02T13:00:16+00:00",
+  "created": "2026-10-02T13:30:28+00:00",
   "relabel_v0_eval": {
     "n": 1189,
     "reverify_rows": 1189,
@@ -140,17 +140,18 @@
   },
   "stackchan_eval_included": true,
   "inherited_train": {
-    "n": 58431,
+    "n": 58418,
     "reverify_rows": 66800,
-    "relabeled": 66,
-    "relabeled_kept": 60,
+    "relabeled": 53,
+    "relabeled_kept": 47,
     "overlap_or_dup": 52,
     "relabel_from_action": 5159,
     "verifier_disagrees_v0": 2366,
     "relabel_from_empty": 687,
     "relabel_negation": 3,
     "relabel_no_evidence": 63,
-    "verified_invalid": 39
+    "verified_invalid": 39,
+    "relabel_doubtful": 13
   },
   "inherited_val": {
     "n": 3083,
@@ -190,15 +191,15 @@
     "multi_action:malformed": 12
   },
   "train": {
-    "n": 88733,
+    "n": 88720,
     "by_category": {
-      "single": 27433,
-      "multi_action": 23385,
+      "single": 27421,
+      "multi_action": 23384,
       "negation": 10374,
       "correction": 4926,
       "no_action": 22615
     },
-    "sha256": "40f1f09d300dc1241e5022ff54f7f3b53343a9fdfb3e3af879e54e50ab4dea5b"
+    "sha256": "fefed90c1eeed8bc4bd937ddf4d60082bfd0e8c67922faec7e391a5c234d6ee5"
   },
   "val": {
     "n": 4678,
