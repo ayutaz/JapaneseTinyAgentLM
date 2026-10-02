@@ -102,9 +102,16 @@ def show(rec: dict, verbose: bool) -> None:
     elif t == "act" and any(s.get("clamped") for s in rec.get("steps", [])):
         print("  可動域の端で止めました", flush=True)
     elif t == "setting":
-        what = {"volume": "音量", "brightness": "画面の明るさ", "led": "LED"}[rec["what"]]
-        value = COLOR_JA.get(rec.get("color"), "消灯") if rec["what"] == "led" else rec["level"]
-        print(f"  {what}: {value}", flush=True)
+        # The device's record (servo.c): "what" is volume / brightness (with "level") or led
+        # (with "color"). Anything else is printed as it came, never raised in the reader.
+        kind = rec.get("what")
+        what = {"volume": "音量", "brightness": "画面の明るさ", "led": "LED"}.get(kind, kind)
+        if kind == "led":
+            value = COLOR_JA.get(rec.get("color"), "消灯")
+        else:
+            value = rec.get("level", rec.get("color", "?"))
+        failed = "" if rec.get("ok", 1) else "（失敗）"
+        print(f"  {what}: {value}{failed}", flush=True)
     elif t == "servo" and "ping_ms" in rec:
         print(f"  servo: {rec.get('state')}", flush=True)
     elif t == "stop":

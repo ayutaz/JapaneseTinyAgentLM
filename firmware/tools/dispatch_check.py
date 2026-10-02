@@ -165,7 +165,7 @@ def read_log(path: Path) -> list[dict]:
 
 
 def check_log(recs: list[dict], acts: list[dict], tol_ms: float) -> dict:
-    """Checks act_done / face / fault records in the serial log against the plans."""
+    """Checks act_done / face / setting / fault records in the serial log against the plans."""
     done = {r["seq"]: r for r in recs if r.get("t") == "act_done"}
     faces = [r for r in recs if r.get("t") == "face"]
     crc: dict[str, set[str]] = {}
@@ -187,6 +187,14 @@ def check_log(recs: list[dict], acts: list[dict], tol_ms: float) -> dict:
         n_face = sum(f["seq"] == a["seq"] for f in faces)
         if n_expr != n_face:
             problems.append(f"seq {a['seq']}: {n_expr} expr steps, {n_face} face records")
+        n_set = sum(s["k"] in ("led", "volume", "brightness") for s in a["steps"])
+        n_rec = sum(r.get("t") == "setting" and r.get("seq") == a["seq"] for r in recs)
+        if n_set != n_rec:
+            problems.append(f"seq {a['seq']}: {n_set} setting steps, {n_rec} setting records")
+        bad = [r for r in recs if r.get("t") == "setting" and r.get("seq") == a["seq"]
+               and not r.get("ok")]  # fmt: skip
+        if bad:
+            problems.append(f"seq {a['seq']}: setting failed {bad}")
         if d["ms"] > d["planned_ms"] + tol_ms:
             problems.append(f"seq {a['seq']}: took {d['ms']} ms for {d['planned_ms']} ms")
     per_expr = {k: sorted(v) for k, v in crc.items()}

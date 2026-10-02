@@ -16,6 +16,9 @@ observer can compare the motion with the printed plan. Any `fault` or `stop` rec
 on the screen, the watchdog, a servo error) or Ctrl+C ends the run with `!stop`. At the end
 the head is centered and servo output is turned off (`!servo off`).
 `--only うなずき` runs just the items whose label or line contains the text.
+`--section` picks a part: act (v0 head moves and faces), setting (v1 faces, LED, volume and
+brightness, no motion; the device's `setting` records must show the expected values), motion
+(v1 head moves: degrees, turn, diagonals, shake, bow), lm (utterances through the LM), all.
 """
 
 import argparse
@@ -43,6 +46,19 @@ def expr(name: str) -> dict:
     return {"name": "set_expression", "arguments": {"expression": name}}
 
 
+def turn(direction: str, amount: str | None = None, degrees: int | None = None) -> dict:
+    size = {"degrees": degrees} if degrees is not None else {"amount": amount or "normal"}
+    return {"name": "turn", "arguments": {"direction": direction, **size}}
+
+
+def look_deg(direction: str, degrees: int) -> dict:
+    return {"name": "look", "arguments": {"direction": direction, "degrees": degrees}}
+
+
+def tool(name: str, **arguments: object) -> dict:
+    return {"name": name, "arguments": arguments}
+
+
 # Part A: fixed Action JSON (no LM), every direction, amount and nod count once.
 ACT_ITEMS = [
     ("右（slight）", act([look("right", "slight")])),
@@ -60,6 +76,61 @@ ACT_ITEMS = [
     ("表情: happy → sad", act([expr("happy"), expr("sad")])),
     ("表情: surprised → neutral", act([expr("surprised"), expr("neutral")])),
     ("上を向いてうなずく（上を向いたまま）", act([look("up", "normal"), nod(2)])),
+    ("正面", act([look("center")])),
+]
+
+# Part C (v1): no motion. Faces, LED, volume (a beep) and brightness; the expected settings
+# are checked from the device's "setting" records.
+SETTING_ITEMS = [
+    ("表情: angry → sleepy", act([expr("angry"), expr("sleepy")]), None),
+    ("表情: doubt → neutral", act([expr("doubt"), expr("neutral")]), None),
+    ("LED: 青", act([tool("set_led", color="blue")]), {"led": "blue"}),
+    (
+        "LED: 水色 → ピンク",
+        act([tool("set_led", color="light_blue"), tool("set_led", color="pink")]),
+        {"led": "pink"},
+    ),
+    ("LED: 消灯", act([tool("set_led", color="off")]), {"led": "off"}),
+    ("音量 50（ピッ）", act([tool("set_volume", level=50)]), {"volume": 50}),
+    (
+        "音量 +20 → +100 は 100 で止まる",
+        act(
+            [
+                tool("adjust_volume", direction="up", amount="normal"),
+                tool("adjust_volume", direction="up", by=100),
+            ]
+        ),
+        {"volume": 100},
+    ),
+    ("消音（鳴らない）", act([tool("set_volume", level=0)]), {"volume": 0}),
+    ("音量 50 に戻す", act([tool("set_volume", level=50)]), {"volume": 50}),
+    (
+        "明るさ 0 は下限 5 になる（顔は見える）",
+        act([tool("set_brightness", level=0)]),
+        {"brightness": 5},
+    ),
+    (
+        "明るさ 5 で暗く → 5 のまま",
+        act([tool("adjust_brightness", direction="down", amount="large")]),
+        {"brightness": 5},
+    ),
+    ("明るさ 80", act([tool("set_brightness", level=80)]), {"brightness": 80}),
+]
+
+# Part D (v1): head motion (look with degrees, turn, diagonals, shake, bow).
+MOTION_ITEMS = [
+    ("右に 45°（絶対）", act([look_deg("right", 45)])),
+    ("さらに右（端なので clamped、動かない）", act([turn("right", "slight")])),
+    ("正面", act([look("center")])),
+    ("上に 90°（上限で止まる、clamped）", act([look_deg("up", 90)])),
+    ("正面", act([look("center")])),
+    ("今の向きから左に 20°", act([turn("left", degrees=20)])),
+    ("右上（normal）", act([look("up_right")])),
+    ("左下に 10°", act([look_deg("down_left", 10)])),
+    ("正面", act([look("center")])),
+    ("首を横に 2回振る", act([tool("shake", count=2)])),
+    ("お辞儀", act([tool("bow")])),
+    ("うなずき 5回", act([nod(5)])),
     ("正面", act([look("center")])),
 ]
 
@@ -96,6 +167,12 @@ def describe(a: dict) -> str:
     for s in a["steps"]:
         if s["k"] == "expr":
             parts.append(f"face {s['expr']}")
+        elif s["k"] == "led":
+            parts.append(f"led {s['color']}")
+        elif s["k"] in ("volume", "brightness"):
+            parts.append(f"{s['k']} {s['level']}" if "level" in s else f"{s['k']} {s['delta']:+d}")
+        elif s["k"] == "pause":
+            parts.append(f"hold {s['ms']}ms")
         else:
             clamp = " (clamped)" if s["clamped"] else ""
             parts.append(
@@ -105,7 +182,15 @@ def describe(a: dict) -> str:
     return "; ".join(parts) or "(no action)"
 
 
-def run_item(dev: Device, label: str, line: str, expect: str | None, f, keep: list) -> None:
+def run_item(
+    dev: Device,
+    label: str,
+    line: str,
+    expect: str | None,
+    f,
+    keep: list,
+    want: dict | None = None,
+) -> None:
     dev.send(line)
     gen = None
     if not line.startswith("!"):
@@ -121,6 +206,14 @@ def run_item(dev: Device, label: str, line: str, expect: str | None, f, keep: li
     done = None
     if a["queued"]:
         done = dev.wait_for("act_done", a["total_ms"] / 1000.0 + 10.0, keep)
+        if want:  # before check(keep), which clears keep
+            got = {}
+            for r in keep + dev.pending:
+                if r.get("t") == "setting" and r.get("seq") == a["seq"]:
+                    got[r["what"]] = r.get("level", r.get("color"))
+            print(f"    settings: {got}", flush=True)
+            if any(got.get(k) != v for k, v in want.items()):
+                raise Stopped(f"settings: want {want}, got {got}")
         check(keep)
         print(
             f"    done:   {done['ms']:.0f} ms (planned {done['planned_ms']}), servo "
@@ -141,7 +234,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True, help="serial port, e.g. COM3 or /dev/ttyACM0")
     ap.add_argument("--servo", action="store_true", help="turn servo output ON (head moves)")
-    ap.add_argument("--section", choices=["act", "lm", "all"], default="all")
+    ap.add_argument("--section", choices=["act", "lm", "setting", "motion", "all"], default="all")
     ap.add_argument("--pause", type=float, default=2.0, help="seconds between items")
     ap.add_argument("--only", help="run only the items whose label or line contains this")
     ap.add_argument("--out", type=Path, required=True)
@@ -153,9 +246,13 @@ def main() -> int:
     keep: list[dict] = []
     items = []
     if args.section in ("act", "all"):
-        items += [(label, line, None) for label, line in ACT_ITEMS]
+        items += [(label, line, None, None) for label, line in ACT_ITEMS]
+    if args.section in ("setting", "all"):
+        items += [(label, line, None, want) for label, line, want in SETTING_ITEMS]
+    if args.section in ("motion", "all"):
+        items += [(label, line, None, None) for label, line in MOTION_ITEMS]
     if args.section in ("lm", "all"):
-        items += [(text, text, expect) for text, expect in LM_ITEMS]
+        items += [(text, text, expect, None) for text, expect in LM_ITEMS]
     if args.only:
         items = [it for it in items if args.only in it[0] or args.only in it[1]]
         if not items:
@@ -176,9 +273,9 @@ def main() -> int:
                 # wait_for("servo") has already passed it; wait for its completion instead.
                 dev.wait_for("act_done", 15.0, keep)
                 check(keep)
-            for i, (label, line, expect) in enumerate(items):
+            for i, (label, line, expect, want) in enumerate(items):
                 print(f"[{i + 1}/{len(items)}]", end=" ", flush=True)
-                run_item(dev, label, line, expect, f, keep)
+                run_item(dev, label, line, expect, f, keep, want)
                 time.sleep(args.pause)
                 dev._read()
                 check(keep + [r for r in dev.pending if r.get("t") in ("fault", "stop")])

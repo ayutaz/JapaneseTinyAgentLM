@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 ayutaz
 //
-// Action dispatcher: runs planned steps (face changes and head moves) in order in its own
-// task, drives the two SCS0009 servos when servo output is on, and guards them.
+// Action dispatcher: runs planned steps (face changes, head moves and holds, the base LED
+// color, speaker volume and screen brightness) in order in its own task, drives the two
+// SCS0009 servos when servo output is on, and guards them.
 //
 // Servo output is OFF after every boot ("dry-run"): plans are computed, timed and reported
 // exactly as they would run, and the face changes, but the servo UART is not even opened and
@@ -14,6 +15,7 @@
 #include <stdint.h>
 
 #include "action.h"
+#include "settings.h"
 
 // Output lock for "JTALM" lines printed from more than one task (out_init first).
 void out_init(void);
@@ -42,6 +44,10 @@ void servo_stop(const char *src, int power_off);
 
 // 1 when servo output is on.
 int servo_output_on(void);
+
+// The settings the dispatcher starts from (applied by the caller); later steps change them and
+// the dispatcher stores them in NVS after each plan that changed one.
+void servo_set_settings(const settings_t *s);
 
 // Prints a "servo" status line.
 void servo_status(void);

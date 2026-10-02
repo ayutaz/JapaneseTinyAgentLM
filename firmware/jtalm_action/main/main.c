@@ -26,6 +26,14 @@
 // LM is busy, "!stop" / "!servo off" (torque off and servo power off), "!relax" (torque
 // off), "!servo" (status). A touch on the screen also stops. "!wdtest" (dry-run only) runs a
 // plan that overruns its deadline, to check the watchdog. No Wi-Fi.
+//
+// Action schema v1: besides look / turn (amount or degrees, diagonals), nod, shake and bow
+// (the head holds bowed for a moment), the dispatcher shows 7 faces (happy, sad, surprised,
+// neutral, angry, sleepy, doubt), sets the 12 base LEDs to one color, sets the speaker volume
+// (a short beep at the new volume) and the screen brightness (never below 5, so the face stays
+// visible). Volume, brightness and LED color are stored in NVS after each plan that changed
+// one and are restored at boot: JTALM {"t":"settings",...} at boot, {"t":"setting",...} per
+// step.
 
 #include <inttypes.h>
 #include <math.h>
@@ -51,6 +59,7 @@
 #include "mbedtls/sha256.h"
 #include "sdkconfig.h"
 #include "servo.h"
+#include "settings.h"
 #include "soc/extmem_reg.h"
 
 #define MODEL_PARTITION_SUBTYPE 0x40
@@ -584,6 +593,18 @@ static void boot_board(void) {
       "\",\"draw_us\":%" PRIu32 ",\"push_us\":%" PRIu32 "}\n",
       face_err == 0, f.crc, f.draw_us, f.push_us
   );
+  // Volume, brightness and LED color from NVS (defaults: 50, the boot backlight, off).
+  int nvs = settings_init() == 0;
+  settings_t st = {.volume = 50, .brightness = (uint8_t)board_brightness_level(),
+                   .led = COLOR_OFF};
+  if (st.brightness < ACT_BRIGHTNESS_MIN) st.brightness = ACT_BRIGHTNESS_MIN;
+  if (nvs) settings_load(&st);
+  board_volume(st.volume, 0);
+  board_brightness(st.brightness);
+  board_led(act_led_rgb[st.led][0], act_led_rgb[st.led][1], act_led_rgb[st.led][2]);
+  servo_set_settings(&st);
+  printf("JTALM {\"t\":\"settings\",\"volume\":%d,\"brightness\":%d,\"led\":\"%s\",\"nvs\":%d}\n",
+         st.volume, st.brightness, act_color_names[st.led], nvs);
   if (servo_start() != 0) emit_error("dispatcher start failed");
 }
 

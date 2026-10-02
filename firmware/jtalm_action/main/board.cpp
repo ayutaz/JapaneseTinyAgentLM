@@ -13,6 +13,7 @@
 #include "board.h"
 
 #include <M5Unified.h>
+#include <math.h>
 
 #include "action.h"
 #include "esp_rom_crc.h"
@@ -70,6 +71,22 @@ void draw_face(M5Canvas &c, int expr) {
       c.fillEllipse(160, 180, 18, 24, fg);  // open mouth
       c.fillEllipse(160, 180, 10, 16, TFT_BLACK);
       break;
+    case EXPR_ANGRY:
+      for (int x : ex) c.fillCircle(x, 108, 12, fg);
+      c.drawWideLine(78, 76, 118, 90, 3.0f, fg);   // eyebrows, lowered at the inner ends
+      c.drawWideLine(202, 90, 242, 76, 3.0f, fg);
+      c.fillArc(160, 200, 30, 24, 210, 330, fg);   // small frown
+      break;
+    case EXPR_SLEEPY:
+      for (int x : ex) c.fillRoundRect(x - 18, 104, 36, 6, 3, fg);  // closed eyes
+      c.fillEllipse(160, 176, 8, 6, fg);                             // small "o" mouth
+      break;
+    case EXPR_DOUBT:
+      c.fillCircle(ex[0], 104, 14, fg);
+      c.fillCircle(ex[1], 98, 9, fg);              // one eye smaller and higher
+      c.drawWideLine(204, 74, 240, 66, 3.0f, fg);  // one raised eyebrow
+      c.drawWideLine(130, 178, 190, 166, 3.0f, fg);  // tilted mouth
+      break;
     default:  // EXPR_NEUTRAL
       for (int x : ex) c.fillCircle(x, 100, 14, fg);
       c.fillRoundRect(120, 166, 80, 8, 4, fg);
@@ -113,10 +130,11 @@ extern "C" int board_init(board_info_t *info) {
   cfg.internal_imu = false;
   cfg.internal_rtc = false;
   cfg.internal_mic = false;
-  cfg.internal_spk = false;
+  cfg.internal_spk = true;
   cfg.led_brightness = 0;
   M5.begin(cfg);
   M5.Display.setRotation(1);  // landscape, as stackchan-idf on CoreS3
+  M5.Speaker.begin();  // CoreS3 speaker (AW88298) for the volume confirmation beep
   info->begin_ms = (uint32_t)((esp_timer_get_time() - t0) / 1000);
   info->board = (int)M5.getBoard();
   g_gfx_lock = xSemaphoreCreateMutex();
@@ -216,4 +234,25 @@ extern "C" int board_led(uint8_t r, uint8_t g, uint8_t b) {
 extern "C" int board_led_cfg(void) {
   if (!g_py32) return -1;
   return M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
+}
+
+extern "C" int board_volume(int level, int beep) {
+  M5.Speaker.setVolume((uint8_t)lround(level * 255.0 / 100.0));
+  if (beep && level > 0) M5.Speaker.tone(1000, 80);
+  return M5.Speaker.isRunning() ? 0 : -1;  // the volume is kept even when the speaker is off
+}
+
+// On the CoreS3, M5GFX sets the backlight through the AXP2101's DLDO1 (as M5.begin already
+// does at boot); this file writes no AXP2101 register itself. Its internal I2C is shared with
+// the touch controller and the PY32, hence the lock.
+extern "C" int board_brightness(int level) {
+  if (g_gfx_lock == nullptr) return -1;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  M5.Display.setBrightness((uint8_t)lround(level * 255.0 / 100.0));
+  xSemaphoreGive(g_gfx_lock);
+  return 0;
+}
+
+extern "C" int board_brightness_level(void) {
+  return (int)lround(M5.Display.getBrightness() * 100.0 / 255.0);
 }

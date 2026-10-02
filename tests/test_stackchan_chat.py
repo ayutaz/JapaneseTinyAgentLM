@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "firmware" / "tools"))
-from stackchan_chat import describe  # noqa: E402
+from stackchan_chat import describe, show  # noqa: E402
 
 
 def out(*calls: dict) -> str:
@@ -50,3 +50,16 @@ def test_describe(calls: tuple, text: str) -> None:
 
 def test_describe_keeps_unparsable_output() -> None:
     assert describe("[{") == "[{"
+
+
+def test_show_setting_records(capsys: pytest.CaptureFixture[str]) -> None:
+    # The records servo.c prints, then ones it does not: none may raise in the reader thread.
+    show({"t": "setting", "seq": 1, "what": "volume", "level": 50, "ok": 1}, False)
+    show({"t": "setting", "seq": 2, "what": "brightness", "level": 5, "ok": 1}, False)
+    show({"t": "setting", "seq": 3, "what": "led", "color": "blue", "ok": 1}, False)
+    show({"t": "setting", "seq": 4, "what": "led", "color": "off", "ok": 0}, False)
+    show({"t": "setting", "seq": 5}, False)
+    show({"t": "setting", "what": "speed", "level": 3}, False)
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[:4] == ["  音量: 50", "  画面の明るさ: 5", "  LED: 青", "  LED: 消灯（失敗）"]
+    assert len(lines) == 6
