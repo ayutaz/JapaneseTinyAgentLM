@@ -49,7 +49,7 @@ uv run --group train pytest
 ```
 
 - `uv sync` は、指定していないグループのパッケージを削除します。学習や評価の module を動かす前は `--group train` か `--all-groups` を付けてください。以下のコマンドは `uv run --group train` で実行します。
-- PyTorch の取得元は `pyproject.toml` で指定しています。Linux は CUDA 12.6 版（cu126）、それ以外は CPU 版です。
+- PyTorch の取得元は `pyproject.toml` で指定しています。Linux と Windows は CUDA 12.6 版（cu126）、macOS は CPU 版です。
 
 ### GPU と CPU
 
