@@ -439,6 +439,7 @@ uv run --group train python -m jtalm.model.release prepare \
     --out runs/release/action_3m
 ```
 
+- 上のパス（`runs/local/v1/3m-s0`）は、手元で学習し直したときの出力先です。公開したモデルは vast.ai の job `train_action_v1` で学習したもので、その checkpoint は `runs/vast/train_action_v1-<日時>/artifacts/v1/3m-s0/`（`best.pt`、量子化後の `best_q4_g64.pt`）にあります。公開したパッケージを作り直すときは、`--ckpt` と `--ckpt-q4` にこのパスを渡します。
 - `generate` の `reverify` phase は、正解のある文（`prompt` か `text`）を Qwen3 に schema v1 で読み直させます。`build_v1` は、その答えと v0 の正解を比べて、引き継ぐ文、付け直す文、除く文を決めます（規則は [`data.md`](data.md) の「v1.0」）。
 - `stackchan_eval` の実例の文（`datasets/action/stackchan_v1/sources.jsonl`）は第三者の文なので、リポジトリに入れていません。
 - 公開したモデルは seed 0 で、gate は 0.88506 です。結果は [`../results/v1_action/`](../results/v1_action/comparison.md)、実機での確認は [`../results/v1_action/device/`](../results/v1_action/device/README.md) にあります。
