@@ -77,3 +77,33 @@ def test_contrastive_pair_needs_both_cases_correct() -> None:
     one = evaluate(cases, {"pos": json.dumps([look("right")]), "neg": json.dumps([look("right")])})
     assert both["contrastive_pair_accuracy"] == 1.0
     assert one["contrastive_pair_accuracy"] == 0.0
+
+
+def test_v1_reverse_direction_and_numeric_error() -> None:
+    case = EvalCase(
+        id="a",
+        prompt="p",
+        category="single",
+        expected=[{"name": "turn", "arguments": {"direction": "up_left", "degrees": 30}}],
+    )
+    raw = '[{"name":"turn","arguments":{"direction":"down_right","degrees":30}}]'
+    assert "reverse_direction" in score_case(case, raw).critical
+    vol = EvalCase(
+        id="b",
+        prompt="p",
+        category="single",
+        expected=[{"name": "set_volume", "arguments": {"level": 50}}],
+    )
+    report = evaluate([vol], {"b": '[{"name":"set_volume","arguments":{"level":40}}]'})
+    assert report["numeric"] == {"n": 1, "exact": 0, "mean_abs_error": 10.0}
+
+
+def test_numeric_ignores_bool_and_empty() -> None:
+    case = EvalCase(
+        id="c",
+        prompt="p",
+        category="single",
+        expected=[{"name": "set_volume", "arguments": {"level": 50}}],
+    )
+    report = evaluate([case], {"c": '[{"name":"set_volume","arguments":{"level":true}}]'})
+    assert report["numeric"] == {"n": 0, "exact": 0, "mean_abs_error": None}

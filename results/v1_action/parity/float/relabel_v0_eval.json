@@ -1,0 +1,49 @@
+{
+  "ckpt": "runs\\vast\\train_action_v1-20261002T133903Z\\artifacts\\v1\\3m-s0\\best.pt",
+  "cases": "datasets\\action\\relabel_v1\\v0_eval.jsonl",
+  "kv_int8": false,
+  "tokenization": {
+    "v0_eval.jsonl": {
+      "n": 1189,
+      "match": 1189,
+      "mismatches": []
+    }
+  },
+  "generation": {
+    "int4": {
+      "file": "3m-s0_q4_g64.jtlm",
+      "bytes": 1970720,
+      "first_logits": {
+        "n": 1189,
+        "max_abs_diff": 1.811981201171875e-05,
+        "max_abs_logit": 17.943984985351562
+      },
+      "plain": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.9318755256518082,
+        "exact_c": 0.9318755256518082,
+        "min_prob_max_abs_diff": 1.537781149296702e-05,
+        "c_summary": "1189 prompts, 22996 forward tokens (6376 generated) in 25.628 s: 897.3 tok/s",
+        "python_seconds": 32.42,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.9310344827586207,
+        "fake_quant_output_match": 1188
+      },
+      "grammar": {
+        "n": 1189,
+        "token_match": 1189,
+        "output_match": 1189,
+        "exact_python": 0.9318755256518082,
+        "exact_c": 0.9318755256518082,
+        "min_prob_max_abs_diff": 1.537781149296702e-05,
+        "c_summary": "1189 prompts, 22996 forward tokens (6376 generated) in 26.160 s: 879.1 tok/s",
+        "python_seconds": 34.88,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.9310344827586207,
+        "fake_quant_output_match": 1188
+      }
+    }
+  }
+}

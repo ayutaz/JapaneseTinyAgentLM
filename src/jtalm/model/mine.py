@@ -3,7 +3,7 @@
 """Hard-negative mining for training data v0.5.
 
     uv run --group train python -m jtalm.model.mine --ckpt <best.pt> \
-        --tokenizer tokenizer/out/action_v0_sp2048.model \
+        --tokenizer tokenizer/out/action_v1_sp2048.model \
         --pool datasets/raw/mine_pool/pool.jsonl --out artifacts/raw_mined
 
 Runs the current Action LM (grammar + confidence gate, as deployed) over human-written sentences

@@ -7,34 +7,40 @@
 
 [日本語](README.md)
 
-Tiny Japanese language models that run entirely on a microcontroller (ESP32-S3). The first model, the **Action LM** (3.15M parameters, trained from scratch), turns short Japanese requests into robot action calls (JSON). It runs on the M5Stack Stack-chan (K151, CoreS3) by itself — no NPU, no network — and moves the head and changes the face.
+Tiny Japanese language models that run entirely on a microcontroller (ESP32-S3). The first model, the **Action LM** (3.15M parameters, trained from scratch), turns short Japanese requests into robot action calls (JSON). It runs on the M5Stack Stack-chan (K151, CoreS3) by itself — no NPU, no network — and moves the head and changes the face, the base LED color, the volume and the screen brightness.
 
 ```text
-input:  左を見て、真ん中に戻ってきて。 ("Look left, then come back to the middle.")
-output: [{"name":"look","arguments":{"direction":"left","amount":"normal"}},
-         {"name":"look","arguments":{"direction":"center","amount":"normal"}}]
+input:  顔を右に45度向いて ("Turn your face 45 degrees to the right.")
+output: [{"name":"look","arguments":{"direction":"right","degrees":45}}]
+
+input:  LEDライトの色を青にして ("Make the LED light blue.")
+output: [{"name":"set_led","arguments":{"color":"blue"}}]
 ```
 
 ## What it does
 
-The output is a list of up to two calls to three actions: `look` (direction, amount), `set_expression` (happy / sad / surprised / neutral) and `nod` (count 1–3). Non-requests, negated requests and requests the robot cannot perform give `[]` (do nothing).
+The output is a list of up to two calls to the 11 tools of Action schema v1: `look` (absolute) and `turn` (relative to the current pose) with a direction (including diagonals) and either an amount or `degrees` (1–180); `nod` / `shake` (count 1–5); `bow`; `set_expression` (happy / sad / surprised / neutral / angry / sleepy / doubt); `set_led` (10 colors); `set_volume` / `set_brightness` (level 0–100); `adjust_volume` / `adjust_brightness` (up / down by an amount or `by` 1–100). Non-requests, negated requests, devices the robot does not have (the room light, the air conditioner) and requests the robot cannot perform give `[]` (do nothing).
 
 - Decoding is constrained by the action schema, so the output is always valid JSON.
-- A confidence gate (0.868) turns low-confidence outputs into `[]`.
-- The `.jtlm` file (INT4 weights + tokenizer) is 2.0 MB (1,971,456 bytes); the weights alone are 1.68 MB. The median latency on the device is 1.3 s per request.
+- A confidence gate (0.88506, chosen on validation only) turns low-confidence outputs into `[]`.
+- The `.jtlm` file (INT4 weights + tokenizer) is 2.0 MB (1,970,720 bytes); the weights alone are 1.68 MB. The median latency on the device is 1.04 s per request.
+- The previous release (Action schema v0: `look`, `set_expression`, `nod` only) is in the Git history and [`results/v051_action/`](results/v051_action/).
 
 ## Results
 
-INT4 + grammar + gate, mean ± standard deviation over five training seeds (the released model is seed 0):
+INT4 + grammar + gate, mean ± standard deviation over five training seeds (the released model is seed 0, fixed before evaluation):
 
 | Evaluation | Cases | Result |
 |---|---:|---|
-| Human-written requests | 62 | **85.2 ± 6.4%** (seed 0: 91.9%) |
-| False actions on human-written non-requests | 1,097 | **0.0 ± 0.0%** |
-| LLM-written evaluation set (exact match) | 1,189 | **94.0 ± 0.6%** |
-| Device (ESP32-S3) vs. PC (PyTorch) output | 300 | 300 / 300 identical |
+| The user's four everyday requests (「LEDライトの色を青にして」 etc.) | 4 | **4 / 4** (all seeds) |
+| Everyday Stack-chan phrasings (public examples and paraphrases, exact match) | 140 | **94.4 ± 0.9%** (seed 0: 92.9%) |
+| False actions on its confusable non-requests (room light, air conditioner, ...) | 65 | **0** (all seeds) |
+| Human-written requests | 65 | **91.7 ± 2.1%** (seed 0: 93.8%) |
+| False actions on human-written non-requests | 1,092 | **0.1 ± 0.1%** |
+| LLM-written evaluation set eval v3 (exact match) | 1,816 | **95.3 ± 0.5%** |
+| Device (ESP32-S3) vs. PC (PyTorch) output | 300 | 300 / 300 identical (motion plans too) |
 
-Japanese only (English requests are about 5% correct). Details: [`docs/evaluation.md`](docs/evaluation.md); device measurements: [`results/v051_action/device/`](results/v051_action/device/README.md). The documents in `docs/` are written in Japanese.
+Weak spots: relative `turn` (84.3% vs. 97.4% for `look` on single-action eval v3 cases), numeric requests stopped by the gate (7.3 ± 4.1% of them on the Stack-chan set), 「首を振って」 (nod or shake), and English (about 7% of requests correct; Japanese only). Details: [`docs/evaluation.md`](docs/evaluation.md) and [`results/v1_action/comparison.md`](results/v1_action/comparison.md); device measurements: [`results/v1_action/device/`](results/v1_action/device/README.md). The documents in `docs/` are written in Japanese.
 
 ## Quick start
 
@@ -60,7 +66,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 
 `<PORT>` is the serial port of the robot, e.g. `COM3` on Windows or `/dev/ttyACM0` on Linux.
 
-The servos are off at boot. Touching the screen or sending `!stop` stops the motion and powers the servos off; the firmware limits the angles (yaw ±30°, pitch −10 to +15°). Keep fingers and cables clear of the neck.
+The servos are off at boot. Touching the screen or sending `!stop` stops the motion and powers the servos off; the firmware limits the angles (yaw ±45°, pitch 0 to +85°; the head rests on the floor below horizontal). Keep fingers and cables clear of the neck.
 
 Building from source: [`firmware/README.md`](firmware/README.md), [`runtime/host/README.md`](runtime/host/README.md), [`docs/training.md`](docs/training.md). The C runtime in `runtime/host` is also an ESP-IDF component (`git: https://github.com/ayutaz/JapaneseTinyAgentLM.git`, `path: runtime/host` in `idf_component.yml`). [`runtime/web/`](runtime/web/README.md) builds the same runtime as WebAssembly for an in-browser demo.
 

@@ -1,0 +1,47 @@
+{
+  "sources_n": 101,
+  "sources_sha256": "d7225017121f0e3549d01fc3ab20dd9bfddc1c38a6a0e81df855c5977bd9126f",
+  "eval_sha256": "94eedae0362083e0f537068f18811f2a3b28cd31332257a40706fdb30548c6f2",
+  "n": 140,
+  "by_kind": {
+    "verbatim": 97,
+    "user": 4,
+    "paraphrase": 39
+  },
+  "by_source": {
+    "verbatim:https://docs.m5stack.com/ja/StackChan": 13,
+    "verbatim:https://github.com/Nonchira/StackChan-Pocket-Core2": 30,
+    "verbatim:https://github.com/Parassharmaa/stackchan-live": 22,
+    "verbatim:https://github.com/ronron-gh/AI_StackChan_Ex": 2,
+    "verbatim:https://github.com/ronron-gh/AI_StackChan2_FuncCall": 18,
+    "verbatim:https://blog.rpine.net/posts/stackchan-setup": 1,
+    "verbatim:https://blog.rpine.net/posts/stackchan-local-llm": 1,
+    "verbatim:https://blog.rpine.net/posts/stackchan-mcp-notion": 2,
+    "verbatim:https://github.com/kumakumapon/stack-chan": 4,
+    "verbatim:https://github.com/shatoshan/stackchan-brain": 3,
+    "verbatim:https://github.com/karaage0703/xangi-stackchan": 1,
+    "user": 4,
+    "paraphrase:llm-jp/llm-jp-3.1-13b-instruct4": 39
+  },
+  "by_category": {
+    "single": 75,
+    "no_action": 65
+  },
+  "licenses": {
+    "https://docs.m5stack.com/ja/StackChan: none stated (M5Stack docs; firmware repo m5stack/StackChan is MIT)": 13,
+    "https://github.com/Nonchira/StackChan-Pocket-Core2: MIT": 30,
+    "https://github.com/Parassharmaa/stackchan-live: MIT": 22,
+    "https://github.com/ronron-gh/AI_StackChan_Ex: MIT": 2,
+    "https://github.com/ronron-gh/AI_StackChan2_FuncCall: MIT": 18,
+    "https://blog.rpine.net/posts/stackchan-setup: none stated": 1,
+    "https://blog.rpine.net/posts/stackchan-local-llm: none stated": 1,
+    "https://blog.rpine.net/posts/stackchan-mcp-notion: none stated": 2,
+    "https://github.com/kumakumapon/stack-chan: Apache-2.0": 4,
+    "https://github.com/shatoshan/stackchan-brain: none set": 3,
+    "https://github.com/karaage0703/xangi-stackchan: MIT": 1,
+    "user: user": 4
+  },
+  "overrides": 6,
+  "overridden": 6,
+  "excluded": 1
+}

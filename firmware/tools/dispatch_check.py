@@ -2,10 +2,10 @@
 # Copyright 2026 ayutaz
 """Check the jtalm_action dispatcher (firmware A1-A3) against a Python reference.
 
-The reference validates with `jtalm.action.parse_output` and maps with
-`jtalm.action.mapping`; the device policy on top of it (soft limits, raw conversion,
-motion timing, nod around the current pitch) is recomputed here from the constants in
-`firmware/jtalm_action/main/action.h`. Every `JTALM {"t":"act"}` plan must match exactly.
+The reference (schema v1) validates with `jtalm.action.parse_output` and plans with
+`jtalm.action.mapping.plan_v1`; the device policy on top of it (raw conversion, motion
+timing) is recomputed here from the constants in `firmware/jtalm_action/main/action.h`,
+which must equal mapping.py's. Every `JTALM {"t":"act"}` plan must match exactly.
 
 Offline, on the output of `lm_serial.py --act` and its serial log:
 
@@ -20,6 +20,15 @@ On the device, validator fuzzing with `!act <json>` (needs pyserial):
 
     uv run --with pyserial python firmware/tools/dispatch_check.py \
         --port COM3 --fuzz 400 --out runs/device/a1/fuzz.jsonl
+
+On the host, the same validator and planner built from action.c (firmware/tools/act_host.c;
+Windows: the gcc of the ESP-IDF Docker image):
+
+    uv run python firmware/tools/dispatch_check.py --write-cases runs/fw/cases.txt --seed 1
+    # cc ... -o runs/fw/act_host firmware/tools/act_host.c firmware/jtalm_action/main/action.c -lm
+    runs/fw/act_host < runs/fw/cases.txt > runs/fw/host.jsonl
+    uv run python firmware/tools/dispatch_check.py --host-results runs/fw/host.jsonl \
+        --cases runs/fw/cases.txt
 """
 
 import argparse
@@ -32,7 +41,15 @@ import time
 from pathlib import Path
 
 from jtalm.action import mapping
-from jtalm.action.schema import AMOUNTS, DIRECTIONS, EXPRESSIONS, parse_output
+from jtalm.action.schema import (
+    ADJUST_DIRECTIONS,
+    AMOUNTS,
+    COLORS,
+    DIRECTIONS,
+    EXPRESSIONS,
+    TOOL_NAMES,
+    parse_output,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 ACTION_H = ROOT / "firmware" / "jtalm_action" / "main" / "action.h"
@@ -51,13 +68,18 @@ class Policy:
     """Device policy constants, taken from action.h and cross-checked with mapping.py."""
 
     def __init__(self, d: dict[str, float]) -> None:
-        assert d["ACT_YAW_LIMIT_DEG"] == mapping.YAW_LIMIT_DEG
-        assert d["ACT_PITCH_LIMIT_DEG"] == mapping.PITCH_LIMIT_DEG
+        self.limits = mapping.Limits(
+            d["ACT_YAW_MIN_DEG"], d["ACT_YAW_MAX_DEG"], d["ACT_PITCH_MIN_DEG"],
+            d["ACT_PITCH_MAX_DEG"],
+        )  # fmt: skip
+        assert self.limits == mapping.DEFAULT_LIMITS, (self.limits, mapping.DEFAULT_LIMITS)
         assert d["ACT_NOD_PITCH_DEG"] == mapping.NOD_PITCH_DEG
-        self.yaw_min = int(max(-mapping.YAW_LIMIT_DEG, d["HW_YAW_MIN_DEG"]))
-        self.yaw_max = int(min(mapping.YAW_LIMIT_DEG, d["HW_YAW_MAX_DEG"]))
-        self.pitch_min = int(max(-mapping.PITCH_LIMIT_DEG, d["HW_PITCH_MIN_DEG"]))
-        self.pitch_max = int(min(mapping.PITCH_LIMIT_DEG, d["HW_PITCH_MAX_DEG"]))
+        assert d["ACT_SHAKE_YAW_DEG"] == mapping.SHAKE_YAW_DEG
+        assert d["ACT_BOW_LIFT_DEG"] == mapping.BOW_LIFT_DEG
+        assert d["ACT_BOW_HOLD_MS"] == mapping.BOW_HOLD_MS
+        assert d["ACT_BRIGHTNESS_MIN"] == mapping.BRIGHTNESS_MIN
+        steps = [d["ACT_ADJUST_SLIGHT"], d["ACT_ADJUST_NORMAL"], d["ACT_ADJUST_LARGE"]]
+        assert steps == [mapping.ADJUST_STEP[a] for a in AMOUNTS]
         self.yaw_zero = d["SERVO_YAW_ZERO"]
         self.pitch_zero = d["SERVO_PITCH_ZERO"]
         self.vmax = d["MOTION_VMAX_DPS"]
@@ -74,61 +96,39 @@ class Policy:
         t = max(math.pi * deg / (2 * vmax), math.pi * math.sqrt(deg / (2 * amax)))
         return int(math.ceil(t * 1000 / self.tick - 1e-9) * self.tick)
 
-    def plan(self, calls: list[dict], yaw: int, pitch: int) -> dict:
+    def plan(self, calls: list[dict], yaw: float, pitch: float) -> dict:
+        """The device plan from mapping.plan_v1 plus the device's motion timing."""
         steps: list[dict] = []
         total = 0
-
-        def move(c: int, y: int, p: int, nod: bool = False) -> None:
-            nonlocal yaw, pitch, total
-            cy = min(max(y, self.yaw_min), self.yaw_max)
-            cp = min(max(p, self.pitch_min), self.pitch_max)
-            ms = self.move_ms(max(abs(cy - yaw), abs(cp - pitch)), nod)
-            steps.append(
-                {
-                    "c": c,
-                    "k": "move",
-                    "yaw": cy,
-                    "pitch": cp,
-                    "yaw_raw": round(self.yaw_zero - cy * 16 / 5),
-                    "pitch_raw": round(self.pitch_zero + cp * 16 / 5),
-                    "ms": ms,
-                    "clamped": int((cy, cp) != (y, p)),
-                }
-            )
-            total += ms
-            yaw, pitch = cy, cp
-
-        start_yaw, start_pitch = yaw, pitch
+        start = [yaw, pitch]
         for c, call in enumerate(calls):
             if c:
                 total += self.gap
-            name = call["name"]
-            if name == "set_expression":
-                steps.append({"c": c, "k": "expr", "expr": call["arguments"]["expression"]})
-            elif name == "look":
-                (t,) = mapping.servo_targets(call)
-                move(
-                    c,
-                    yaw if t.yaw_deg is None else t.yaw_deg,
-                    pitch if t.pitch_deg is None else t.pitch_deg,
-                )
-            else:
-                # The swing around the current pitch within the soft limits comes from
-                # mapping.nod_targets; the device then returns to the pitch it started from.
-                start = pitch
-                targets = mapping.nod_targets(
-                    call["arguments"]["count"], start, self.pitch_min, self.pitch_max
-                )
-                for t in targets:
-                    move(c, yaw, t.pitch_deg, nod=True)
-                if targets and targets[-1].pitch_deg != start:
-                    move(c, yaw, start, nod=True)
-        return {
-            "from": [start_yaw, start_pitch],
-            "steps": steps,
-            "to": [yaw, pitch],
-            "total_ms": total,
-        }
+            swing = call["name"] in ("nod", "shake")  # the faster nod profile
+            for s in mapping.plan_v1([call], (yaw, pitch), self.limits):
+                k = s["kind"]
+                if k == "move":
+                    y, p = s["yaw"], s["pitch"]
+                    ms = self.move_ms(max(abs(y - yaw), abs(p - pitch)), swing)
+                    steps.append({
+                        "c": c, "k": "move", "yaw": y, "pitch": p,
+                        "yaw_raw": round(self.yaw_zero - y * 16 / 5),
+                        "pitch_raw": round(self.pitch_zero + p * 16 / 5),
+                        "ms": ms, "clamped": int(s["clamped"]),
+                    })  # fmt: skip
+                    total += ms
+                    yaw, pitch = y, p
+                elif k == "pause":
+                    steps.append({"c": c, "k": "pause", "ms": s["ms"]})
+                    total += s["ms"]
+                elif k == "expr":
+                    steps.append({"c": c, "k": "expr", "expr": s["expression"]})
+                elif k == "led":
+                    steps.append({"c": c, "k": "led", "color": s["color"]})
+                else:  # volume / brightness: "level" or "delta"
+                    key = "level" if "level" in s else "delta"
+                    steps.append({"c": c, "k": k, key: s[key]})
+        return {"from": start, "steps": steps, "to": [yaw, pitch], "total_ms": total}
 
 
 def check_act(pol: Policy, act: dict, output: str, pose: list[int]) -> list[str]:
@@ -166,7 +166,7 @@ def read_log(path: Path) -> list[dict]:
 
 
 def check_log(recs: list[dict], acts: list[dict], tol_ms: float) -> dict:
-    """Checks act_done / face / fault records in the serial log against the plans."""
+    """Checks act_done / face / setting / fault records in the serial log against the plans."""
     done = {r["seq"]: r for r in recs if r.get("t") == "act_done"}
     faces = [r for r in recs if r.get("t") == "face"]
     crc: dict[str, set[str]] = {}
@@ -188,6 +188,14 @@ def check_log(recs: list[dict], acts: list[dict], tol_ms: float) -> dict:
         n_face = sum(f["seq"] == a["seq"] for f in faces)
         if n_expr != n_face:
             problems.append(f"seq {a['seq']}: {n_expr} expr steps, {n_face} face records")
+        n_set = sum(s["k"] in ("led", "volume", "brightness") for s in a["steps"])
+        n_rec = sum(r.get("t") == "setting" and r.get("seq") == a["seq"] for r in recs)
+        if n_set != n_rec:
+            problems.append(f"seq {a['seq']}: {n_set} setting steps, {n_rec} setting records")
+        bad = [r for r in recs if r.get("t") == "setting" and r.get("seq") == a["seq"]
+               and not r.get("ok")]  # fmt: skip
+        if bad:
+            problems.append(f"seq {a['seq']}: setting failed {bad}")
         if d["ms"] > d["planned_ms"] + tol_ms:
             problems.append(f"seq {a['seq']}: took {d['ms']} ms for {d['planned_ms']} ms")
     per_expr = {k: sorted(v) for k, v in crc.items()}
@@ -207,6 +215,18 @@ def check_log(recs: list[dict], acts: list[dict], tol_ms: float) -> dict:
         "problems": problems[:20],
         "n_problems": len(problems),
     }
+
+
+def compare_host(pol: Policy, cases: list[str], recs: list[dict]) -> dict:
+    """Checks act_host records (one per case, pose carried over) against the reference."""
+    pose = [0, 0]
+    mism = []
+    for i, (text, act) in enumerate(zip(cases, recs, strict=True)):
+        errs = check_act(pol, act, text, pose)
+        if errs:
+            mism.append({"i": i, "json": text, "errs": errs})
+        pose = next_pose(act, pose)
+    return {"n": len(cases), "match": len(cases) - len(mism), "mismatches": mism[:20]}
 
 
 def offline(args: argparse.Namespace, pol: Policy) -> dict:
@@ -241,31 +261,51 @@ def fuzz_cases(n: int, seed: int) -> list[str]:
     rng = random.Random(seed)
 
     def call() -> dict:
-        k = rng.randrange(3)
-        if k == 0:
-            args = {"direction": rng.choice(DIRECTIONS), "amount": rng.choice(AMOUNTS)}
-            return {"name": "look", "arguments": args}
-        if k == 1:
-            return {"name": "set_expression", "arguments": {"expression": rng.choice(EXPRESSIONS)}}
-        return {"name": "nod", "arguments": {"count": rng.randint(1, 3)}}
+        name = rng.choice(TOOL_NAMES)
+        if name in ("look", "turn"):
+            dirs = DIRECTIONS if name == "look" else tuple(d for d in DIRECTIONS if d != "center")
+            d = rng.choice(dirs)
+            if d == "center" or rng.random() < 0.5:
+                return {"name": name, "arguments": {"direction": d, "amount": rng.choice(AMOUNTS)}}
+            return {"name": name, "arguments": {"direction": d, "degrees": rng.randint(1, 180)}}
+        if name in ("nod", "shake"):
+            return {"name": name, "arguments": {"count": rng.randint(1, 5)}}
+        if name == "bow":
+            return {"name": name, "arguments": {}}
+        if name == "set_expression":
+            return {"name": name, "arguments": {"expression": rng.choice(EXPRESSIONS)}}
+        if name == "set_led":
+            return {"name": name, "arguments": {"color": rng.choice(COLORS)}}
+        if name in ("set_volume", "set_brightness"):
+            return {"name": name, "arguments": {"level": rng.randint(0, 100)}}
+        d = rng.choice(ADJUST_DIRECTIONS)
+        if rng.random() < 0.5:
+            return {"name": name, "arguments": {"direction": d, "amount": rng.choice(AMOUNTS)}}
+        return {"name": name, "arguments": {"direction": d, "by": rng.randint(1, 100)}}
 
     def mutate(calls: list[dict]) -> object:
         calls = json.loads(json.dumps(calls))
-        m = rng.randrange(14)
+        m = rng.randrange(20)
         c = calls[0] if calls else call()
         a = c["arguments"]
-        if m == 0:
+        bad_numbers = [0, -1, 6, 101, 181, 2.0, 45.0, 1e2, True, "45", None, 1.5]
+        if m == 0 and a:
             a[rng.choice(list(a))] = rng.choice(["LEFT", "", "happy ", "center", 1, None])
         elif m == 1:
             c["extra"] = 1
         elif m == 2:
             a["speed"] = "fast"
-        elif m == 3:
+        elif m == 3 and a:
             del a[rng.choice(list(a))]
         elif m == 4:
-            c["name"] = rng.choice(["look_at", "Look", "nod ", "speak"])
+            c["name"] = rng.choice(["look_at", "Look", "nod ", "speak", "set_color", "volume"])
         elif m == 5:
-            return {"name": "nod", "arguments": {"count": rng.choice([0, 4, -1, 2.0, True, "2"])}}
+            key = rng.choice(["count", "degrees", "level", "by"])
+            for k in ("amount", "count", "degrees", "level", "by"):
+                if k in a:
+                    del a[k]
+                    a[key] = rng.choice(bad_numbers)
+                    break
         elif m == 6:
             return [c, c]
         elif m == 7:
@@ -280,8 +320,25 @@ def fuzz_cases(n: int, seed: int) -> list[str]:
             return {"calls": calls}
         elif m == 12:
             return [{"arguments": a, "name": c["name"]}]
-        else:
+        elif m == 13:
             c["arguments"] = json.dumps(a)
+        elif m == 14:  # amount and degrees together
+            return [{"name": "look", "arguments": {"direction": "right", "amount": "slight",
+                                                   "degrees": 30}}]  # fmt: skip
+        elif m == 15:  # center with degrees, turn to center
+            name = rng.choice(["look", "turn"])
+            args = {"direction": "center", "degrees": rng.randint(1, 90)}
+            return [{"name": name, "arguments": args}]
+        elif m == 16:  # bow with arguments
+            return [{"name": "bow", "arguments": {"count": 1}}]
+        elif m == 17:  # adjust with level / set with by
+            return [{"name": "adjust_volume", "arguments": {"level": 50}}]
+        elif m == 18:  # a number as a float twice: kept apart by the duplicate rule
+            return [{"name": "nod", "arguments": {"count": 2}},
+                    {"name": "nod", "arguments": {"count": 2.0}}]  # fmt: skip
+        else:  # the same relative move twice from the limit
+            far = {"name": "turn", "arguments": {"direction": "right", "degrees": 180}}
+            return [far, {"name": "turn", "arguments": {"direction": "right", "amount": "large"}}]
         return calls
 
     raw = [
@@ -318,6 +375,12 @@ def fuzz_cases(n: int, seed: int) -> list[str]:
         '{"name":"look","arguments":{"direction":"left","amount":"large"}}]',
         '[{"name":"look","arguments":{"direction":"left","amount":"large"}},'
         '{"name":"look","arguments":{"direction":"right","amount":"large"}}]',
+        # outside schema v0, valid in v1
+        '[{"name":"look","arguments":{"direction":"up_left","amount":"slight"}}]',
+        '[{"name":"set_expression","arguments":{"expression":"angry"}}]',
+        '[{"name":"nod","arguments":{"count":4}}]',
+        '[{"name":"look","arguments":{"direction":"left","degrees":20}}]',
+        '[{"name":"set_volume","arguments":{"level":5}}]',
         '{"name":"nod","arguments":{"count":1}}',
         "[[[[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]]]]",
         '["look"]',
@@ -326,6 +389,29 @@ def fuzz_cases(n: int, seed: int) -> list[str]:
         '[{"name":"nod","arguments":{"count":1}} ]',
         '[{"name":"nod","arguments":{"count":1}\n}]',
         '[{"name":"nod","arguments":{"count":1}}]]',
+        '[{"name":"look","arguments":{"direction":"up","degrees":90}}]',
+        '[{"name":"look","arguments":{"direction":"right","degrees":45}}]',
+        '[{"name":"turn","arguments":{"direction":"right","amount":"slight"}}]',
+        '[{"name":"turn","arguments":{"direction":"up_left","degrees":20}},'
+        '{"name":"shake","arguments":{"count":5}}]',
+        '[{"name":"bow","arguments":{}}]',
+        '[{"name":"bow","arguments":{}},{"name":"bow","arguments":{}}]',
+        '[{"name":"set_led","arguments":{"color":"blue"}}]',
+        '[{"name":"set_volume","arguments":{"level":50}}]',
+        '[{"name":"set_volume","arguments":{"level":0}}]',
+        '[{"name":"set_volume","arguments":{"level":-0}}]',
+        '[{"name":"set_volume","arguments":{"level":100.0}}]',
+        # json.dumps tells -0.0 from 0.0, so these two are not duplicates
+        '[{"name":"set_volume","arguments":{"level":-0.0}},'
+        '{"name":"set_volume","arguments":{"level":0.0}}]',
+        '[{"name":"set_volume","arguments":{"level":-0.0}},'
+        '{"name":"set_volume","arguments":{"level":-0.0}}]',
+        '[{"name":"adjust_volume","arguments":{"direction":"down","by":10}}]',
+        '[{"name":"adjust_brightness","arguments":{"direction":"down","amount":"slight"}}]',
+        '[{"name":"set_brightness","arguments":{"level":0}}]',
+        '[{"name":"nod","arguments":{"count":5}},{"name":"nod","arguments":{"count":5.0}}]',
+        '[{"name":"shake","arguments":{"count":5}},{"name":"nod","arguments":{"count":5}}]',
+        '[{"name":"look","arguments":{"direction":"down_right","degrees":180}}]',
     ]
     cases = [c for c in raw if "\n" not in c]
     while len(cases) < n:
@@ -397,9 +483,26 @@ def main() -> int:
     ap.add_argument("--fuzz", type=int, default=0, help="number of !act cases to send")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", type=Path, help="fuzz records (.jsonl) / summary path")
+    ap.add_argument("--write-cases", type=Path, help="write --n fuzz cases (one per line)")
+    ap.add_argument("--n", type=int, default=3000, help="number of cases for --write-cases")
+    ap.add_argument("--host-results", type=Path, help="act_host output for --cases")
+    ap.add_argument("--cases", type=Path, help="the cases given to act_host")
     args = ap.parse_args()
 
     pol = Policy(load_defines())
+    if args.write_cases:
+        cases = fuzz_cases(args.n, args.seed)
+        args.write_cases.write_text("\n".join(cases) + "\n", encoding="utf-8", newline="\n")
+        print(f"{len(cases)} cases -> {args.write_cases}")
+        return 0
+    if args.host_results:
+        if not args.cases:
+            ap.error("--host-results needs --cases")
+        cases = args.cases.read_text("utf-8").splitlines()
+        recs = [json.loads(x) for x in args.host_results.read_text("utf-8").splitlines()]
+        summary = compare_host(pol, cases, recs)
+        print(json.dumps(summary, ensure_ascii=False, indent=1))
+        return 1 if summary["mismatches"] else 0
     if args.fuzz:
         if not args.port or not args.out:
             ap.error("--fuzz needs --port and --out")

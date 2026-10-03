@@ -1,0 +1,17 @@
+stackchan_v1 {"prompts":140,"sameOutput":140,"sameProb":140,"msPerPrompt":56.464285714285715}
+eval_v3 {"prompts":1816,"sameOutput":1816,"sameProb":1816,"msPerPrompt":70.58480176211454}
+val_v1.0 {"prompts":4678,"sameOutput":4678,"sameProb":4678,"msPerPrompt":53.63980333475845}
+relabel_eval_v2_amount_words {"prompts":278,"sameOutput":278,"sameProb":278,"msPerPrompt":63.223021582733814}
+relabel_eval_v2_center_phrasing {"prompts":223,"sameOutput":223,"sameProb":223,"msPerPrompt":50.964125560538115}
+relabel_eval_v2_correction {"prompts":44,"sameOutput":44,"sameProb":44,"msPerPrompt":65.54545454545455}
+relabel_eval_v2_english {"prompts":70,"sameOutput":70,"sameProb":70,"msPerPrompt":88.81428571428572}
+relabel_eval_v2_fragments {"prompts":182,"sameOutput":182,"sameProb":182,"msPerPrompt":22.01098901098901}
+relabel_eval_v2_long_preface {"prompts":247,"sameOutput":247,"sameProb":247,"msPerPrompt":77.03643724696356}
+relabel_eval_v2_negation_forms {"prompts":168,"sameOutput":168,"sameProb":168,"msPerPrompt":41.654761904761905}
+relabel_eval_v2_numbers {"prompts":167,"sameOutput":167,"sameProb":167,"msPerPrompt":43.15568862275449}
+relabel_eval_v2_order_words {"prompts":296,"sameOutput":296,"sameProb":296,"msPerPrompt":64.98648648648648}
+relabel_eval_v2_orthography {"prompts":282,"sameOutput":282,"sameProb":282,"msPerPrompt":55.758865248226954}
+relabel_eval_v2_question_forms {"prompts":203,"sameOutput":203,"sameProb":203,"msPerPrompt":52.69458128078818}
+relabel_eval_v2_unexecutable {"prompts":286,"sameOutput":286,"sameProb":286,"msPerPrompt":44.87762237762238}
+relabel_human_v1 {"prompts":1157,"sameOutput":1157,"sameProb":1157,"msPerPrompt":46.868625756266205}
+relabel_v0_eval {"prompts":1189,"sameOutput":1189,"sameProb":1189,"msPerPrompt":48.52144659377628}

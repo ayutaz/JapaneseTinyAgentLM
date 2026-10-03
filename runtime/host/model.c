@@ -616,7 +616,7 @@ int jtlm_generate_from(const jtlm_model *m, jtlm_state *s, const jtlm_grammar *g
         softmax(logits, c->vocab_size); /* now probabilities */
         int next = 0;
         if (grammar) {
-            int allowed[8], k = jtlm_grammar_allowed(grammar, &st, allowed);
+            int allowed[JTLM_MAX_ALLOWED], k = jtlm_grammar_allowed(grammar, &st, allowed);
             next = allowed[0];
             for (int i = 1; i < k; i++) /* highest probability, lowest id on ties */
                 if (logits[allowed[i]] > logits[next] ||

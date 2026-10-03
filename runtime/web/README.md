@@ -31,4 +31,6 @@ runtime/host/build/accf/jtalm -m model.jtlm --grammar -i prompts.txt > host.json
 node runtime/web/parity.cjs model.jtlm prompts.txt host.jsonl
 ```
 
-公開しているモデル（`jtalm_action_3m_q4_g64.jtlm`）と評価セットの全 4,794 文（Emscripten 3.1.62、Node.js 24）で、出力も確信度も host の C runtime と完全に一致しました（`{"prompts":4794,"sameOutput":4794,"sameProb":4794}`）。Node.js では1文あたり約 40 ms でした。
+schema v1 の公開モデル（`jtalm_action_3m_q4_g64.jtlm`）と、v1 の評価セットと validation の 11,426 文（Emscripten 3.1.62、Node.js 22〜24）で、出力も確信度も host の C runtime（`float` の累積）と完全に一致しました（[`results/v1_action/parity/`](../../results/v1_action/parity/README.md)）。Node.js では1文あたり約 50 ms でした。前の版（schema v0）のモデルでも、評価セットの全 4,794 文で一致していました。
+
+- ページの gate の既定値は、Hugging Face のモデルの `config.json` の `gate_threshold` です（読めないときは 0.88506）。

@@ -1,0 +1,41 @@
+{
+  "training_text": {
+    "lines": 198005,
+    "sources": [
+      "datasets\\action\\v1.0 train+val prompts and targets",
+      "MASSIVE ja-JP train utterances (CC BY 4.0)"
+    ]
+  },
+  "tokenizers": [
+    {
+      "file": "action_v1_sp2048.model",
+      "sha256": "80eae3c8ef151273cddafe45f4f5432c2bafefac07b294bbd0cc6f19558b7314",
+      "vocab_size": 2048,
+      "val_prompts": {
+        "n": 4678,
+        "tokens_mean": 11.95,
+        "tokens_max": 56,
+        "byte_fallback_rate": 0.00174,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 26
+      },
+      "massive_dev": {
+        "n": 1996,
+        "tokens_mean": 14.29,
+        "tokens_max": 54,
+        "byte_fallback_rate": 0.00999,
+        "unk_rate": 0.0,
+        "texts_with_byte_fallback": 84
+      },
+      "target_tokens_mean": 5.61,
+      "target_tokens_max": 14,
+      "target_roundtrip_ok": true,
+      "sequence_tokens_max": 71,
+      "embedding_params": {
+        "192": 393216,
+        "256": 524288,
+        "384": 786432
+      }
+    }
+  ]
+}

@@ -3,9 +3,9 @@
 """Evaluate Action LM checkpoints and compare them with the rule baseline and existing models.
 
     uv run --group train python -m jtalm.model.evaluate \
-        --ckpt runs/m4/3m/best.pt runs/m4/5m/best.pt \
-        --tokenizer tokenizer/out/action_v0_sp2048.model \
-        --out runs/m4/eval
+        --ckpt runs/local/v1/3m-s0/best.pt \
+        --tokenizer tokenizer/out/action_v1_sp2048.model \
+        --out runs/local/v1/eval
 
 Decoding is greedy with the fixed prompt format of ``jtalm.model.format``. ``--modes`` selects
 ``plain`` (no constraint), ``grammar`` (``jtalm.model.grammar``), and ``gate`` (grammar plus the
@@ -126,12 +126,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--ckpt", type=Path, nargs="+", required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
     parser.add_argument(
-        "--cases", type=Path, default=PROJECT_ROOT / "datasets/action/v0/eval.jsonl"
+        "--cases", type=Path, default=PROJECT_ROOT / "datasets/action/eval_v3/eval.jsonl"
     )
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--device", default="auto")
     parser.add_argument("--modes", nargs="+", choices=MODES, default=["plain"])
-    parser.add_argument("--val", type=Path, default=PROJECT_ROOT / "datasets/action/v0/val.jsonl")
+    parser.add_argument("--val", type=Path, default=PROJECT_ROOT / "datasets/action/v1.0/val.jsonl")
     args = parser.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):  # Japanese tables on a cp932 Windows console
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")

@@ -1,0 +1,513 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ayutaz/JapaneseTinyAgentLM/action_schema_v1.json",
+  "title": "JapaneseTinyAgentLM Action schema v1",
+  "type": "array",
+  "maxItems": 2,
+  "items": {
+    "oneOf": [
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "look"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "amount"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "left",
+                  "right",
+                  "up",
+                  "down",
+                  "up_left",
+                  "up_right",
+                  "down_left",
+                  "down_right",
+                  "center"
+                ]
+              },
+              "amount": {
+                "enum": [
+                  "slight",
+                  "normal",
+                  "large"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "look"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "degrees"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "left",
+                  "right",
+                  "up",
+                  "down",
+                  "up_left",
+                  "up_right",
+                  "down_left",
+                  "down_right",
+                  "center"
+                ]
+              },
+              "degrees": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 180
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "turn"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "amount"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "left",
+                  "right",
+                  "up",
+                  "down",
+                  "up_left",
+                  "up_right",
+                  "down_left",
+                  "down_right"
+                ]
+              },
+              "amount": {
+                "enum": [
+                  "slight",
+                  "normal",
+                  "large"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "turn"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "degrees"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "left",
+                  "right",
+                  "up",
+                  "down",
+                  "up_left",
+                  "up_right",
+                  "down_left",
+                  "down_right"
+                ]
+              },
+              "degrees": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 180
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "nod"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "count"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "shake"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "count"
+            ],
+            "properties": {
+              "count": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "bow"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [],
+            "properties": {}
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "set_expression"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "expression"
+            ],
+            "properties": {
+              "expression": {
+                "enum": [
+                  "happy",
+                  "sad",
+                  "surprised",
+                  "neutral",
+                  "angry",
+                  "sleepy",
+                  "doubt"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "set_led"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "color"
+            ],
+            "properties": {
+              "color": {
+                "enum": [
+                  "red",
+                  "orange",
+                  "yellow",
+                  "green",
+                  "light_blue",
+                  "blue",
+                  "purple",
+                  "pink",
+                  "white",
+                  "off"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "set_volume"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "level"
+            ],
+            "properties": {
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "adjust_volume"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "amount"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "up",
+                  "down"
+                ]
+              },
+              "amount": {
+                "enum": [
+                  "slight",
+                  "normal",
+                  "large"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "adjust_volume"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "by"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "up",
+                  "down"
+                ]
+              },
+              "by": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "set_brightness"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "level"
+            ],
+            "properties": {
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "adjust_brightness"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "amount"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "up",
+                  "down"
+                ]
+              },
+              "amount": {
+                "enum": [
+                  "slight",
+                  "normal",
+                  "large"
+                ]
+              }
+            }
+          }
+        }
+      },
+      {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "arguments"
+        ],
+        "properties": {
+          "name": {
+            "const": "adjust_brightness"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "direction",
+              "by"
+            ],
+            "properties": {
+              "direction": {
+                "enum": [
+                  "up",
+                  "down"
+                ]
+              },
+              "by": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}

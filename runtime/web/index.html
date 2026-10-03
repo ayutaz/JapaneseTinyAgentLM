@@ -69,8 +69,8 @@ a { color: var(--accent); }
 
   <div class="card note">
     <ul>
-      <li><strong>会話のモデルではありません。</strong>返すのは次の3種類の動作を最大2個まで並べた JSON だけです:
-        <code>look</code>（首を向ける: 左右上下・正面、少し/普通/大きく）、<code>set_expression</code>（表情: 笑顔/悲しい/驚き/普通）、<code>nod</code>（うなずく: 1〜3回）。</li>
+      <li><strong>会話のモデルではありません。</strong>返すのは次の11の動作を最大2個まで並べた JSON だけです:
+        首を向ける（絶対・相対、角度も可）、うなずく、首を横に振る、お辞儀、表情（7種類）、LED の色、音量、画面の明るさ。</li>
       <li>動作の依頼でない文、否定された依頼、このロボットにできない依頼には <code>[]</code>（何もしない）を返すように学習しています。</li>
       <li>生成した token の確率の最小値（確信度）が閾値より低いときは、出力を <code>[]</code> に取り消します（gate）。</li>
       <li>計算は ESP32-S3 の firmware と同じ C の runtime を WebAssembly にしたもので、重みも実機と同じ INT4 の <code>.jtlm</code> です。入力した文はどこにも送られません。</li>
@@ -120,20 +120,38 @@ const EXAMPLES = [
   "左を見て、真ん中に戻ってきて。", "いや、下は見なくて大丈夫。上を向いてみて!", "ほら 笑顔を見せて",
   "笑わないでね", "右むかないで、ちょっとやめといてくれる?", "まっすぐ行って、右に曲がってください。",
   "こんにちは", "今日の天気はどう?",
+  "LEDライトの色を青にして", "音声の音量を50にして", "頭を90度上に向けて", "顔を右に45度向いて",
+  "もう少し右", "寝室のライトをつけて",
 ];
-const DIRECTION = { left: "左", right: "右", up: "上", down: "下", center: "正面" };
+const DIRECTION = { left: "左", right: "右", up: "上", down: "下", up_left: "左上", up_right: "右上",
+  down_left: "左下", down_right: "右下", center: "正面" };
 const AMOUNT = { slight: "少し", normal: "", large: "大きく" };
-const EXPRESSION = { happy: "笑顔", sad: "悲しい顔", surprised: "驚いた顔", neutral: "普通の顔" };
+const EXPRESSION = { happy: "笑顔", sad: "悲しい顔", surprised: "驚いた顔", neutral: "普通の顔",
+  angry: "怒った顔", sleepy: "眠そうな顔", doubt: "不思議そうな顔" };
+const COLOR = { red: "赤", orange: "オレンジ", yellow: "黄色", green: "緑", light_blue: "水色",
+  blue: "青", purple: "紫", pink: "ピンク", white: "白" };
+const UPDOWN = { up: "上げる", down: "下げる" };
+
+function size(a) { return "degrees" in a ? `${a.degrees}度` : AMOUNT[a.amount]; }
 const $ = (id) => document.getElementById(id);
-let predict, defaultGate = 0.868, last = null;
+let predict, defaultGate = 0.88506, last = null;
 
 function describe(call) {
   const a = call.arguments;
-  if (call.name === "look") {
-    return a.direction === "center" ? "正面を向く" : `${AMOUNT[a.amount]}${DIRECTION[a.direction]}を向く`;
+  switch (call.name) {
+    case "look": return a.direction === "center" ? "正面を向く" : `${DIRECTION[a.direction]}を${size(a)}向く`;
+    case "turn": return `今の向きから${DIRECTION[a.direction]}へ${size(a) || "普通に"}動く`;
+    case "nod": return `${a.count}回うなずく`;
+    case "shake": return `首を横に${a.count}回振る`;
+    case "bow": return "お辞儀する";
+    case "set_expression": return `${EXPRESSION[a.expression]}にする`;
+    case "set_led": return a.color === "off" ? "LED を消す" : `LED を${COLOR[a.color]}にする`;
+    case "set_volume": return `音量を${a.level}にする`;
+    case "set_brightness": return `画面の明るさを${a.level}にする`;
+    case "adjust_volume": return `音量を${"by" in a ? a.by : AMOUNT[a.amount]}${UPDOWN[a.direction]}`;
+    case "adjust_brightness": return `明るさを${"by" in a ? a.by : AMOUNT[a.amount]}${UPDOWN[a.direction]}`;
   }
-  if (call.name === "set_expression") return `${EXPRESSION[a.expression]}にする`;
-  return `${a.count}回うなずく`;
+  return JSON.stringify(call);
 }
 
 function gated(r, gate) {

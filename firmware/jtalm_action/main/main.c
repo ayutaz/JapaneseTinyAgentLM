@@ -10,8 +10,8 @@
 //
 //   JTALM {"t":"gen","output":"[...]","raw":"[...]","gated":0,"ids":[...],...}
 //
-// "raw" is the decoded output; "output" is it after the confidence gate (CONFIG_JTALM_GATE_
-// PERMILLE): "[]" when the minimum token probability is below the threshold.
+// "raw" is the decoded output; "output" is it after the confidence gate (CONFIG_JTALM_GATE_PPM,
+// parts per million): "[]" when the minimum token probability is below the threshold.
 // Lines starting with '!' are commands: "!heap", "!info", "!grammar 0|1", "!gate <threshold>"
 // (0 turns it off), "!par 0|1" (split
 // matrix products across both cores), "!batch 0|1" (batched prefill; 0 runs the prompt one
@@ -22,10 +22,18 @@
 // (servo.c), which changes the face on the display (board.cpp) and moves the head. Servo
 // output is off after boot (dry-run: plans run with their timing but nothing is sent to the
 // servos). Commands: "!act <json>" (dispatch an Action JSON without the LM), "!center",
-// "!servo on" (power the servos and center the head), and, handled at once even while the
+// "!pose <yaw> <pitch>" (one move within the soft limits), "!led <r> <g> <b>" (diagnostics: the base LEDs), "!servo on" (power the servos and center the head), and, handled at once even while the
 // LM is busy, "!stop" / "!servo off" (torque off and servo power off), "!relax" (torque
 // off), "!servo" (status). A touch on the screen also stops. "!wdtest" (dry-run only) runs a
 // plan that overruns its deadline, to check the watchdog. No Wi-Fi.
+//
+// Action schema v1: besides look / turn (amount or degrees, diagonals), nod, shake and bow
+// (the head holds bowed for a moment), the dispatcher shows 7 faces (happy, sad, surprised,
+// neutral, angry, sleepy, doubt), sets the 12 base LEDs to one color, sets the speaker volume
+// (a short beep at the new volume) and the screen brightness (never below 5, so the face stays
+// visible). Volume, brightness and LED color are stored in NVS after each plan that changed
+// one and are restored at boot: JTALM {"t":"settings",...} at boot, {"t":"setting",...} per
+// step.
 
 #include <inttypes.h>
 #include <math.h>
@@ -51,6 +59,7 @@
 #include "mbedtls/sha256.h"
 #include "sdkconfig.h"
 #include "servo.h"
+#include "settings.h"
 #include "soc/extmem_reg.h"
 
 #define MODEL_PARTITION_SUBTYPE 0x40
@@ -214,7 +223,7 @@ static void emit_info(const lm_t *lm) {
       ",\"vocab\":%d,\"d_model\":%d,\"n_layers\":%d,\"n_heads\":%d,\"n_kv_heads\":%d"
       ",\"d_ff\":%d,\"max_seq_len\":%d,\"bits\":%d,\"group\":%d"
       ",\"arena\":\"%s\",\"arena_bytes\":%u,\"kv_bytes\":%u,\"kv_int8\":%d,\"batch\":%d"
-      ",\"grammar\":%d,\"gate\":%.3f,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
+      ",\"grammar\":%d,\"gate\":%.6g,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
       app->project_name, app->idf_ver, elf_sha, app->date, app->time,
       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, lm->sha, (unsigned)lm->image_bytes,
       c->vocab_size, c->d_model, c->n_layers, c->n_heads, c->n_kv_heads, c->d_ff,
@@ -279,7 +288,7 @@ static int lm_init(lm_t *lm) {
     return -1;
   }
   lm->use_grammar = 1;
-  lm->gate = CONFIG_JTALM_GATE_PERMILLE / 1000.0;
+  lm->gate = CONFIG_JTALM_GATE_PPM / 1000000.0;
   lm->use_batch = 1;
   lm->use_par = 1;
   jtlm_set_parallel(run_parallel);
@@ -299,24 +308,35 @@ static void reset_state(lm_t *lm) {
   }
 }
 
-static void print_call(const act_call_t *c) {
-  if (c->kind == ACT_LOOK) {
-    printf(
-        "{\"name\":\"look\",\"arguments\":{\"direction\":\"%s\",\"amount\":\"%s\"}}",
-        act_dir_names[c->dir], act_amount_names[c->amount]
-    );
-  } else if (c->kind == ACT_EXPR) {
-    printf(
-        "{\"name\":\"set_expression\",\"arguments\":{\"expression\":\"%s\"}}",
-        act_expr_names[c->expr]
-    );
-  } else {
-    printf("{\"name\":\"nod\",\"arguments\":{\"count\":%d}}", c->count);
+// Queues a plan and prints
+//   JTALM {"t":"act","seq":..,"valid":..,"calls":[..],"from":[yaw,pitch],"steps":[..],...}
+static void submit_and_report(lm_t *lm, const char *src, act_plan_t *plan, int valid,
+                              const char *err, int64_t t0) {
+  uint32_t seq = ++lm->act_seq;
+  int queued = 0, dropped = 0;
+  if (plan->n_steps > 0) {
+    queued = servo_submit(plan, seq) == 0;
+    dropped = !queued;
+    if (queued) {
+      lm->pose_yaw = plan->yaw1;
+      lm->pose_pitch = plan->pitch1;
+    }
   }
+  int64_t t1 = now_us();
+  out_lock();
+  printf(
+      "JTALM {\"t\":\"act\",\"seq\":%" PRIu32 ",\"src\":\"%s\",\"valid\":%d,\"err\":%s%s%s,",
+      seq, src, valid, err ? "\"" : "", err ? err : "null", err ? "\"" : ""
+  );
+  act_print_body(stdout, plan);
+  printf(
+      ",\"queued\":%d,\"dropped\":%d,\"servo\":\"%s\",\"plan_us\":%" PRId64 "}\n", queued,
+      dropped, servo_output_on() ? "on" : "dry", t1 - t0
+  );
+  out_unlock();
 }
 
-// Validates an Action JSON string, plans it from the current pose, queues it and prints
-//   JTALM {"t":"act","seq":..,"valid":..,"calls":[..],"from":[yaw,pitch],"steps":[..],...}
+// Validates an Action JSON string, plans it from the current pose and queues it.
 // Only "output" (after the gate) is dispatched; "[]" and invalid outputs do nothing.
 static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
   static act_plan_t plan;
@@ -325,48 +345,15 @@ static void dispatch(lm_t *lm, const char *src, const char *json, size_t len) {
   int valid = act_parse(json, len, plan.calls, &plan.n_calls, &err) == 0;
   if (!valid) plan.n_calls = 0;
   act_plan(&plan, lm->pose_yaw, lm->pose_pitch);
-  uint32_t seq = ++lm->act_seq;
-  int queued = 0, dropped = 0;
-  if (plan.n_steps > 0) {
-    queued = servo_submit(&plan, seq) == 0;
-    dropped = !queued;
-    if (queued) {
-      lm->pose_yaw = plan.yaw1;
-      lm->pose_pitch = plan.pitch1;
-    }
-  }
-  int64_t t1 = now_us();
-  out_lock();
-  printf(
-      "JTALM {\"t\":\"act\",\"seq\":%" PRIu32 ",\"src\":\"%s\",\"valid\":%d,\"err\":%s%s%s"
-      ",\"calls\":[",
-      seq, src, valid, err ? "\"" : "", err ? err : "null", err ? "\"" : ""
-  );
-  for (int i = 0; i < plan.n_calls; i++) {
-    if (i) putchar(',');
-    print_call(&plan.calls[i]);
-  }
-  printf("],\"from\":[%d,%d],\"steps\":[", plan.yaw0, plan.pitch0);
-  for (int i = 0; i < plan.n_steps; i++) {
-    const act_step_t *s = &plan.steps[i];
-    if (i) putchar(',');
-    if (s->kind == STEP_EXPR) {
-      printf("{\"c\":%d,\"k\":\"expr\",\"expr\":\"%s\"}", s->call, act_expr_names[s->expr]);
-    } else {
-      printf(
-          "{\"c\":%d,\"k\":\"move\",\"yaw\":%d,\"pitch\":%d,\"yaw_raw\":%d,\"pitch_raw\":%d"
-          ",\"ms\":%d,\"clamped\":%d}",
-          s->call, s->yaw, s->pitch, s->yaw_raw, s->pitch_raw, s->ms, s->clamped
-      );
-    }
-  }
-  printf(
-      "],\"to\":[%d,%d],\"total_ms\":%" PRIu32 ",\"queued\":%d,\"dropped\":%d"
-      ",\"servo\":\"%s\",\"plan_us\":%" PRId64 "}\n",
-      plan.yaw1, plan.pitch1, plan.total_ms, queued, dropped,
-      servo_output_on() ? "on" : "dry", t1 - t0
-  );
-  out_unlock();
+  submit_and_report(lm, src, &plan, valid, err, t0);
+}
+
+// "!pose <yaw> <pitch>": one move within the soft limits (limit checks, maintenance).
+static void dispatch_pose(lm_t *lm, int yaw, int pitch) {
+  static act_plan_t plan;
+  int64_t t0 = now_us();
+  act_plan_pose(&plan, lm->pose_yaw, lm->pose_pitch, yaw, pitch);
+  submit_and_report(lm, "pose", &plan, 1, NULL, t0);
 }
 
 static void run_prompt(lm_t *lm, const char *text, size_t len) {
@@ -413,7 +400,7 @@ static void run_prompt(lm_t *lm, const char *text, size_t len) {
   fputs(",\"raw\":", stdout);
   print_json_string(lm->out, olen);
   printf(
-      ",\"gated\":%d,\"gate\":%.3f,\"min_prob\":%.9g,\"ids\":", gated, lm->gate,
+      ",\"gated\":%d,\"gate\":%.6g,\"min_prob\":%.9g,\"ids\":", gated, lm->gate,
       (double)r.min_prob
   );
   print_ids(r.ids, r.n);
@@ -490,7 +477,7 @@ static void run_command(lm_t *lm, const char *line) {
     printf("JTALM {\"t\":\"ok\",\"grammar\":%d}\n", lm->use_grammar);
   } else if (!strncmp(line, "!gate ", 6)) {
     lm->gate = atof(line + 6);
-    printf("JTALM {\"t\":\"ok\",\"gate\":%.3f}\n", lm->gate);
+    printf("JTALM {\"t\":\"ok\",\"gate\":%.6g}\n", lm->gate);
   } else if (!strncmp(line, "!par ", 5)) {
     lm->use_par = line[5] == '1';
     jtlm_set_parallel(lm->use_par ? run_parallel : NULL);
@@ -504,6 +491,23 @@ static void run_command(lm_t *lm, const char *line) {
     printf("JTALM {\"t\":\"ok\",\"batch_prefill\":%d}\n", lm->use_batch);
   } else if (!strncmp(line, "!act ", 5)) {
     dispatch(lm, "cmd", line + 5, strlen(line + 5));
+  } else if (!strncmp(line, "!led ", 5)) {
+    // Diagnostics: all 12 base LEDs to one color (each channel limited to 168).
+    int r = 0, g = 0, b = 0;
+    sscanf(line + 5, "%d %d %d", &r, &g, &b);
+    r = r < 0 ? 0 : r > 168 ? 168 : r;
+    g = g < 0 ? 0 : g > 168 ? 168 : g;
+    b = b < 0 ? 0 : b > 168 ? 168 : b;
+    int err = board_led((uint8_t)r, (uint8_t)g, (uint8_t)b);
+    printf("JTALM {\"t\":\"led\",\"r\":%d,\"g\":%d,\"b\":%d,\"ok\":%d,\"cfg\":%d}\n", r, g, b,
+           err == 0, board_led_cfg());
+  } else if (!strncmp(line, "!pose ", 6)) {
+    int yaw = 0, pitch = 0;
+    if (sscanf(line + 6, "%d %d", &yaw, &pitch) != 2) {
+      emit_error("usage: !pose <yaw> <pitch>");
+      return;
+    }
+    dispatch_pose(lm, yaw, pitch);
   } else if (!strcmp(line, "!center")) {
     dispatch(lm, "center", kCenter, strlen(kCenter));
   } else if (!strcmp(line, "!servo on")) {
@@ -580,15 +584,27 @@ static void boot_board(void) {
   printf(
       "JTALM {\"t\":\"board\",\"ok\":%d,\"board\":%d,\"begin_ms\":%" PRIu32
       ",\"py32\":%d,\"py32_version\":%d,\"vm_mode\":[%d,%d],\"vm_out\":[%d,%d]"
-      ",\"servo\":\"dry\"}\n",
+      ",\"led_init\":%d,\"led_cfg\":%d,\"servo\":\"dry\"}\n",
       err == 0, b.board, b.begin_ms, b.py32, b.py32_version, b.vm_mode_before,
-      b.vm_mode_after, b.vm_out_before, b.vm_out_after
+      b.vm_mode_after, b.vm_out_before, b.vm_out_after, b.led_init, board_led_cfg()
   );
   printf(
       "JTALM {\"t\":\"face\",\"seq\":0,\"expr\":\"neutral\",\"ok\":%d,\"crc\":\"%08" PRIx32
       "\",\"draw_us\":%" PRIu32 ",\"push_us\":%" PRIu32 "}\n",
       face_err == 0, f.crc, f.draw_us, f.push_us
   );
+  // Volume, brightness and LED color from NVS (defaults: 50, the boot backlight, off).
+  int nvs = settings_init() == 0;
+  settings_t st = {.volume = 50, .brightness = (uint8_t)board_brightness_level(),
+                   .led = COLOR_OFF};
+  if (st.brightness < ACT_BRIGHTNESS_MIN) st.brightness = ACT_BRIGHTNESS_MIN;
+  if (nvs) settings_load(&st);
+  board_volume(st.volume, 0);
+  board_brightness(st.brightness);
+  board_led(act_led_rgb[st.led][0], act_led_rgb[st.led][1], act_led_rgb[st.led][2]);
+  servo_set_settings(&st);
+  printf("JTALM {\"t\":\"settings\",\"volume\":%d,\"brightness\":%d,\"led\":\"%s\",\"nvs\":%d}\n",
+         st.volume, st.brightness, act_color_names[st.led], nvs);
   if (servo_start() != 0) emit_error("dispatcher start failed");
 }
 

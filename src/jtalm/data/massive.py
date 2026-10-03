@@ -2,9 +2,11 @@
 # Copyright 2026 ayutaz
 """Amazon MASSIVE (ja-JP, CC BY 4.0) utterances as no-action negatives.
 
-MASSIVE is a virtual-assistant dataset (alarms, music, IoT, QA, chit-chat); none of its intents
-are robot head/face actions, so every utterance is a valid ``[]`` example. MASSIVE rows are used
-for training/evaluation but are not redistributed in our Hugging Face dataset.
+MASSIVE is a virtual-assistant dataset (alarms, music, IoT, QA, chit-chat); its intents are not
+robot actions, so rows are ``[]`` candidates for training/evaluation (not redistributed in our
+Hugging Face dataset). Under schema v1 a few kept rows (bare ライト / 明るく / 音量 phrasing) can be
+actions, so inherited rows are re-parsed by the v1 verifier in the data v1.0 build and v1 configs
+sample no new MASSIVE negatives. Volume intents are dropped: a volume request is an action in v1.
 """
 
 import json
@@ -18,6 +20,7 @@ MASSIVE_URL = (
     "https://amazon-massive-nlu-dataset.s3.amazonaws.com/amazon-massive-dataset-1.1.tar.gz"
 )
 MASSIVE_LICENSE = "CC BY 4.0"
+VOLUME_INTENTS = ("audio_volume_up", "audio_volume_down", "audio_volume_mute", "audio_volume_other")
 # Skip the rare utterances that talk about heads/faces so they cannot be read as robot actions.
 ROBOT_WORDS = re.compile(r"(向いて|向け|うなず|頷|首を|顔を|表情)")
 
@@ -41,7 +44,9 @@ def download(dest_dir: Path) -> Path:
 
 def load(path: Path) -> list[dict]:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line]
-    return [r for r in rows if not ROBOT_WORDS.search(r["utt"])]
+    return [
+        r for r in rows if not ROBOT_WORDS.search(r["utt"]) and r["intent"] not in VOLUME_INTENTS
+    ]
 
 
 def sample(rows: list[dict], partition: str, k: int, rng: random.Random) -> list[dict]:

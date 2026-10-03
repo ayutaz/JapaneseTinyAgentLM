@@ -15,7 +15,7 @@ from jtalm.eval.cases import EvalCase
 from jtalm.model.format import ACT, OUT, target_json
 
 IGNORE = -100
-MAX_TARGET_TOKENS = 24  # longest v0 target is 13 tokens + </s>
+MAX_TARGET_TOKENS = 24  # longest v1 target is 17 tokens + </s> (two calls with 3-digit numbers)
 
 
 class Codec:

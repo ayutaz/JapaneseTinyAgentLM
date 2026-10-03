@@ -4,7 +4,7 @@ Action LM の推論を、外部ライブラリに依存しない C11 で実装�
 
 - `python -m jtalm.model.export` が書き出した `.jtlm` ファイル（モデルと tokenizer を1つにまとめたもの）を読みます。
 - UTF-8 の入力を SentencePiece と同じ手順で token に分けます（`nmt_nfkc` の正規化、unigram の Viterbi、byte fallback）。
-- KV cache を使って greedy に生成します。`--grammar` を付けると、Action schema v0 の grammar（`jtalm.model.grammar` の移植）で生成を制約します。
+- KV cache を使って greedy に生成します。`--grammar` を付けると、Action schema v1 の grammar（`jtalm.model.grammar` の移植）で生成を制約します。
 - 重みは FP32、INT8、INT4（どちらも weight-only、64 個ごとに fp16 の scale を1つ）に対応します。
 
 ## ファイル
@@ -14,7 +14,7 @@ Action LM の推論を、外部ライブラリに依存しない C11 で実装�
 | `jtalm.h` | 公開 API（読み込み、forward、tokenizer、grammar、生成） |
 | `model.c` | `.jtlm` の読み込み、Transformer の forward（KV cache）、greedy 生成 |
 | `tokenizer.c` | 正規化（precompiled charsmap の Darts double array を直接引く）、unigram の Viterbi、decode |
-| `grammar.c` | Action schema v0 の状態機械 |
+| `grammar.c` | Action schema v1 の状態機械（enum の値は1 token、数値は1桁ずつ範囲と先頭の 0 を制約、2つ目の call は1つ目と違うものだけ） |
 | `main.c` | コマンドラインの入口 |
 | `Makefile` | `make` で `build/jtalm` を作る |
 
@@ -57,7 +57,7 @@ dependencies:
 #include "jtalm.h"
 
 #define WORK_BYTES (64 * 1024) /* tokenizer と grammar の作業領域 */
-#define GATE 0.868             /* 確信度の gate（採用モデルの値） */
+#define GATE 0.88506           /* 確信度の gate（採用モデルの値） */
 
 static jtlm_model model;
 static jtlm_state state;
@@ -101,7 +101,7 @@ void lm_run(const char *text, size_t len, char *out, size_t cap) {
 
 ## モデルの入手
 
-採用モデルは、データ v0.5.1 で学習した 3M の INT4（group 64）です。`.jtlm` は Hugging Face のモデルのリポジトリから取得できます（1,971,456 B）。
+採用モデルは、Action schema v1 のデータ v1.0 で学習した 3M の INT4（group 64）です。`.jtlm` は Hugging Face のモデルのリポジトリから取得できます（1,970,720 B）。この runtime の grammar は v1 の tokenizer（`action_v1_sp2048`）の部品を前提にしているので、v0 の `.jtlm`（1,971,456 B）は `--grammar` で使えません。
 
 ```sh
 hf download ayousanz/JapaneseTinyAgentLM-Action-3M jtalm_action_3m_q4_g64.jtlm --local-dir models
@@ -143,7 +143,7 @@ docker run --rm -v "$PWD:/w" -w /w --entrypoint runtime/host/build/jtalm espress
 | `tokens` | 生成した token 数（`</s>` を含む） |
 | `ids` | 生成した token id |
 
-この runtime は gate をかけません。採用モデルと同じ判定にするには、`min_prob` が 0.868 未満の出力を `[]` として扱ってください（firmware と `jtalm.model.evaluate` の `gate` と同じ比較）。
+この runtime は gate をかけません。採用モデルと同じ判定にするには、`min_prob` が 0.88506 未満の出力を `[]` として扱ってください（firmware と `jtalm.model.evaluate` の `gate` と同じ比較）。
 
 処理した件数と速度（tok/s）は標準エラーに出します。
 
@@ -151,10 +151,11 @@ docker run --rm -v "$PWD:/w" -w /w --entrypoint runtime/host/build/jtalm espress
 |---|---|
 | `-m FILE` | `.jtlm` ファイル（必須） |
 | `-i FILE` | 入力ファイル。省略するか `-` のときは標準入力 |
-| `--grammar` | Action schema v0 の grammar で生成を制約する |
+| `--grammar` | Action schema v1 の grammar で生成を制約する |
 | `--tokenize` | 生成せず、各行の token id（`sp.encode` と同じ）を JSON の配列で出す |
 | `--decode` | 各行の空白区切りの token id を文字列に戻す（`sp.decode` と同じ） |
 | `--first-logits` | 最初の生成 step の logits を `logits0` として出力に加える（golden vector の比較用） |
+| `--grammar-trace` | 生成せず、各行の空白区切りの token id 列について、各 token の前と最後の token の後で grammar が許す id（昇順）を `{"allowed":[[…],…]}` で出す。Python の grammar との一致の確認用（`tests/test_export.py`） |
 
 ## 設計
 
@@ -254,7 +255,8 @@ checkpoint は自分で学習したもの（[`../../docs/training.md`](../../doc
 - 完全一致の率は、C と Python で同じ値です（表の値）。token 列の一致は、どの行も 1,189 / 1,189 です。logits の絶対値は最大で約 19 です。
 - INT8 / INT4 の比較相手は、`.jtlm` から読み戻した重み（fp16 の scale）で作った Python のモデルです。`jtalm.model.quantize` の fake quant（f32 の scale）で評価した出力とも、1,189件すべてで一致しました。scale を fp16 にしても結果は変わりません。
 - `-DJTLM_ACC=float`（ESP32 向けの設定）で build した場合も、3M の6条件すべてで token 列が 1,189件一致しました（logits の差は最大 3.2e-5）。
-- データ v0.4 の 3M（INT4 / INT8、grammar あり）でも、host の C の出力は Python と評価セット全 1,189件で一致し、実機（`firmware/jtalm_action`）の出力も host と全件一致しました。採用モデル（データ v0.5.1 の 3M INT4、gate 0.868）では、実機の出力が評価セットの先頭 300件で PyTorch と一致しています（gate の前も後も 300 / 300。[`results/v051_action/device/`](../../results/v051_action/device/README.md)）。
+- データ v0.4 の 3M（INT4 / INT8、grammar あり）でも、host の C の出力は Python と評価セット全 1,189件で一致し、実機（`firmware/jtalm_action`）の出力も host と全件一致しました。v0.5.1 の 3M INT4（gate 0.868）では、実機の出力が評価セットの先頭 300件で PyTorch と一致しました（gate の前も後も 300 / 300。[`results/v051_action/device/`](../../results/v051_action/device/README.md)）。
+- schema v1 の採用モデル（データ v1.0 の 3M INT4）では、v1 の評価セットと validation の 11,426件で、`double` と `float` の累積の build のどちらも、grammar あり・なしの両方で、token 列と出力が PyTorch と一致しました（[`results/v1_action/parity/`](../../results/v1_action/parity/README.md)）。実機の出力も 300 / 300 件一致しました（gate 0.88506。[`results/v1_action/device/`](../../results/v1_action/device/README.md)）。
 
 **速度（参考）:** AMD Ryzen 9 5900X の Docker（WSL2）上で1 thread、評価セット全体（prompt と生成を合わせて約 22,500 token）を処理した値です。3M は FP32 で約 1,000 tok/s、INT8 / INT4 で約 380 tok/s。5M は FP32 で約 470 tok/s、INT8 / INT4 で約 230 tok/s。量子化した重みは group ごとに f32 へ戻してから掛けるので、PC では FP32 より遅くなります。
 

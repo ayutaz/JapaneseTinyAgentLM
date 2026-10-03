@@ -6,10 +6,14 @@
 // register map (version 0x02, GPIO mode 0x03, output 0x05; VM_EN is pin 0) is the one used
 // by stackchan-idf components/board/io_expander_py32.cpp (BSL-1.0, (c) Kenta IDA); this file
 // only reads and writes those registers through M5Unified's I2C class.
+// The base LED protocol (pin 13 as a push-pull output with pull-up, LED count in 0x24 bits 0-5,
+// refresh bit 6, RGB565 little-endian pairs from 0x30) follows the M5Stack StackChan firmware
+// (MIT, hal_io_expander.cpp and PY32IOExpander_Class.cpp); no code is copied.
 
 #include "board.h"
 
 #include <M5Unified.h>
+#include <math.h>
 
 #include "action.h"
 #include "esp_rom_crc.h"
@@ -29,6 +33,16 @@ constexpr uint8_t kPy32RegPullDownLow = 0x0B;
 constexpr uint8_t kAw9523Addr = 0x58;  // CoreS3 IO expander (BUS_EN, BOOST_EN)
 constexpr uint32_t kAw9523Freq = 400000;
 constexpr uint8_t kVmEnMask = 1u << 0;
+constexpr uint8_t kPy32RegModeHigh = 0x04;      // pins 8-15
+constexpr uint8_t kPy32RegPullUpHigh = 0x0A;
+constexpr uint8_t kPy32RegPullDownHigh = 0x0C;
+constexpr uint8_t kPy32RegDriveHigh = 0x14;     // 0 = push-pull
+constexpr uint8_t kPy32RegLedCfg = 0x24;        // bits 0-5 LED count, bit 6 refresh
+constexpr uint8_t kPy32RegLedRam = 0x30;        // RGB565 little-endian, 2 bytes per LED
+constexpr uint8_t kLedPinMask = 1u << (13 - 8);  // the LED data line is PY32 pin 13
+constexpr uint8_t kLedRefresh = 1u << 6;
+constexpr int kLedCount = 12;
+constexpr uint8_t kLedMax = 168;  // official firmware safe range per channel
 
 constexpr int kW = 320, kH = 240;
 
@@ -57,11 +71,52 @@ void draw_face(M5Canvas &c, int expr) {
       c.fillEllipse(160, 180, 18, 24, fg);  // open mouth
       c.fillEllipse(160, 180, 10, 16, TFT_BLACK);
       break;
+    case EXPR_ANGRY:
+      for (int x : ex) c.fillCircle(x, 108, 12, fg);
+      c.drawWideLine(78, 76, 118, 90, 3.0f, fg);   // eyebrows, lowered at the inner ends
+      c.drawWideLine(202, 90, 242, 76, 3.0f, fg);
+      c.fillArc(160, 200, 30, 24, 210, 330, fg);   // small frown
+      break;
+    case EXPR_SLEEPY:
+      for (int x : ex) c.fillRoundRect(x - 18, 104, 36, 6, 3, fg);  // closed eyes
+      c.fillEllipse(160, 176, 8, 6, fg);                             // small "o" mouth
+      break;
+    case EXPR_DOUBT:
+      c.fillCircle(ex[0], 104, 14, fg);
+      c.fillCircle(ex[1], 98, 9, fg);              // one eye smaller and higher
+      c.drawWideLine(204, 74, 240, 66, 3.0f, fg);  // one raised eyebrow
+      c.drawWideLine(130, 178, 190, 166, 3.0f, fg);  // tilted mouth
+      break;
     default:  // EXPR_NEUTRAL
       for (int x : ex) c.fillCircle(x, 100, 14, fg);
       c.fillRoundRect(120, 166, 80, 8, 4, fg);
       break;
   }
+}
+
+// Caller holds g_gfx_lock (the internal I2C is also used by the touch controller).
+bool led_write(uint8_t r, uint8_t g, uint8_t b) {
+  const uint16_t c = (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
+  uint8_t buf[2 * kLedCount];
+  for (int i = 0; i < kLedCount; i++) {
+    buf[2 * i] = (uint8_t)(c & 0xFF);
+    buf[2 * i + 1] = (uint8_t)(c >> 8);
+  }
+  bool ok = M5.In_I2C.writeRegister(kPy32Addr, kPy32RegLedRam, buf, sizeof(buf), kPy32Freq);
+  // Count and refresh are written together without a read first: a failed read returns 0 and
+  // would write count 0 (LEDs dark) while reporting success.
+  return ok && M5.In_I2C.writeRegister8(kPy32Addr, kPy32RegLedCfg, kLedCount | kLedRefresh,
+                                        kPy32Freq);
+}
+
+bool led_init() {
+  bool ok = M5.In_I2C.bitOn(kPy32Addr, kPy32RegModeHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.bitOff(kPy32Addr, kPy32RegPullDownHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.bitOn(kPy32Addr, kPy32RegPullUpHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.bitOff(kPy32Addr, kPy32RegDriveHigh, kLedPinMask, kPy32Freq);
+  ok = ok && M5.In_I2C.writeRegister8(kPy32Addr, kPy32RegLedCfg, kLedCount, kPy32Freq);
+  vTaskDelay(pdMS_TO_TICKS(50));
+  return ok && led_write(0, 0, 0);
 }
 
 }  // namespace
@@ -75,10 +130,11 @@ extern "C" int board_init(board_info_t *info) {
   cfg.internal_imu = false;
   cfg.internal_rtc = false;
   cfg.internal_mic = false;
-  cfg.internal_spk = false;
+  cfg.internal_spk = true;
   cfg.led_brightness = 0;
   M5.begin(cfg);
   M5.Display.setRotation(1);  // landscape, as stackchan-idf on CoreS3
+  M5.Speaker.begin();  // CoreS3 speaker (AW88298) for the volume confirmation beep
   info->begin_ms = (uint32_t)((esp_timer_get_time() - t0) / 1000);
   info->board = (int)M5.getBoard();
   g_gfx_lock = xSemaphoreCreateMutex();
@@ -104,6 +160,7 @@ extern "C" int board_init(board_info_t *info) {
     M5.In_I2C.bitOn(kPy32Addr, kPy32RegPullUpLow, kVmEnMask, kPy32Freq);
     info->vm_mode_after = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegModeLow, kPy32Freq);
     info->vm_out_after = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegOutLow, kPy32Freq);
+    info->led_init = led_init() ? 1 : 0;
   }
 
   // The face is drawn into a PSRAM frame and pushed whole: no flicker, no internal SRAM.
@@ -161,4 +218,52 @@ extern "C" int board_touched(void) {
   int n = M5.Touch.getCount();
   xSemaphoreGive(g_gfx_lock);
   return n > 0;
+}
+
+extern "C" int board_led(uint8_t r, uint8_t g, uint8_t b) {
+  if (!g_py32 || g_gfx_lock == nullptr) return -1;
+  if (r > kLedMax) r = kLedMax;
+  if (g > kLedMax) g = kLedMax;
+  if (b > kLedMax) b = kLedMax;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  bool ok = led_write(r, g, b);
+  xSemaphoreGive(g_gfx_lock);
+  return ok ? 0 : -1;
+}
+
+extern "C" int board_led_cfg(void) {
+  if (!g_py32 || g_gfx_lock == nullptr) return -1;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  int cfg = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
+  xSemaphoreGive(g_gfx_lock);
+  return cfg;
+}
+
+// M5.Speaker can reach the internal I2C (the CoreS3 amplifier enable), hence the lock.
+extern "C" int board_volume(int level, int beep) {
+  if (g_gfx_lock == nullptr) return -1;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  M5.Speaker.setVolume((uint8_t)lround(level * 255.0 / 100.0));
+  if (beep && level > 0) M5.Speaker.tone(1000, 80);
+  bool running = M5.Speaker.isRunning();
+  xSemaphoreGive(g_gfx_lock);
+  return running ? 0 : -1;  // the volume is kept even when the speaker is off
+}
+
+// On the CoreS3, M5GFX sets the backlight through the AXP2101's DLDO1 (as M5.begin already
+// does at boot); this file writes no AXP2101 register itself. Its internal I2C is shared with
+// the touch controller and the PY32, hence the lock.
+extern "C" int board_brightness(int level) {
+  if (g_gfx_lock == nullptr) return -1;
+  // The floor is kept here, whatever the caller passes: 0 would switch DLDO1 off (no backlight).
+  if (level < ACT_BRIGHTNESS_MIN) level = ACT_BRIGHTNESS_MIN;
+  if (level > ACT_LEVEL_MAX) level = ACT_LEVEL_MAX;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  M5.Display.setBrightness((uint8_t)lround(level * 255.0 / 100.0));
+  xSemaphoreGive(g_gfx_lock);
+  return 0;
+}
+
+extern "C" int board_brightness_level(void) {
+  return (int)lround(M5.Display.getBrightness() * 100.0 / 255.0);
 }

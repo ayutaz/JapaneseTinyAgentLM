@@ -4,7 +4,7 @@
  *
  * Loads a .jtlm file written by `python -m jtalm.model.export` (layout documented there),
  * tokenizes UTF-8 text like SentencePiece (nmt_nfkc charsmap + unigram Viterbi + byte fallback),
- * and runs greedy decoding with a KV cache, optionally under the Action schema v0 grammar.
+ * and runs greedy decoding with a KV cache, optionally under the Action schema v1 grammar.
  *
  * Memory: the model struct only points into the (read-only) file image, so the image can be a
  * flash mmap on the ESP32. All mutable state lives in one caller-provided arena sized by
@@ -144,21 +144,37 @@ int jtlm_encode(const jtlm_tokenizer *t, const char *text, size_t len, int *ids,
  * returns the full length. */
 size_t jtlm_decode(const jtlm_tokenizer *t, const int *ids, int n, char *out, size_t cap);
 
-/* Action schema v0 grammar (port of jtalm.model.grammar). */
+/* Action schema v1 grammar (port of jtalm.model.grammar; tool table of jtalm.action.schema). */
+#define JTLM_N_TOOLS 11
+#define JTLM_MAX_ALLOWED 16 /* the most: 11 call heads, or 10 digits + a closer */
+#define JTLM_CALL_MAX 7     /* head, value, key, three digits, closer */
+
 typedef struct {
-    int eos;
-    int empty, open, close, comma, look, amount_key, expr, nod, close_str, close_obj;
-    int dirs[5], amounts[3], exprs[4], counts[3]; /* schema order */
+    int head;
+    int n_values, values[10]; /* first argument as enum ids; n_values == 0: a number lo..hi */
+    int lo, hi;               /* lo > hi with n_values == 0: no arguments (bow) */
+    int second;               /* 0: none, 1: amount | degrees, 2: amount | by */
+} jtlm_tool;
+
+typedef struct {
+    int eos, empty, open, close, comma, close_str, close_num;
+    int key_amount, key_degrees, key_by;
+    int amounts[3], digits[10];
+    int center, normal, look; /* look toward center takes only amount normal */
+    jtlm_tool tools[JTLM_N_TOOLS];
 } jtlm_grammar;
 
 typedef struct {
-    int step;
-    int n_calls, calls[2][3], n_cur, cur[3]; /* token ids: name piece, then values */
+    int step, phase, tool;
+    int lo, hi, value, n_digits; /* the number being written */
+    int n_calls, calls[2][JTLM_CALL_MAX], call_len[2];
+    int n_cur, cur[JTLM_CALL_MAX];
 } jtlm_grammar_state;
 
 int jtlm_grammar_init(jtlm_grammar *g, const jtlm_tokenizer *t, void *work, size_t work_bytes);
 void jtlm_grammar_reset(jtlm_grammar_state *st);
-/* Writes the allowed ids (at most 8) after the tokens consumed so far; returns their count. */
+/* Writes the allowed ids (at most JTLM_MAX_ALLOWED, ascending) after the tokens consumed so far;
+ * returns their count. */
 int jtlm_grammar_allowed(const jtlm_grammar *g, const jtlm_grammar_state *st, int *ids);
 void jtlm_grammar_advance(const jtlm_grammar *g, jtlm_grammar_state *st, int token);
 

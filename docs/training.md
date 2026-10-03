@@ -6,6 +6,8 @@
 
 コマンドは bash 用です（Windows では Git Bash か WSL で実行してください）。
 
+**公開しているのは Action schema v1 のモデルです（下の「13. Action schema v1」）。** 1〜12 は schema v0（データ v0.5.1 まで）の手順です。今の code では、grammar、`eval_suite` の評価セット、`release`、`tokenizer` の既定値が schema v1 に変わっているので、v0.5.1 の結果をそのまま作り直すときは、v0.5.1 を公開した時点の commit `a803813`（tag `action-v0.5.1`）を使ってください。データの生成と組み立て（1〜8）は、v1.0 でも v0.5.1 のデータを引き継ぐのに使います。
+
 ## 全体の流れ
 
 各段階が作るファイル（`datasets/action/`、`datasets/raw/`、`tokenizer/out/`、`runs/` の下）は Git の管理外です。
@@ -24,6 +26,7 @@
 | 10 | 量子化、`.jtlm` の書き出し、C runtime との一致の確認 | `jtalm.model.quantize`、`export`、`parity` | `best_q4_g64.pt`、`3m_q4_g64.jtlm` |
 | 11 | 評価と誤差の範囲 | `jtalm.model.evaluate`、`eval_suite`、`jtalm.eval.bootstrap`、`jtalm.eval.consistency` | 評価の表 |
 | 12 | 公開用のパッケージ | `jtalm.model.release` | 公開用のディレクトリ |
+| 13 | Action schema v1（データ v1.0、Stack-chan v1、eval v3、tokenizer v1、学習から公開まで） | `jtalm.data.stackchan_eval`、`jtalm.data.build_v1` ほか | `datasets/action/v1.0` など |
 
 表の番号は、下の見出しの番号と同じです。
 
@@ -49,7 +52,7 @@ uv run --group train pytest
 ```
 
 - `uv sync` は、指定していないグループのパッケージを削除します。学習や評価の module を動かす前は `--group train` か `--all-groups` を付けてください。以下のコマンドは `uv run --group train` で実行します。
-- PyTorch の取得元は `pyproject.toml` で指定しています。Linux は CUDA 12.6 版（cu126）、それ以外は CPU 版です。
+- PyTorch の取得元は `pyproject.toml` で指定しています。Linux と Windows は CUDA 12.6 版（cu126）、macOS は CPU 版です。
 
 ### GPU と CPU
 
@@ -149,12 +152,12 @@ uv run python -m jtalm.data.build \
 ## 4. Tokenizer の学習
 
 ```sh
-uv run --group train python -m jtalm.model.tokenizer --vocab 2048 4096 8192
+uv run --group train python -m jtalm.model.tokenizer --data datasets/action/v0 --name action_v0 --vocab 2048 4096 8192
 ```
 
 - `datasets/action/v0` の train と validation の入力文と出力、MASSIVE ja-JP の train の発話で学習し、`tokenizer/out/action_v0_sp<語彙>.model` と比較の表（`report.json`）を書きます。評価セットは使いません。
 - 採用したのは語彙 2,048 の `action_v0_sp2048.model` です（sha256 `61482f90…`、`datasets/manifests/tokenizer_action_v0.json`）。決め方は [`architecture.md`](architecture.md) を参照してください。
-- checkpoint は tokenizer の sha256 を持っており、評価と書き出しの module は、違う tokenizer を渡すと止まります。公開しているモデルと同じ tokenizer で作り直すときは、[Hugging Face のモデル](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) の `tokenizer.model`（`action_v0_sp2048.model` と同じファイル）を `tokenizer/out/action_v0_sp2048.model` に置いてください。
+- checkpoint は tokenizer の sha256 を持っており、評価と書き出しの module は、違う tokenizer を渡すと止まります。v0 の tokenizer は、[Hugging Face のモデル](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) の v0 の版（commit 履歴）の `tokenizer.model` と同じファイルです。今の Hugging Face の `tokenizer.model` は v1 の `action_v1_sp2048.model` です（13 を参照）。
 
 以下では、`TOK=tokenizer/out/action_v0_sp2048.model` とします。
 
@@ -246,7 +249,7 @@ uv run python -m jtalm.data.build --base datasets/action/v0.5 \
 
 ## 9. 学習
 
-採用したモデルは、データ v0.5.1 で次のように学習しました。
+v0 で採用したモデルは、データ v0.5.1 で次のように学習しました。
 
 ```sh
 uv run --group train python -m jtalm.model.train --size 3m --tokenizer $TOK \
@@ -275,7 +278,7 @@ uv run --group train python -m jtalm.model.parity --ckpt runs/local/v051/3m/best
     --docker espressif/idf:v5.5.5 --build
 ```
 
-- 採用したモデルの `.jtlm` は 1,971,456 bytes です。形式は [`architecture.md`](architecture.md) を参照してください。
+- v0.5.1 の `.jtlm` は 1,971,456 bytes、schema v1 の採用モデルは 1,970,720 bytes です。形式は [`architecture.md`](architecture.md) を参照してください。
 - `parity` は、tokenizer の結果、生成した token 列、出力の文字列を比べ、実機への移植用に `golden.jsonl` を書きます。`--docker` を使うとき、`--out` はリポジトリの中に置いてください。`--limit 50` で件数を絞れます。
 - C runtime の build は [`../runtime/host/README.md`](../runtime/host/README.md)、firmware への書き込みは [`../firmware/README.md`](../firmware/README.md) を参照してください。
 
@@ -302,7 +305,7 @@ uv run --group train python -m jtalm.model.eval_suite \
 ```
 
 - v0 eval、human v1、eval v2 の12パターンを、grammar と gate で評価し、`suite.md` と `suite.json`、評価セットごとの `*_predictions.jsonl` を書きます。
-- **gate の閾値は validation だけで選びます。** validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値です。採用したモデルでは 0.86808 になりました（firmware の既定値は千分率で 868）。`--val` の既定値は v0.4 の validation なので、モデルの学習に使った版の validation を渡してください。閾値を固定するときは `--gate 0.86808` を使います。
+- **gate の閾値は validation だけで選びます。** validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値です。v0.5.1 では 0.86808（v0 の firmware の既定値は千分率で 868）、schema v1 の採用モデルでは 0.88506（firmware の既定値は100万分率で 885060）になりました。`--val` の既定値は v1.0 の validation なので、ほかの版ではモデルの学習に使った版の validation を渡してください。閾値を固定するときは `--gate 0.88506` のように使います。
 
 ### 誤差の範囲（`jtalm.eval.bootstrap`）
 
@@ -337,6 +340,8 @@ uv run python -m jtalm.eval.consistency runs/local/suite_v051_3m_q4 --out paraph
 - 評価セットごとに、正解が同じ依頼の組の中で出力がそろった割合（pair agreement）と、ルールベースの同じ値を出します。定義は [evaluation.md](evaluation.md) の「言い換えへの一貫性」にあります。結果は `results/v051_action/`（`paraphrase_3m.md`、`paraphrase_seeds_3m.md`）にあります。
 
 ## 12. 公開用のパッケージ（`jtalm.model.release`）
+
+下の例は v0.5.1 のときのものです。今の公開モデル（schema v1）の引数は「13. Action schema v1」にあります。
 
 ```sh
 # 公開するファイルとモデルカードを用意する
@@ -379,3 +384,73 @@ job の名前は、`smoke`（動作確認）、`gen_action_<版>`（データの
 - job の手順は `src/jtalm/infra/jobs.py` にあり、上の手元の手順と同じ module を呼びます。生成の job は書き手ごとに vLLM を起動し、終わると重みを消してから次の書き手に進みます。
 - `gen_action_v05` は、v0.4 の 3M の checkpoint と収集用の候補を `jobs.py` の `V04_CKPT`、`MINE_POOL` のパスから送ります。自分で学習した checkpoint を使うときは、パスを書き換えてください。
 - 学習の job は、同じ GPU で複数の学習を並列に走らせます（設定は変えません）。
+
+## 13. Action schema v1（採用モデル）
+
+公開している schema v1 のモデルの手順です。設計は [`superpowers/specs/2026-10-02-action-schema-v1-design.md`](superpowers/specs/2026-10-02-action-schema-v1-design.md)、データの内容は [`data.md`](data.md) の「v1.0」にあります。生成と学習は vast.ai の job（`gen_action_v1`、`gen_action_v1b`、`train_action_v1`。手順は `src/jtalm/infra/jobs.py`）で行いました。手元の GPU で動かすときは、job と同じ phase を順に実行します。
+
+```sh
+# schema v1 の JSON Schema（src/jtalm/action/action_schema_v1.json）を tool の表から書く
+uv run python -m jtalm.action.schema
+
+# 生成（vLLM。served name は config のとおり。R=artifacts/gen_action_v1）
+#  llm-jp: eval v3 と Stack-chan v1 の言い換え
+uv run python -m jtalm.data.generate --phase eval-gen --config configs/eval_v3.json --out $R/raw1_eval
+uv run python -m jtalm.data.generate --phase eval-gen --config configs/stackchan_v1_paraphrase.json --out $R/raw1_paraphrase
+#  5つの書き手（abeja、nemoja、elyza、calm3、qwen）が学習データを書く
+uv run python -m jtalm.data.generate --phase train-gen --config configs/action_v1_<name>.json --out $R/raw1_<name>
+#  Qwen3: 学習データと評価セットの検証、引き継ぐ文と前の評価セットと Stack-chan の実例の読み直し
+uv run python -m jtalm.data.generate --phase train-verify --config configs/action_v1_<name>.json --out $R/raw1_<name>
+uv run python -m jtalm.data.generate --phase eval-verify --config configs/eval_v3.json --out $R/raw1_eval
+uv run python -m jtalm.data.generate --phase eval-verify --config configs/stackchan_v1_paraphrase.json --out $R/raw1_paraphrase
+uv run python -m jtalm.data.generate --phase reverify --config configs/action_v1_qwen.json --out $R/reverify1 \
+    --input datasets/action/v0.5.1/{train,val}.jsonl datasets/action/v0/eval.jsonl \
+    datasets/action/human_v1/eval.jsonl datasets/action/eval_v2/*.jsonl \
+    datasets/action/stackchan_v1/sources.jsonl
+
+# Stack-chan v1（review.md で検証役の正解を見直し、利用者が決めた直しを overrides.jsonl に書いてから、もう一度実行する）
+uv run python -m jtalm.data.stackchan_eval --raw $R
+# データ v1.0、eval v3、付け直した前の評価セット（datasets/action/relabel_v1/、changes.md）
+uv run python -m jtalm.data.build_v1 --raw $R
+# tokenizer v1
+uv run --group train python -m jtalm.model.tokenizer --data datasets/action/v1.0 --vocab 2048 \
+    --name action_v1 --record datasets/manifests/tokenizer_action_v1.json
+TOK1=tokenizer/out/action_v1_sp2048.model
+
+# 学習（seed 0〜4。1 seed は RTX 3090 で約13分）
+uv run --group train python -m jtalm.model.train --size 3m --tokenizer $TOK1 \
+    --data datasets/action/v1.0 --lr 1e-3 --epochs 12 --seed 0 --out runs/local/v1/3m-s0
+# INT4、評価（Stack-chan v1、eval v3、付け直した v0 eval・human v1・eval v2。gate は v1.0 の validation で選ぶ）
+uv run --group train python -m jtalm.model.quantize --ckpt runs/local/v1/3m-s0/best.pt --bits 4
+uv run --group train python -m jtalm.model.eval_suite --ckpt runs/local/v1/3m-s0/best_q4_g64.pt \
+    --tokenizer $TOK1 --out runs/local/v1_action/suite_3m-s0
+uv run python -m jtalm.eval.bootstrap seeds runs/local/v1_action/suite_3m-s{0,1,2,3,4}
+# .jtlm（→ runs/local/v1/export/3m-s0_q4_g64.jtlm）と、C runtime との一致
+uv run --group train python -m jtalm.model.export --ckpt runs/local/v1/3m-s0/best.pt \
+    --tokenizer $TOK1 --bits 4 --out runs/local/v1/export
+uv run --group train python -m jtalm.model.parity --ckpt runs/local/v1/3m-s0/best.pt \
+    --tokenizer $TOK1 --bits 4 --cases datasets/action/stackchan_v1/eval.jsonl \
+    --out runs/local/v1/parity --docker espressif/idf:v5.5.5 --build
+# 公開用のパッケージ（firmware は firmware/jtalm_action/build_release を先に build する）
+uv run --group train python -m jtalm.model.release prepare \
+    --ckpt runs/local/v1/3m-s0/best.pt --ckpt-q4 runs/local/v1/3m-s0/best_q4_g64.pt \
+    --jtlm runs/local/v1/export/3m-s0_q4_g64.jtlm --suite results/v1_action/suite_3m-s0 \
+    --gate 0.88506 --eval-extra results/v1_action/ci_3m.md results/v1_action/seeds_3m.md \
+    --out runs/release/action_3m
+```
+
+- 上のパス（`runs/local/v1/3m-s0`）は、手元で学習し直したときの出力先です。公開したモデルは vast.ai の job `train_action_v1` で学習したもので、その checkpoint は `runs/vast/train_action_v1-<日時>/artifacts/v1/3m-s0/`（`best.pt`、量子化後の `best_q4_g64.pt`）にあります。公開したパッケージを作り直すときは、`--ckpt` と `--ckpt-q4` にこのパスを渡します。
+- `generate` の `reverify` phase は、正解のある文（`prompt` か `text`）を Qwen3 に schema v1 で読み直させます。`build_v1` は、その答えと v0 の正解を比べて、引き継ぐ文、付け直す文、除く文を決めます（規則は [`data.md`](data.md) の「v1.0」）。
+- `stackchan_eval` の実例の文（`datasets/action/stackchan_v1/sources.jsonl`）は第三者の文なので、リポジトリに入れていません。
+- 公開したモデルは seed 0 で、gate は 0.88506 です。結果は [`../results/v1_action/`](../results/v1_action/comparison.md)、実機での確認は [`../results/v1_action/device/`](../results/v1_action/device/README.md) にあります。
+- 費用（vast.ai）: `gen_action_v1` は disk が足りなくなって途中で止まり 1.57 時間（約 $1.68）、続きの `gen_action_v1b` が 0.89 時間（約 $0.92）、`train_action_v1`（5 seed を1枚の RTX 3090 で並列）が 0.43 時間（約 $0.09）でした。
+
+### 公開のチェックリスト（schema v1）
+
+公開は、次の順に行います。どの手順も、利用者の承認なしには実行しません。
+
+1. **利用者の承認:** `runs/release/action_3m` の中身（モデルカード、`config.json`、評価の表、firmware のイメージ）を利用者が確かめ、モデルの公開を承認する。`sha256sum -c SHA256SUMS` と `jtalm.model.release run` で、パッケージを確かめておく。
+2. **Community を off に:** 公開するリポジトリ（モデル、Space、データセット）の Community contributions（Discussions と Pull Requests）が off であることを確かめる（`jtalm.model.release publish` と `jtalm.data.publish publish` は、public にする前に off にする）。
+3. **モデルをアップロードする:** `runs/release/action_3m` を `ayousanz/JapaneseTinyAgentLM-Action-3M` に上書きでアップロードする（`uv run python -m jtalm.model.release publish runs/release/action_3m --repo ayousanz/JapaneseTinyAgentLM-Action-3M --confirm`）。v0 のモデルは、リポジトリの以前の commit に残る。
+4. **すぐに Space を更新する:** デモのページは Hugging Face のモデルの `.jtlm` と `config.json` を読むので、3. の直後に `runtime/web/jtalm.js` を作り直し（`runtime/web/build.sh`。[`../runtime/web/README.md`](../runtime/web/README.md)）、`jtalm.js` と `index.html` を Space（`ayousanz/JapaneseTinyAgentLM-Action-3M-demo`）にアップロードする。古い `jtalm.js`（schema v0 の grammar）のままでは、v1 のモデルを読めない。
+5. **データ v1.0 は別に承認を得る:** データ v1.0 を `japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth` に公開するのは、モデルとは別に利用者の承認を得てから（`uv run python -m jtalm.data.publish prepare` で `datasets/action/v1.0/hf/` を作り、データセットカードを確かめてから `publish --confirm`）。公開するのはオープンモデルが書いた文だけで、MASSIVE の行と、集めた Tatoeba・JESC・MASSIVE の負例、評価セットは含めない。

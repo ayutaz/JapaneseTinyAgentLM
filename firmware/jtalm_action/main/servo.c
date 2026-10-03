@@ -29,6 +29,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
+#include "settings.h"
 
 #define SCS_UART UART_NUM_1
 #define SCS_TX_PIN 6
@@ -73,6 +74,8 @@ static int g_last_raw[2] = {-1, -1};   // last goal written to yaw, pitch
 
 static int g_rx_got;           // bytes received by the last scs_txrx (diagnostics)
 static uint8_t g_rx_last[12];
+
+static settings_t g_settings;  // dispatcher task only (after servo_set_settings)
 
 static int64_t now_us(void) { return esp_timer_get_time(); }
 
@@ -300,6 +303,7 @@ static void run_plan(const msg_t *m) {
   g_deadline_us = t0 + (int64_t)(p->total_ms + WATCHDOG_MARGIN_MS) * 1000;
   g_active = 1;
   int sync_ms = 0;
+  int changed = 0;  // a setting step ran: the settings are stored after the plan
   if (r.real) {
     engage(&r);
     double d = fmax(fabs(g_yaw - p->yaw0), fabs(g_pitch - p->pitch0));
@@ -316,18 +320,67 @@ static void run_plan(const msg_t *m) {
     const act_step_t *s = &p->steps[i];
     if (i > 0 && s->call != p->steps[i - 1].call) pause_ms(&r, MOTION_CALL_GAP_MS);
     if (r.aborted) break;
-    if (s->kind == STEP_EXPR) {
-      face_info_t f;
-      int err = board_face(s->expr, &f);
-      out_lock();
-      printf(
-          "JTALM {\"t\":\"face\",\"seq\":%" PRIu32 ",\"expr\":\"%s\",\"ok\":%d"
-          ",\"crc\":\"%08" PRIx32 "\",\"draw_us\":%" PRIu32 ",\"push_us\":%" PRIu32 "}\n",
-          m->seq, act_expr_names[s->expr], err == 0, f.crc, f.draw_us, f.push_us
-      );
-      out_unlock();
-    } else {
-      move_to(&r, s->yaw, s->pitch, s->ms);
+    switch (s->kind) {
+      case STEP_MOVE:
+        move_to(&r, s->yaw, s->pitch, s->ms);
+        break;
+      case STEP_PAUSE:  // hold the pose (bow); a stop still ends it, the watchdog covers it
+        pause_ms(&r, s->ms);
+        break;
+      case STEP_EXPR: {
+        face_info_t f;
+        int err = board_face(s->arg, &f);
+        out_lock();
+        printf(
+            "JTALM {\"t\":\"face\",\"seq\":%" PRIu32 ",\"expr\":\"%s\",\"ok\":%d"
+            ",\"crc\":\"%08" PRIx32 "\",\"draw_us\":%" PRIu32 ",\"push_us\":%" PRIu32 "}\n",
+            m->seq, act_expr_names[s->arg], err == 0, f.crc, f.draw_us, f.push_us
+        );
+        out_unlock();
+        break;
+      }
+      case STEP_LED: {
+        const uint8_t *rgb = act_led_rgb[s->arg];
+        int err = board_led(rgb[0], rgb[1], rgb[2]);  // board_led keeps each channel <= 168
+        g_settings.led = s->arg;
+        changed = 1;
+        out_lock();
+        printf(
+            "JTALM {\"t\":\"setting\",\"seq\":%" PRIu32 ",\"what\":\"led\",\"color\":\"%s\""
+            ",\"ok\":%d}\n",
+            m->seq, act_color_names[s->arg], err == 0
+        );
+        out_unlock();
+        break;
+      }
+      case STEP_VOLUME:
+      case STEP_BRIGHTNESS: {
+        int bright = s->kind == STEP_BRIGHTNESS;
+        int level = act_apply_level(bright ? g_settings.brightness : g_settings.volume, s);
+        int err = bright ? board_brightness(level) : board_volume(level, 1);
+        if (bright) {
+          g_settings.brightness = (uint8_t)level;
+        } else {
+          g_settings.volume = (uint8_t)level;
+        }
+        changed = 1;
+        out_lock();
+        printf(
+            "JTALM {\"t\":\"setting\",\"seq\":%" PRIu32 ",\"what\":\"%s\",\"level\":%d"
+            ",\"ok\":%d}\n",
+            m->seq, bright ? "brightness" : "volume", level, err == 0
+        );
+        out_unlock();
+        break;
+      }
+      default:  // a step kind this dispatcher does not know: nothing is done
+        out_lock();
+        printf(
+            "JTALM {\"t\":\"error\",\"seq\":%" PRIu32 ",\"msg\":\"unknown step kind %d\"}\n",
+            m->seq, s->kind
+        );
+        out_unlock();
+        break;
     }
   }
   int present[2] = {-1, -1};
@@ -351,7 +404,14 @@ static void run_plan(const msg_t *m) {
       r.err ? "\"" : "", g_yaw, g_pitch, present[0], present[1]
   );
   out_unlock();
+  // A fault first: torque off and VM_EN low never wait for the NVS write (a page erase can
+  // take tens of ms). NVS is written after the plan, outside its watchdog deadline.
   if (r.err) fault(r.err);
+  if (changed && settings_save(&g_settings) != 0) {
+    out_lock();
+    printf("JTALM {\"t\":\"error\",\"msg\":\"settings save failed\"}\n");
+    out_unlock();
+  }
 }
 
 // VM_EN on, then ping both servos every POWER_POLL_MS until they answer (the SCS0009 needs
@@ -582,3 +642,5 @@ void servo_status(void) {
 }
 
 void out_init(void) { g_print = xSemaphoreCreateMutex(); }
+
+void servo_set_settings(const settings_t *s) { g_settings = *s; }

@@ -5,6 +5,9 @@
 Deliberately NOT lexical label checks: requiring action keywords would keep only sentences that a
 keyword rule can parse and would inflate the rule-based baseline. Labels are confirmed by the
 cross-model verifier instead; these checks only remove malformed text and obvious negation mismatch.
+The one exception is ``device_evidence``: it guards relabels of old (v0) [] rows, where the
+verifier's answer is the only source of the new label (ruling R18), not the label-first new
+sentences.
 """
 
 import re
@@ -50,3 +53,65 @@ def negation_consistent(text: str, category: str, language: str) -> bool:
         text = normalize(text)
         return CONTRAST_JA.search(text) is not None or NEGATION_JA.search(text) is not None
     return True
+
+
+# Ruling R18: a v0 [] row may be relabeled only to device commands, and only when the prompt names
+# the device of every call. Matched against normalize(text).lower() (NFKC folds full-width letters
+# such as ＬＥＤ and half-width kana). Bare 音/声/光 or 明るく are not evidence: they also occur in
+# narrative sentences and in requests the device commands cannot serve (音楽, 部屋を明るく).
+DEVICE_EVIDENCE = {
+    "led": r"led|ライト|ランプ",
+    "volume": (
+        r"音量|ボリューム|ミュート|消音|静かに|しずかに|うるさ"
+        r"|音を(?:大きく|小さく|上げ|下げ)|声を(?:大きく|小さく)"
+    ),
+    "brightness": r"画面|明るさ",
+}
+_EVIDENCE_RE = {k: re.compile(v) for k, v in DEVICE_EVIDENCE.items()}
+DEVICE_TOOLS = {
+    "set_led": "led",
+    "set_volume": "volume",
+    "adjust_volume": "volume",
+    "set_brightness": "brightness",
+    "adjust_brightness": "brightness",
+}
+
+
+def device_evidence(text: str, calls: list[dict]) -> list[str]:
+    """The device calls of ``calls`` whose device the prompt does not name ([] = accept).
+
+    Calls to other tools are not checked: only device commands may relabel a [] row.
+    """
+    folded = normalize(text).lower()
+    missing: list[str] = []
+    for call in calls:
+        key = DEVICE_TOOLS.get(call["name"])
+        if key and not _EVIDENCE_RE[key].search(folded) and call["name"] not in missing:
+            missing.append(call["name"])
+    return missing
+
+
+# Ruling R20: among relabels of v0 [] rows to device commands, drop those whose label is doubtful
+# even though the device is named: another device is the target, a target level read as a step,
+# an unmute (the level to restore is a guess), a guessed direction, or several calls.
+OTHER_DEVICE = re.compile(
+    r"テレビ|プレーヤー|プレイヤー|ラジオ|シャワー|スマホ|携帯|エアコン|照明|電気|冷蔵庫|洗濯機"
+)
+UNMUTE = re.compile(r"ミュート解除|ミュートを(?:外|解除)|アンミュート")
+ADJUST_WORD = re.compile(r"調節|調整")
+DIRECTION_WORD = re.compile(r"上げ|下げ|大きく|小さく|明るく|暗く")
+
+
+def relabel_doubtful(text: str, calls: list[dict]) -> bool:
+    """True when a device relabel of a v0 [] row must be dropped (R20)."""
+    folded = normalize(text)
+    if OTHER_DEVICE.search(folded) or UNMUTE.search(folded):
+        return True
+    if ADJUST_WORD.search(folded) and not DIRECTION_WORD.search(folded):
+        return True
+    if len(calls) > 1:
+        return True
+    return any(
+        c["name"] in ("adjust_volume", "adjust_brightness") and "by" in c.get("arguments", {})
+        for c in calls
+    )

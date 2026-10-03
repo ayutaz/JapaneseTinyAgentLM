@@ -20,6 +20,7 @@ typedef struct {
   int vm_mode_before, vm_out_before;  // GPIO mode / output registers (low byte) at boot
   int vm_mode_after, vm_out_after;    // after forcing VM_EN to a low output
   uint32_t begin_ms;  // M5.begin() time
+  int led_init;       // the base LEDs were set up (PY32 pin 13, 12 LEDs)
 } board_info_t;
 
 typedef struct {
@@ -27,7 +28,7 @@ typedef struct {
   uint32_t draw_us, push_us;
 } face_info_t;
 
-// Initializes M5Unified (display, touch, power; no speaker, mic, IMU or RTC), makes sure the
+// Initializes M5Unified (display, touch, power; speaker on; no mic, IMU or RTC), makes sure the
 // servo power is off, and allocates the face frame in PSRAM. Returns 0 on success.
 int board_init(board_info_t *info);
 
@@ -42,6 +43,25 @@ int board_servo_power_state(void);
 
 // Raw registers for diagnostics: PY32L020 0..n_py32-1 and AW9523 0..n_aw9523-1.
 void board_regs(uint8_t *py32, int n_py32, uint8_t *aw9523, int n_aw9523);
+
+// The 12 RGB LEDs on the back of the base (WS2812 driven by the PY32): all set to one color,
+// each channel 0..168 (larger values are clamped to 168, the official firmware's safe range).
+// Returns 0 on success.
+int board_led(uint8_t r, uint8_t g, uint8_t b);
+
+// REG_LED_CFG of the PY32 read back (LED count in bits 0-5), -1 without the PY32. Diagnostics.
+int board_led_cfg(void);
+
+// Speaker volume 0..100 (M5.Speaker 0..255); beep: a short tone at the new volume (none at 0).
+// Returns 0, or -1 when the speaker did not start (the volume is still kept).
+int board_volume(int level, int beep);
+
+// Backlight 0..100 (M5.Display 0..255), clamped here to ACT_BRIGHTNESS_MIN..100: the screen
+// is never turned dark (0 would switch the backlight supply off).
+int board_brightness(int level);
+
+// The present backlight as 0..100 (the boot default when NVS has none).
+int board_brightness_level(void);
 
 // 1 while the screen is touched (polls the touch controller).
 int board_touched(void);

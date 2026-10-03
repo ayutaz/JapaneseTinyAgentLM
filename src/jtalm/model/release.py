@@ -3,8 +3,8 @@
 """Package the Action LM for Hugging Face, run the packaged model, and publish it.
 
     uv run --group train python -m jtalm.model.release prepare \
-        --ckpt <best.pt> --ckpt-q4 <best_q4_g64.pt> --jtlm <3m_q4_g64.jtlm> \
-        --suite runs/local/suite_v051_3m_q4 --gate 0.86808 --out runs/release/action_3m
+        --ckpt <best.pt> --ckpt-q4 <best_q4_g64.pt> --jtlm <3m-s0_q4_g64.jtlm> \
+        --suite results/v1_action/suite_3m-s0 --gate 0.88506 --out runs/release/action_3m
     uv run --group train python -m jtalm.model.release run runs/release/action_3m 右を向いて
     uv run python -m jtalm.model.release publish runs/release/action_3m --confirm
 
@@ -35,7 +35,7 @@ from jtalm.model.transformer import ActionLM, ModelConfig
 
 REPO_ID = "ayousanz/JapaneseTinyAgentLM-Action-3M"
 CARD_TEMPLATE = Path(__file__).with_name("model_card_action.md")
-SCHEMA = PROJECT_ROOT / "src/jtalm/action/action_schema_v0.json"
+SCHEMA = PROJECT_ROOT / "src/jtalm/action/action_schema_v1.json"
 JTLM_NAME = "jtalm_action_3m_q4_g64.jtlm"
 FIRMWARE_NAME = "stackchan_k151_jtalm_action.bin"
 FIRMWARE_DIR = PROJECT_ROOT / "firmware/jtalm_action"
@@ -84,7 +84,7 @@ def prepare(args: argparse.Namespace) -> Path:
     if state["tokenizer_sha256"] != codec.sha256:
         raise SystemExit("tokenizer sha256 mismatch")
     shutil.copy(args.tokenizer, out / "tokenizer.model")
-    shutil.copy(SCHEMA, out / "action_schema_v0.json")
+    shutil.copy(SCHEMA, out / "action_schema_v1.json")
     shutil.copy(args.jtlm, out / JTLM_NAME)
     shutil.copy(Path(__file__).with_name("hf_inference.py"), out / "inference.py")
     fw = out / "firmware"
@@ -99,7 +99,7 @@ def prepare(args: argparse.Namespace) -> Path:
         "dropout": 0.0,
         "tokenizer": "tokenizer.model",
         "tokenizer_sha256": codec.sha256,
-        "schema": "action_schema_v0.json",
+        "schema": "action_schema_v1.json",
         "quantization": {"bits": 4, "group": 64, "scale_dtype": "float16"},
         "gate_threshold": args.gate,
         "training_data": args.data_version,
@@ -193,9 +193,9 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--suite", type=Path, required=True, help="eval_suite output of --ckpt-q4")
     p.add_argument("--gate", type=float, required=True)
     p.add_argument(
-        "--tokenizer", type=Path, default=PROJECT_ROOT / "tokenizer/out/action_v0_sp2048.model"
+        "--tokenizer", type=Path, default=PROJECT_ROOT / "tokenizer/out/action_v1_sp2048.model"
     )
-    p.add_argument("--data-version", default="action v0.5.1")
+    p.add_argument("--data-version", default="action v1.0")
     p.add_argument(
         "--firmware-build", type=Path, default=FIRMWARE_DIR / "build_release",
         help="ESP-IDF build directory of firmware/jtalm_action",
