@@ -9,7 +9,7 @@ Gate thresholds (seed 0..4): 0.885, 0.908, 0.862, 0.940, 0.904; val exact gated:
 | # | criterion | target | seed 0 | mean ± sd (5 seeds) | seeds passing | verdict (seed 0) |
 |---|---|---|---|---|---|---|
 | 1 | user's 4 sentences exact | 4/4 | 4/4 | 4.0/4 | 5/5 | pass |
-| 2a | Stack-chan v1 exact | ≥ 90% | 92.9 [88.6, 96.4] | 94.4 ± 0.9 | 5/5 | pass |
+| 2a | Stack-chan v1 exact | ≥ 90% | 92.9 [88.6, 97.1] | 94.4 ± 0.9 | 5/5 | pass |
 | 2b | Stack-chan v1 false actions on `[]` (n=65) | 0 | 0 | 0.0 (per seed 0, 0, 0, 0, 0) | 5/5 | pass |
 | 3 | human v1 negatives false-action rate (n=1092) | ≤ 0.5% | 0.3 [0.0, 0.6] | 0.1 ± 0.1 | 5/5 | pass |
 | 4 | human v1 positives exact (n=65) | not below v0.5.1 85.2 ± 6.4 | 93.8 [87.7, 98.5] | 91.7 ± 2.1 | 5/5 (≥ 85.2) | pass (mean pass) |
@@ -20,6 +20,7 @@ Review Focus (details below): numeric gated rate, seed 0 / mean ± sd — Stack-
 
 Notes:
 
+- Seed 0 intervals in this table are the ones of `jtalm.eval.bootstrap ci` (section "bootstrap: seed 0 intervals" below and `ci_3m.md`; one random stream over all sets, seed 0). The first version of this table drew a separate stream per row and gave [88.6, 96.4] for row 2a; the two differ only by resampling noise (one case of 140 is 0.7 points), and the table now uses the `bootstrap ci` interval so that the file has one value.
 - Criterion 4 compares against v0.5.1's 85.2 ± 6.4 measured on the v0 labels of human v1 (62 positives); under the v1 relabel the set has 65 positives, so the sets differ slightly.
 - Stack-chan v1 has no `turn` case; eval v3 has no single-action level/by cases and no out-of-range case (see Review Focus).
 - Training data covers 40 distinct `degrees` values and 18 distinct `level` values; unseen values are not measured by any evaluation set (sc-048 「18度」 → raw 180, gated).
@@ -101,6 +102,17 @@ Mean ± sd over 5 seeds (%). `numeric gated` = share of cases whose expected cal
 | v2/orthography | 282 | 82.9 ± 1.3 | 81.1 ± 1.4 | 0.0 ± 0.0 | — |
 | v2/question_forms | 203 | 86.2 ± 0.3 | 86.2 ± 0.3 | — | — |
 | v2/unexecutable | 286 | 99.1 ± 0.3 | 0.0 ± 0.0 | 0.6 ± 0.3 | — |
+
+### v2/numbers: requests with 首…振
+
+Of the 63 v2/numbers requests (cases with a non-empty label), 21 contain 首…振 (e.g. 「首を振って」); 20 of them are labelled `nod` in the older set (eval v2, kept under the v1 relabel). Errors per seed 0..4 (from the local predictions of `suite_3m-s{N}`):
+
+| group | n | errors per seed 0..4 | of which the output has `shake` |
+|---|---:|---|---|
+| contains 首…振 | 21 | 7, 17, 7, 13, 13 | 5, 8, 4, 4, 5 |
+| other requests | 42 | 13, 13, 11, 13, 11 | — |
+
+The nod/shake reading of 「首を振って」 is one of the main causes of the drop in v2/numbers requests exact (62.5 ± 7.6 vs v0.5.1's 84.4 ± 1.3), not the only one.
 
 ### bootstrap: seeds
 

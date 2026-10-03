@@ -408,7 +408,7 @@ uv run python -m jtalm.data.generate --phase reverify --config configs/action_v1
     datasets/action/human_v1/eval.jsonl datasets/action/eval_v2/*.jsonl \
     datasets/action/stackchan_v1/sources.jsonl
 
-# Stack-chan v1（review.md を利用者が確かめ、直す正解を overrides.jsonl に書いてから、もう一度実行する）
+# Stack-chan v1（review.md で検証役の正解を見直し、利用者が決めた直しを overrides.jsonl に書いてから、もう一度実行する）
 uv run python -m jtalm.data.stackchan_eval --raw $R
 # データ v1.0、eval v3、付け直した前の評価セット（datasets/action/relabel_v1/、changes.md）
 uv run python -m jtalm.data.build_v1 --raw $R

@@ -72,7 +72,7 @@ decoder-only Transformer です（`src/jtalm/model/transformer.py`）。
 | 形式 | SentencePiece unigram、語彙 **2,048**、byte fallback あり、`nmt_nfkc` 正規化、数字は1文字ずつ、先頭の `▁` は付けない |
 | 特殊 token | `<unk>` 0、`<s>` 1、`</s>` 2、`<pad>` 3、制御用の `<act>` と `<out>` |
 | 1 token にまとめる断片 | 出力の JSON の固定の断片（`[]`、call の頭 `{"name":"look","arguments":{"direction":"`、引数の間の `","degrees":`、閉じ `"}}`、引数のない call `{"name":"bow","arguments":{}}` など）、enum の値（`left`、`up_left`、`slight`、`sleepy`、`light_blue` など）、**数字 `0`〜`9`**。user-defined symbol として登録する（`jtalm.model.format.JSON_PIECES`、`ENUM_VALUES`、`DIGITS`）。v0 では `0`、`4`、`6`〜`9` が語彙になく byte に分かれていたので、v1 で数字をすべて1 token にした |
-| 学習に使った文 | data v1.0 の学習データと validation の入力文と出力、MASSIVE ja-JP の train の発話（198,005行）。評価セットは使わない |
+| 学習に使った文 | data v1.0 の学習データと validation の入力文と出力、MASSIVE ja-JP の train の発話（合わせて 198,005行）。評価セットは使わない |
 | 語彙を選んだ理由 | 出力の token 数は語彙によらず同じなので、入力側で比べた。v0 のとき、2k は未知の日本語（MASSIVE の dev）での byte fallback が 4k / 8k より少なく（1.3%。4k は 2.0%、8k は 2.2%）、embedding が最も小さい（d192 で 0.39M）。v1 も 2k にした（MASSIVE の dev の byte fallback は 1.0%） |
 
 1件の系列は次の形です（`jtalm.model.format`）。
