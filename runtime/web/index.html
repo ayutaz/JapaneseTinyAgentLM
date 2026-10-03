@@ -134,7 +134,7 @@ const UPDOWN = { up: "上げる", down: "下げる" };
 
 function size(a) { return "degrees" in a ? `${a.degrees}度` : AMOUNT[a.amount]; }
 const $ = (id) => document.getElementById(id);
-let predict, defaultGate = 0.868, last = null;
+let predict, defaultGate = 0.88506, last = null;
 
 function describe(call) {
   const a = call.arguments;

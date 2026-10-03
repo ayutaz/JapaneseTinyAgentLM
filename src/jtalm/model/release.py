@@ -3,8 +3,8 @@
 """Package the Action LM for Hugging Face, run the packaged model, and publish it.
 
     uv run --group train python -m jtalm.model.release prepare \
-        --ckpt <best.pt> --ckpt-q4 <best_q4_g64.pt> --jtlm <3m_q4_g64.jtlm> \
-        --suite runs/local/suite_v051_3m_q4 --gate 0.86808 --out runs/release/action_3m
+        --ckpt <best.pt> --ckpt-q4 <best_q4_g64.pt> --jtlm <3m-s0_q4_g64.jtlm> \
+        --suite results/v1_action/suite_3m-s0 --gate 0.88506 --out runs/release/action_3m
     uv run --group train python -m jtalm.model.release run runs/release/action_3m 右を向いて
     uv run python -m jtalm.model.release publish runs/release/action_3m --confirm
 

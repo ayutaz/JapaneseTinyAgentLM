@@ -196,8 +196,8 @@ v0.5.1 の 3M（データ v0.5.1、gate 0.868）の記録は [`results/v051_acti
 | 顔の frame と待ち行列 | 約 158KB | PSRAM |
 | task の stack（LM 16KB、行列積の worker 6KB、dispatcher 6KB、監視 4KB、serial の読み取り 3KB） | 約 35KB | 内部 SRAM |
 
-- token ごとの確保はありません。1件目の処理の後は、空きが変わりません。
-- Action schema v1 の firmware（speaker、LED、NVS を含む）では、画面と dispatcher の初期化後の内部 SRAM の空きが 89,891 B、1,500件の連続実行の後が 85,783 B で、上の表より約 13KB 少なくなります。100件目以降はほぼ一定で（85,651〜86,099 B）、減り続けません（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
+- token ごとの確保はありません。上の表の firmware（v0.4 のモデル）では、1件目の処理の後は空きが変わりませんでした。
+- Action schema v1 の firmware（speaker、LED、NVS を含む）では、画面と dispatcher の初期化後の内部 SRAM の空きが 89,891 B、1,500件の連続実行の後が 85,783 B で、上の表より約 13KB 少なくなります。1件目の後の 86,467 B から 400件目までに約 700 B 減って 85,783 B になり、その後は最後まで一定でした（途中で2回 85,651 B になり、85,783 B に戻った）。減り続けることはありません（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
 - 5M は読み込み後の内部 SRAM の空きが約 90KB（画面なし）まで減ります。`-DJTLM_BATCH=8` で activation を半分にできます（結果は変わりません。速度への影響は未計測）。
 
 ### 読み出し帯域
@@ -216,7 +216,7 @@ quad の PSRAM と QIO の flash はほぼ同じ速さで、理論値（4 bit ×
 
 - **重みの byte 数が速度を決めます。** 重みを毎 token すべて読むので、速度の上限は「約 31 MB/s ÷ 重みの byte 数」です。INT4 化、語彙の縮小、入出力の埋め込みの共有が速度に直結します。3M INT4 では演算が律速なので、さらに速くするには生成する token 数か層を減らすのが効きます。
 - **prompt はまとめて処理します。** 1 token ずつ forward すると、入力の長さに比例して重みを読み直すことになります。prefill のまとめ処理と 2 core の並列化を合わせて、prefill は 166 から 49 ms/token（約 1/3.4）になりました（上の表、3M INT8）。
-- **LM は角度を出しません。** LM はカテゴリだけを出し、firmware が検査、角度への変換、制限をします。LM がどんな出力をしても、首は soft limit の外へ出ません。
+- **LM の角度は firmware が必ず制限します。** schema v1 の LM は量のカテゴリのほかに角度（`degrees` 1〜180）も出しますが、servo の raw 値は出しません。firmware が検査、raw 値への変換、soft limit での制限をするので、LM がどんな出力をしても、首は soft limit の外へ出ません（範囲を超える指示は端で止め、`clamped` を付ける）。
 - **連続回転は使いません。** Action LM からは使えないようにしています。
 - **Wi-Fi は使いません。** Wi-Fi を有効にすると内部 SRAM が約 48KB 減ります。
 

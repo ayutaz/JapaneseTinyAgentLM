@@ -19,15 +19,18 @@ JapaneseTinyAgentLM は、マイコン（ESP32-S3）の上だけで動く、日�
 
 | モデル | 入力 | 出力 | 用途 | 状態 |
 |---|---|---|---|---|
-| Japanese Action LM | 日本語のテキスト | Action の JSON（0〜2個。`[]` は何もしない） | 首の向き、うなずき、表情の制御 | **完成・公開済み** |
+| Japanese Action LM | 日本語のテキスト | Action の JSON（0〜2個。`[]` は何もしない） | 首の向き（角度、相対、斜め）、うなずき、首振り、お辞儀、表情、LED の色、音量、画面の明るさの制御 | **完成・公開済み** |
 | Japanese Tiny Chat LM | 日本語のテキスト | 短い日本語のテキスト | 短い応答、簡単な会話 | 次に取り組む |
 
-Action LM は、3.15M parameter のモデルを INT4 に量子化し、tokenizer を含めて約 2.0MB の1ファイルにしたものです。K151 の上で、1回の依頼に中央値 1.3 秒ほどで応答し、servo を動かします。重みは Hugging Face の [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開しています（CC BY-SA 4.0）。
+Action LM は、3.15M parameter のモデルを INT4 に量子化し、tokenizer を含めて約 2.0MB の1ファイルにしたものです。K151 の上で、1回の依頼に中央値 1.04 秒ほどで応答し、servo、画面の顔、LED、音量、明るさを動かします。2026年10月に、出力の形式を Action schema v0（`look`、`set_expression`、`nod` の3つ）から v1（11 の動作。角度の数値も出せる）に広げました。重みは Hugging Face の [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) で公開しています（CC BY-SA 4.0）。
 
 ```text
 右を向いて、ちょっと嬉しそうにして
 → [{"name":"look","arguments":{"direction":"right","amount":"normal"}},
    {"name":"set_expression","arguments":{"expression":"happy"}}]
+
+顔を右に45度向いて
+→ [{"name":"look","arguments":{"direction":"right","degrees":45}}]
 
 右を向かないで
 → []
@@ -37,13 +40,31 @@ Action LM は、3.15M parameter のモデルを INT4 に量子化し、tokenizer
 
 - **端末の上だけで動く:** ESP32-S3 の CPU だけで推論します。ネットワーク、NPU、外部モジュールは使いません。
 - **小さく、速く:** 量子化した LM の容量の目安を 1.5〜5MB に置き、画面や servo の制御と同居できる大きさにします。
-- **安全を優先する:** 出力は grammar で常に schema に合う形にし、確信度の低い出力は、確信度の gate（confidence gate）で「何もしない」に倒します。LM は servo の raw 値を出さず、角度への変換、可動域の制限、停止は firmware が受け持ちます。
+- **安全を優先する:** 出力は grammar で常に schema に合う形にし、確信度の低い出力は、確信度の gate（confidence gate）で「何もしない」に倒します。LM は servo の raw 値を出さず（角度は度で出すことがあります）、raw 値への変換、可動域の制限、停止は firmware が受け持ちます。
 - **評価を固定する:** prompt の形式、greedy decoding、grammar の実装、gate の閾値の選び方を固定し、PC（PyTorch と C）と実機で同じ評価をします。閾値やモデルは validation だけで選び、評価セットでは選びません。
 - **開発者が組み込みやすく:** 仕様を明確にし、再現手順を公開します。コードは Apache-2.0、重みとデータセットは CC BY-SA 4.0 です。学習データには、ライセンスが両立するオープンモデルの出力と既存のデータだけを使います（[`data.md`](data.md)）。
 
 ## Action LM の完了条件と達成状況
 
-Action LM の完了条件は、no_action カテゴリでルールベースと同程度にとどまる点（※1）を除いて、すべて満たしました。値は、採用したモデル（3M、data v0.5.1、seed 0、INT4 + grammar + gate 0.868）のものです（[`results/v051_action/adopted_q4/comparison.md`](../results/v051_action/adopted_q4/comparison.md)）。評価セットの説明と詳しい表は [`evaluation.md`](evaluation.md) にあります。
+### Action schema v1（今の版）
+
+schema v1 の完了条件（利用者が普段使う4文、スタックチャンで使われている言い方の完全一致 90% 以上と紛らわしい `[]` での誤動作 0件、人が書いた依頼でない文での誤動作 0.5% 以下、人が書いた依頼が v0.5.1 より下がらないこと、実機と PyTorch の一致、実機の応答時間の中央値 2 秒以内）は、5 seed のすべてで満たしました。
+
+| 条件 | 目標 | 結果（seed 0 / 5 seed の平均） |
+|---|---|---|
+| 利用者の4文 | 4 / 4 | 4 / 4（5 seed とも） |
+| スタックチャンの言い方（140件）の完全一致 | 90% 以上 | 92.9% / 94.4 ± 0.9% |
+| その `[]` の文（65件）で誤って動いた件数 | 0 | 0（5 seed とも） |
+| 人が書いた依頼でない文（1,092件）で誤って動いた割合 | 0.5% 以下 | 0.3% / 0.1 ± 0.1% |
+| 人が書いた依頼（65件） | v0.5.1 の 85.2 ± 6.4% から下がらない | 93.8% / 91.7 ± 2.1% |
+| 実機と PyTorch の一致 | 一致 | 300 / 300（動きの計画も 300 / 300）。1,500件の連続実行でもすべて一致 |
+| 実機の応答時間の中央値 | 2 秒以内 | 1,042 ms（p90 1,746 ms）。`.jtlm` 1,970,720 B、app 536,128 B |
+
+出典: [`results/v1_action/comparison.md`](../results/v1_action/comparison.md)、[`results/v1_action/device/`](../results/v1_action/device/README.md)。弱いところ（`turn`、数値の止まり率、「首を振って」、eval v3 の欠け）は [`evaluation.md`](evaluation.md) の「弱いところ」にあります。
+
+### Action schema v0（前の版、v0.5.1）
+
+Action LM の完了条件は、no_action カテゴリでルールベースと同程度にとどまる点（※1）を除いて、すべて満たしました。値は、v0 で採用したモデル（3M、data v0.5.1、seed 0、INT4 + grammar + gate 0.868）のものです（[`results/v051_action/adopted_q4/comparison.md`](../results/v051_action/adopted_q4/comparison.md)）。評価セットの説明と詳しい表は [`evaluation.md`](evaluation.md) にあります。
 
 | 条件 | 目標 | 結果 |
 |---|---|---|
@@ -62,10 +83,11 @@ Action LM の完了条件は、no_action カテゴリでルールベースと同
 
 完了条件に加えて、人が書いた文での評価もしています。人が書いた 1,159 件（依頼 62 件と、依頼ではない文 1,097 件）で、完全一致 99.6%、依頼の正解 91.9%、誤って動いた割合 0.0% でした。依頼の正解は seed によって 75.8〜91.9% と動き、5 seed の平均は **85.2 ± 6.4%** です。採用した seed 0 は5つの中で最も高いので、期待される性能としては5回の平均を見てください。依頼は 62 件しかなく、95% bootstrap 区間は 85.5〜98.4% と広いです。
 
-分かっている限界:
+分かっている限界（今の版）:
 
-- 英語の依頼はほぼ扱えません（正解は約 5%）。日本語専用です。
-- 人が書いた依頼の評価例が 62 件と少なく、「正面を向く」と「笑う」に偏っています。
+- 英語の依頼はほぼ扱えません（正解は約 7%）。日本語専用です。
+- 人が書いた依頼の評価例が 65 件と少なく、「正面を向く」と「笑う」に偏っています。
+- `turn`（今の向きからの移動）は `look` より弱く、角度や数値のある文は gate で止まりやすいです。
 - 消費電力は測っていません。
 
 今後の課題は [`roadmap.md`](roadmap.md) にあります。
@@ -90,7 +112,7 @@ Action LM の完了条件は、no_action カテゴリでルールベースと同
 
 - **出力の性質が違う:** Action は決まった形の JSON を確実に出すことが目的で、自由な文の生成は要りません。Chat は短い自然な文を生成します。重みも評価の目的も違うので、はじめは別のモデルにします。
 - **失敗の原因を切り分ける:** 最初から1つのモデルで両方を学習すると、精度が足りないときに、原因が tokenizer、データ、モデルの大きさ、タスク間の干渉のどれなのか分かりにくくなります。
-- **小さく速くできる:** Action に絞ったことで、3M で完了条件を満たし、実機で約 1.3 秒で応答できました。
+- **小さく速くできる:** Action に絞ったことで、3M で完了条件を満たし、実機で約 1 秒で応答できました。
 - **共通にするもの:** `.jtlm` の形式、C の runtime と演算、量子化、評価の仕組みは共通にします。tokenizer は Chat 用に作り直します。
 - Action LM は事前学習なしで、Action のデータだけで学習しました。日本語の事前学習の corpus は、そのライセンスが重みのライセンスに直結するので、Chat LM で決めます。
 - 2つを1つのモデルにまとめる（Unified）案は、Flash を節約できる可能性がありますが、mode の混ざりと精度の低下を測ってから判断します。
@@ -107,7 +129,7 @@ VLA（Vision-Language-Action）は、画像や映像をモデルの入力とし�
 
 | 区分 | 意味 | 例 |
 |---|---|---|
-| 実測 | PC または実機で測った値。条件（モデル、データの版、firmware の設定）を併記する | 実機の応答 中央値 1,276 ms、評価セット v0 で 93.8% |
+| 実測 | PC または実機で測った値。条件（モデル、データの版、firmware の設定）を併記する | 実機の応答 中央値 1,042 ms（schema v1）、スタックチャンの言い方 140件で 94.4 ± 0.9% |
 | 確認済み | 公式の仕様や一次ソースで確かめた事項 | CoreS3 の Flash / PSRAM の容量、先行例の規模 |
 | 設計目標 | これから達成を目指す値 | Chat LM の大きさ（約 10M）、context 128〜256 |
 | 仮説 | 実験や調査が必要な主張 | 10M の Chat LM が実用になる品質に届くか |

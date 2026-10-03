@@ -73,7 +73,7 @@ record every 100 requests:
 - **Memory:** internal SRAM free 89,891 B after boot (`board_ready`), 86,467 B after the first
   request, 86,099 B after 100 requests, then 85,915 B (request 200) and 85,783 B from request 400
   to the end, with two readings of 85,651 B (requests 1,000 and 1,300) that came back to
-  85,783 B: no steady leak. The smallest free block stayed at 45,056 B and the low-water mark at
+  85,783 B: no steady leak. The smallest free block ended at 45,056 B and the low-water mark at
   53,548 B; PSRAM free did not change (7,755,648 B); the LM task's stack kept 13,324 B free.
   (Internal SRAM free is about 13 KB lower than v0.5.1's 98,7xx B, from the speaker and the v1
   dispatcher.)
@@ -101,7 +101,7 @@ Below horizontal the head rests on the floor (about +2.5 deg), so the lower pitc
 bow from below 20 deg first lifts the head to 20 deg. Requests beyond the limits stop at the edge
 and the plan marks the move `clamped`.
 
-## The user's four sentences (`user4.summary.json`)
+## The user's four sentences (`user4.jsonl`, `user4.summary.json`)
 
 Run before this firmware build (same LM and dispatcher code, gate 0.868 at that time; every
 `min_prob` is 0.9997 or higher, so the 0.88506 gate gives the same outputs):
@@ -113,9 +113,9 @@ Run before this firmware build (same LM and dispatcher code, gate 0.868 at that 
 | 頭を90度上に向けて | `look up 90` | move to pitch 85, `clamped` | 0.99992 | 1,297 |
 | 顔を右に45度向いて | `look right 45` | move to yaw 45 | 0.99978 | 1,258 |
 
-All four equal the outputs of spec section 4.4.
+All four equal the outputs of spec section 4.4. `user4.jsonl` holds the four `gen` records with their `act` plans as the device sent them (copied from `runs/fw/t8_user4.jsonl`).
 
 ## Raw logs
 
 Raw records and serial logs stay in `runs/fw/` (not tracked): `t8_mismatch.log`,
-`t8_boot_v1.log`, `t8_parity.{jsonl,log}`, `t8_long.{jsonl,log}`, `t8_user4.{jsonl,log}`.
+`t8_boot_v1.log`, `t8_parity.{jsonl,log}`, `t8_long.{jsonl,log}`, `t8_user4.log` (the records of `t8_user4.jsonl` are committed here as `user4.jsonl`).

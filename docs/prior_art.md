@@ -67,7 +67,7 @@ llama2.c 系の小型モデルを ESP32 で動かす実験です。
 
 ## 既存の小型モデルとの比較（TinyLM-Bench の16件）
 
-TinyLM-Bench は、作者が本プロジェクトとは別に行った、既存の小型モデルの16件の比較です（非公開。ケースと各モデルの出力は [`../tests/fixtures/tinylm_bench/`](../tests/fixtures/tinylm_bench/) にあります）。16件は英語 8件・日本語 8件で、tool は `look(direction, amount)`、`set_expression(expression)`、`nod(count)` の3種類です（Action schema v0 はこの形式に合わせています。[`architecture.md`](architecture.md)）。厳格一致は FunctionGemma 270M が 6/16、Needle 2 が 3/16（日本語は 1/8）、MimiModel が 1/16 で、3モデルとも multi-action と否定のケースを1件も正解しませんでした。採用した Action LM（3M、data v0.5.1、INT4）は、grammar ありで 75.0%（12/16）、確信度の gate（confidence gate）も加えると 62.5%（10/16）です。表と読むときの注意は [`evaluation.md`](evaluation.md) の「既存モデルとの比較（TinyLM-Bench の16件）」にあります。16件は傾向を見るためのもので、統計的な結論には足りません。
+TinyLM-Bench は、作者が本プロジェクトとは別に行った、既存の小型モデルの16件の比較です（非公開。ケースと各モデルの出力は [`../tests/fixtures/tinylm_bench/`](../tests/fixtures/tinylm_bench/) にあります）。16件は英語 8件・日本語 8件で、tool は `look(direction, amount)`、`set_expression(expression)`、`nod(count)` の3種類です（Action schema v0 はこの形式に合わせています。[`architecture.md`](architecture.md)）。厳格一致は FunctionGemma 270M が 6/16、Needle 2 が 3/16（日本語は 1/8）、MimiModel が 1/16 で、3モデルとも multi-action と否定のケースを1件も正解しませんでした。v0 の版の Action LM（3M、data v0.5.1、INT4）は、grammar ありで 75.0%（12/16）、確信度の gate（confidence gate）も加えると 62.5%（10/16）です（schema v1 のモデルでは測っていません）。表と読むときの注意は [`evaluation.md`](evaluation.md) の「既存モデルとの比較（TinyLM-Bench の16件）」にあります。16件は傾向を見るためのもので、統計的な結論には足りません。
 
 既存のモデルを PC 上で動かして分かったことです。
 
@@ -86,7 +86,7 @@ TinyLM-Bench は、作者が本プロジェクトとは別に行った、既存�
 | slvDev/esp32-ai | TinyStories の文生成 | 28.9M（stored） | 4-bit PLE、14.9MB | 9.88 tok/s | 一次ソースで確認 |
 | esp32-mind | TinyStories の文生成 | 11.5M | int4（group 128）、5.97MB | 14.22 tok/s | 速度は一次ソース、規模は PC で確認 |
 | doryiii/esp32-llm | 小型 Llama の実験 | 3.1M（stories3M） | INT8（group 64）、3.35MB | 約 12 tok/s（上流）。CoreS3 で 6.5〜7.1 tok/s（forward のみ） | CoreS3 の値は実測 |
-| JapaneseTinyAgentLM（Action LM） | 日本語の Action | 3.15M | INT4（group 64）、`.jtlm` 1,971,456 B（tokenizer を含む） | decode 約 105 ms/token。1回の応答は中央値 1,276 ms | 実測（K151） |
+| JapaneseTinyAgentLM（Action LM、schema v1） | 日本語の Action | 3.15M | INT4（group 64）、`.jtlm` 1,970,720 B（tokenizer を含む） | decode 約 105 ms/token。1回の応答は中央値 1,042 ms | 実測（K151） |
 
 ## 先行例の調査と主張の範囲
 
@@ -125,7 +125,7 @@ TinyLM-Bench は、作者が本プロジェクトとは別に行った、既存�
 ### 比較するときの書き方
 
 - 大きさは「ESP32 で動く Needle 2 / 3（29〜45M）の約 1/10〜1/15」と書きます。29〜45M は ESP32 に移植されたモデルの大きさです（Needle 3 全体では 29〜121M）。「最小の tool calling のモデル」とは書きません。
-- 応答時間（中央値 1,276 ms と、Needle の ESP32 移植の 23〜47 秒）は実測の事実として書けます。ただし、Needle は英語の汎用 tool calling（prompt に schema を入れる方式）で、このモデルは schema を固定した Action 専用であることを併記します。
+- 応答時間（中央値 1,042 ms と、Needle の ESP32 移植の 23〜47 秒）は実測の事実として書けます。ただし、Needle は英語の汎用 tool calling（prompt に schema を入れる方式）で、このモデルは schema を固定した Action 専用であることを併記します。
 - TinyLM-Bench の16件の比較は、Needle が日本語を扱わないことを示すものとして書きます。「tool calling の能力で上回った」とは書きません。
 - gate、grammar、INT4、マイコン上の tokenizer、実機と PC の出力の一致は、それぞれ単独では新しくありません。特徴は、これらの組み合わせと日本語への適用です。
 

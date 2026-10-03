@@ -60,11 +60,15 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT>
 
 ```text
 準備ができました。依頼を入力してください（終了は Ctrl+C）。
-右を向いて
-→ [{"name":"look","arguments":{"direction":"right","amount":"normal"}}]  963 ms
-笑わないでね
-→ []  384 ms
+LEDライトの色を青にして
+→ LED を青にする  1063 ms
+  LED: 青
+頭を90度上に向けて
+→ 上を向く（正面から90°）  1297 ms
+  可動域の端で止めました
 ```
+
+`stackchan_chat.py` は出力を日本語の説明で表示します（`--verbose` を付けると、Action の JSON と firmware の記録も表示します）。
 
 画面に顔が出て、表情の依頼で顔が変わります。LED の色、音量（確認音が鳴ります）、画面の明るさの依頼もこの段階で効きます。servo は off で、首は動きません（動きの計画だけを作ります）。
 
@@ -125,7 +129,7 @@ MSYS_NO_PATHCONV=1 docker run --rm -e IDF_COMPONENT_MANAGER=0 -v "$(pwd -W):/w" 
 
 firmware が読むのは `.jtlm` 形式のファイル（モデルと tokenizer を1つにまとめたもの。形式は [`../docs/architecture.md`](../docs/architecture.md)）です。
 
-- **公開モデルを使う:** Hugging Face のモデルのリポジトリにある `jtalm_action_3m_q4_g64.jtlm`（3M、INT4。Action schema v1 のモデルは 1,970,720 B）。
+- **公開モデルを使う:** Hugging Face のモデルのリポジトリにある `jtalm_action_3m_q4_g64.jtlm`（3M、INT4）。Hugging Face のモデルは Action schema v1 のモデル（`.jtlm` は 1,970,720 B）で上書きして公開します。上書きの前の v0 の `.jtlm`（1,971,456 B。Hugging Face の commit 履歴に残ります）は、この firmware では動きません（下の「`.jtlm` と firmware の Action schema の版を合わせてください」）。
 
   ```bash
   hf download ayousanz/JapaneseTinyAgentLM-Action-3M jtalm_action_3m_q4_g64.jtlm --local-dir .

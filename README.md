@@ -8,12 +8,14 @@
 
 [English](README.en.md)
 
-マイコン（ESP32-S3）の上だけで動く、日本語の超小型言語モデルです。最初のモデル **Action LM**（315万パラメータ）は、日本語の短い依頼を、ロボットの動作の呼び出し（JSON）に変えます。M5Stack のスタックチャン（K151、CoreS3）の本体だけで、NPU もネットワークも使わずに、首を動かし、表情を変えます。
+マイコン（ESP32-S3）の上だけで動く、日本語の超小型言語モデルです。最初のモデル **Action LM**（315万パラメータ）は、日本語の短い依頼を、ロボットの動作の呼び出し（JSON）に変えます。M5Stack のスタックチャン（K151、CoreS3）の本体だけで、NPU もネットワークも使わずに、首を動かし、表情、LED の色、音量、画面の明るさを変えます。
 
 ```text
-入力: 左を見て、真ん中に戻ってきて。
-出力: [{"name":"look","arguments":{"direction":"left","amount":"normal"}},
-       {"name":"look","arguments":{"direction":"center","amount":"normal"}}]
+入力: 顔を右に45度向いて
+出力: [{"name":"look","arguments":{"direction":"right","degrees":45}}]
+
+入力: LEDライトの色を青にして
+出力: [{"name":"set_led","arguments":{"color":"blue"}}]
 ```
 
 ## 目次
@@ -32,32 +34,41 @@
 
 ## 何ができるか
 
-出力は、次の3種類の動作を最大2個まで並べた JSON です。動作の依頼でない文、否定された依頼（「笑わないでね」）、このロボットにはできない依頼（「右に曲がってください」）には `[]`（何もしない）を返します。
+出力は、次の 11 の動作（Action schema v1）を最大2個まで並べた JSON です。動作の依頼でない文、否定された依頼（「笑わないでね」）、このロボットにない機器への依頼（「寝室のライトをつけて」「エアコンを25度に」）、このロボットにはできない依頼（「右に曲がってください」）には `[]`（何もしない）を返します。
 
 | 動作 | 引数 |
 |---|---|
-| `look`（首を向ける） | `direction`: left / right / up / down / center、`amount`: slight / normal / large |
-| `set_expression`（表情） | `expression`: happy / sad / surprised / neutral |
-| `nod`（うなずく） | `count`: 1〜3 |
+| `look`（正面を基準に首を向ける） | `direction`: left / right / up / down / up_left / up_right / down_left / down_right / center。`amount`（slight / normal / large）か `degrees`（1〜180）のどちらか |
+| `turn`（今の向きから首を動かす） | `look` と同じ（center はなし）。「もう少し右」のように今の向きを基準にする言い方 |
+| `nod` / `shake`（うなずく / 首を横に振る） | `count`: 1〜5 |
+| `bow`（お辞儀） | なし |
+| `set_expression`（表情） | `expression`: happy / sad / surprised / neutral / angry / sleepy / doubt |
+| `set_led`（台座の LED の色） | `color`: red / orange / yellow / green / light_blue / blue / purple / pink / white / off |
+| `set_volume` / `set_brightness`（音量 / 画面の明るさ） | `level`: 0〜100 |
+| `adjust_volume` / `adjust_brightness`（上げる / 下げる） | `direction`: up / down。`amount`（slight / normal / large）か `by`（1〜100）のどちらか |
 
 - **必ず正しい形の JSON を出します。** 生成の各 step で schema に合う token だけを選びます（文法による制約）。
-- **自信がないときは動きません。** 生成した token の確率の最小値が閾値（0.868）より低いと、`[]` にします。これを確信度の gate（confidence gate）と呼びます。
-- **小さい:** 実機に書き込む `.jtlm` ファイル（INT4 の重みと tokenizer）は 2.0MB（1,971,456 B）で、重みだけなら 1.68MB です。実機での応答は1文あたり中央値 1.3 秒です。
+- **自信がないときは動きません。** 生成した token の確率の最小値が閾値（0.88506）より低いと、`[]` にします。これを確信度の gate（confidence gate）と呼びます。
+- **小さい:** 実機に書き込む `.jtlm` ファイル（INT4 の重みと tokenizer）は 2.0MB（1,970,720 B）で、重みだけなら 1.68MB です。実機での応答は1文あたり中央値 1.04 秒です。
+- 前の版（Action schema v0。`look`、`set_expression`、`nod` の3つだけ）の結果と文書は、Git の履歴と [`results/v051_action/`](results/v051_action/) に残っています。
 
 ## 結果
 
-実機と同じ INT4、文法による制約、gate 0.868 での値です。学習の seed を変えて5回学習した平均 ± 標準偏差です（公開したのは seed 0）。
+実機と同じ INT4、文法による制約、gate での値です（gate の閾値は seed ごとに validation で選ぶ。seed 0 は 0.88506）。学習の seed を変えて5回学習した平均 ± 標準偏差です（公開したのは seed 0。seed は評価の前に決めていました）。
 
 | 評価 | 件数 | 結果 |
 |---|---:|---|
-| 人が書いた依頼文（公開コーパスから選んだ文） | 62 | **85.2 ± 6.4%**（seed 0 は 91.9%） |
-| 人が書いた、動作の依頼でない文で誤って動いた割合 | 1,097 | **0.0 ± 0.0%** |
-| LLM が書いた評価セット（完全一致） | 1,189 | **94.0 ± 0.6%** |
-| できない依頼で誤って動いた割合 | 286 | 0.3 ± 0.3% |
-| 実機（ESP32-S3）と PC（PyTorch）の出力の一致 | 300 | 300 / 300 |
+| 利用者が普段スタックチャンに使う4文（「LEDライトの色を青にして」など） | 4 | **4 / 4**（5 seed とも） |
+| スタックチャンで使われている言い方（公開されている例と言い換え。完全一致） | 140 | **94.4 ± 0.9%**（seed 0 は 92.9%） |
+| 同じセットの紛らわしい `[]`（部屋の照明、エアコンの温度など）で誤って動いた件数 | 65 | **0**（5 seed とも） |
+| 人が書いた依頼文（公開コーパスから選んだ文） | 65 | **91.7 ± 2.1%**（seed 0 は 93.8%） |
+| 人が書いた、動作の依頼でない文で誤って動いた割合 | 1,092 | **0.1 ± 0.1%** |
+| LLM が書いた評価セット eval v3（完全一致） | 1,816 | **95.3 ± 0.5%** |
+| できない依頼で誤って動いた割合 | 285 | 0.6 ± 0.3% |
+| 実機（ESP32-S3）と PC（PyTorch）の出力の一致 | 300 | 300 / 300（動きの計画も 300 / 300） |
 
-- 英語には対応していません（英語の依頼の正解は約5%）。表記の揺れ（ひらがなだけ、カタカナ、打ち間違い、方言）の文は 83.3%、言い直しの文は 85.5% で、やや苦手です（どちらも 5 seed の平均の完全一致）。
-- 評価セットごとの結果、誤差の範囲、版ごとの改善は [`docs/evaluation.md`](docs/evaluation.md) にあります。実機の計測は [`results/v051_action/device/`](results/v051_action/device/README.md) にあります。
+- 弱いところ: `turn`（今の向きからの移動）は `look` より弱く（eval v3 の1動作の文で 84.3% と 97.4%）、角度や数値のある文は gate で止まりやすいです（スタックチャンの言い方のセットで、数値のある文の 7.3 ± 4.1%）。「首を振って」はうなずきと首振りのどちらにも読めます。英語には対応していません（英語の依頼の正解は約7%）。表記の揺れ（ひらがなだけ、カタカナ、打ち間違い、方言）は 82.9%、言い直しは 85.9% で、やや苦手です（5 seed の平均の完全一致）。
+- 評価セットごとの結果、誤差の範囲、版ごとの改善は [`docs/evaluation.md`](docs/evaluation.md) にあります。表の数値は [`results/v1_action/comparison.md`](results/v1_action/comparison.md)、実機の計測は [`results/v1_action/device/`](results/v1_action/device/README.md) にあります。
 
 ## すぐに試す
 
@@ -74,8 +85,8 @@ python JapaneseTinyAgentLM-Action-3M/inference.py 右を向いて 笑わない�
 ```
 
 ```text
-{"input": "右を向いて", "actions": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}], "confidence": 0.9989, ...}
-{"input": "笑わないでね", "actions": [], "confidence": 0.9999, ...}
+{"input": "右を向いて", "actions": [{"name": "look", "arguments": {"direction": "right", "amount": "normal"}}], "confidence": ..., ...}
+{"input": "笑わないでね", "actions": [], "confidence": 1.0, ...}
 ```
 
 Python から使う方法は [モデルカード](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) を見てください。
@@ -106,7 +117,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 | 項目 | 内容 |
 |---|---|
 | 対象 | スタックチャン K151（CoreS3 = ESP32-S3、Flash 16MB、PSRAM 8MB、servo は Feetech SCS0009 ×2） |
-| 使うもの | CPU の2コア、Flash（重みを直接読む）、PSRAM、画面、touch、servo。Wi-Fi と NPU は使わない |
+| 使うもの | CPU の2コア、Flash（重みを直接読む）、PSRAM、画面、touch、servo、台座の RGB LED、speaker（音量の確認音）、NVS（音量、明るさ、LED の色を保存）。Wi-Fi と NPU は使わない |
 | 入力 | USB serial で送る日本語のテキスト（音声認識はこのリポジトリの範囲外） |
 
 - 起動したときは servo が off で、首は動きません。`!servo on`（または `stackchan_chat.py --servo`）で動きます。

@@ -104,10 +104,11 @@
 | `src/jtalm/action/action_schema_v1.json`（新規）、`schema.py`、`mapping.py` | schema v1、canonicalize、角度と段階の対応表 |
 | `src/jtalm/model/format.py`、`grammar.py`、`data.py` | JSON の部品、引数の順、数値の sub-grammar（桁ごとに範囲を制約） |
 | `src/jtalm/model/tokenizer.py` | v1 の user-defined symbols で tokenizer を学習 |
-| `src/jtalm/eval/metrics.py`、`rule_baseline.py`、`cases.py` | 新しい tool。数値は完全一致で評価し、誤差の分布も別に出す |
+| `src/jtalm/eval/metrics.py`、`cases.py` | 新しい tool。数値は完全一致で評価し、誤差の分布も別に出す |
+| `src/jtalm/eval/rule_baseline.py` | 変更なし（v0 の出力は v1 でも正しいので、基準としてそのまま使う） |
 | `src/jtalm/data/specs.py`、`prompts.py`、`focus.py`、`massive.py`、`human_eval.py` | 新しい動作の spec、生成と検証の prompt（ロボットの説明、tool の説明、4.2 節の規則） |
 | `src/jtalm/model/hf_inference.py`、`release.py` | v1 の grammar、schema v1 を同梱 |
-| `src/jtalm/model/classifier.py` | v1 で再学習。数値を含む call 列はクラスが爆発するので、比較の対象は数値のない文に限る |
+| `src/jtalm/model/classifier.py` | 変更なし（v0 の出力は v1 でも正しいので、基準としてそのまま使う） |
 | `runtime/host/grammar.c`、`jtalm.h`、`model.c` | v1 の状態機械。固定長の配列を広げる（候補 8 → 16 以上、1 call の token 数 3 → 6 以上） |
 | `runtime/web/`（`web.c`、`index.html`） | v1 の grammar と表示 |
 | `tests/` | 上の各変更の test。Python と C の grammar の一致を、v1 の全評価セットで確かめる |
