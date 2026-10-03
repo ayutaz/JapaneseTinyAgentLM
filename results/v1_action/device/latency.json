@@ -1,0 +1,86 @@
+{
+ "parity_latency": {
+  "n": 300,
+  "median": 1041.5,
+  "p90": 1745.6,
+  "max": 2752.8
+ },
+ "long_latency": {
+  "n": 1500,
+  "median": 1046.9,
+  "p90": 1745.0,
+  "max": 2753.7
+ },
+ "long_per_pass": [
+  {
+   "n": 300,
+   "median": 1048.9,
+   "p90": 1744.6,
+   "max": 2752.1
+  },
+  {
+   "n": 300,
+   "median": 1047.5,
+   "p90": 1743.6,
+   "max": 2753.4
+  },
+  {
+   "n": 300,
+   "median": 1047.9,
+   "p90": 1745.3,
+   "max": 2752.3
+  },
+  {
+   "n": 300,
+   "median": 1046.5,
+   "p90": 1743.9,
+   "max": 2753.7
+  },
+  {
+   "n": 300,
+   "median": 1047.4,
+   "p90": 1744.9,
+   "max": 2753.3
+  }
+ ],
+ "v051_eval300_latency": {
+  "n": 300,
+  "median": 1276.0,
+  "p90": 1860.0,
+  "max": 2455.7
+ },
+ "v051_long_latency": {
+  "n": 3567,
+  "median": 1057.7,
+  "p90": 1871.3,
+  "max": 3423.0
+ },
+ "matched_vs_v051_eval300": {
+  "buckets": 32,
+  "v1_requests": 156,
+  "median_diff_ms": -0.2,
+  "mean_diff_ms": -0.1,
+  "mean_rel_diff_pct": -0.01
+ },
+ "matched_vs_v051_long": {
+  "buckets": 55,
+  "v1_requests": 234,
+  "median_diff_ms": 1.2,
+  "mean_diff_ms": 1.0,
+  "mean_rel_diff_pct": 0.1
+ },
+ "long_matched_vs_v051_long": {
+  "buckets": 55,
+  "v1_requests": 1170,
+  "median_diff_ms": 1.3,
+  "mean_diff_ms": 1.1,
+  "mean_rel_diff_pct": 0.11
+ },
+ "long_acts": {
+  "n": 1500,
+  "valid": 1500,
+  "queued": 650,
+  "dropped": 0
+ },
+ "note": "total_ms on the device (ms). matched_*: v1 requests whose (n_prompt, n_gen) also occur in the v0.5.1 run; per bucket median v1 minus median v0.5.1, averaged over the v1 requests. v0.5.1 sources: results/v051_action/device (eval300) and results/v051_action/long_run (long3567)."
+}

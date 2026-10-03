@@ -214,7 +214,7 @@ grammar が保証するのは構造だけです。「左を向いて」に `"dir
 - `min_prob` が閾値を下回ったら、call 単位ではなく**出力全体**を `[]` にします。確信度の低い出力で動かないほうを安全側とします。
 - 閾値は **validation だけ**で選びます。評価セットでは選びません。規則は「validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値」です（`jtalm.model.evaluate --modes gate`）。
 - 採用したモデルの閾値は **0.868** です（data v0.5.1 の validation 3,515 件で選んだ値は 0.86808。validation の完全一致は gate なし 98.2%、gate あり 97.8%）。閾値はモデルごとに選び直します。
-- firmware では標準で有効です。build 時の `CONFIG_JTALM_GATE_PERMILLE`（千分率、既定 868）と、実行中の serial command `!gate <閾値>`（0 で無効）で変えられます。
+- firmware では標準で有効です。build 時の `CONFIG_JTALM_GATE_PPM`（100万分率。v1 の firmware の既定は 885060 = 0.88506）と、実行中の serial command `!gate <閾値>`（0 で無効）で変えられます。
 - validation の書き手が1つしかないと、閾値がほぼ 1 に選ばれて gate が逆効果になりました（data v0）。書き手の多い validation を使うことが、閾値の選び方に効きます。
 
 gate の効果（誤って動く割合の変化など）は [`evaluation.md`](evaluation.md) にあります。
@@ -293,7 +293,7 @@ prompt をまとめて処理する prefill（最大 16 token）と、行列積�
 
 ## Action から servo へ
 
-firmware の dispatcher が、検証した Action を角度に変え、可動域（yaw ±30°、pitch −10〜+15°）に制限してから servo を動かし、`set_expression` は画面に顔を描きます（Python の参照実装は `jtalm.action.mapping`）。量ごとの角度、座標の規約、うなずきの動き、停止と watchdog は [`hardware.md`](hardware.md) の「Dispatcher」にあります。起動直後の servo は off です。首が動くので、servo を有効にするときは指やケーブルを近づけないでください。
+firmware の dispatcher が、検証した Action を角度に変え、可動域（yaw ±45°、pitch 0〜+85°。下は頭が床に当たるので水平まで）に制限してから servo を動かし、`set_expression` は画面に顔を描き、`set_led`、音量、明るさの tool は台座の LED、speaker、画面の backlight を変えます（Python の参照実装は `jtalm.action.mapping.plan_v1`）。量ごとの角度、座標の規約、うなずき・首振り・お辞儀の動き、設定の保存、停止と watchdog は [`hardware.md`](hardware.md) の「Dispatcher」にあります。起動直後の servo は off です。首が動くので、servo を有効にするときは指やケーブルを近づけないでください。
 
 ## Chat LM（予定）
 

@@ -60,7 +60,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 
 `<PORT>` is the serial port of the robot, e.g. `COM3` on Windows or `/dev/ttyACM0` on Linux.
 
-The servos are off at boot. Touching the screen or sending `!stop` stops the motion and powers the servos off; the firmware limits the angles (yaw ±30°, pitch −10 to +15°). Keep fingers and cables clear of the neck.
+The servos are off at boot. Touching the screen or sending `!stop` stops the motion and powers the servos off; the firmware limits the angles (yaw ±45°, pitch 0 to +85°; the head rests on the floor below horizontal). Keep fingers and cables clear of the neck.
 
 Building from source: [`firmware/README.md`](firmware/README.md), [`runtime/host/README.md`](runtime/host/README.md), [`docs/training.md`](docs/training.md). The C runtime in `runtime/host` is also an ESP-IDF component (`git: https://github.com/ayutaz/JapaneseTinyAgentLM.git`, `path: runtime/host` in `idf_component.yml`). [`runtime/web/`](runtime/web/README.md) builds the same runtime as WebAssembly for an in-browser demo.
 

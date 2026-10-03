@@ -2,10 +2,10 @@
 # Copyright 2026 ayutaz
 menu "JapaneseTinyAgentLM"
 
-config JTALM_GATE_PERMILLE
-    int "Confidence gate threshold (x 1/1000)"
-    range 0 1000
-    default 868
+config JTALM_GATE_PPM
+    int "Confidence gate threshold (x 1/1000000)"
+    range 0 1000000
+    default 885060
     help
         An output whose minimum token probability (unconstrained, as in
         jtalm.model.decode) is below this threshold becomes "[]", as the

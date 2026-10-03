@@ -110,7 +110,7 @@ python JapaneseTinyAgentLM-Action-3M/firmware/stackchan_chat.py <PORT> --servo  
 | 入力 | USB serial で送る日本語のテキスト（音声認識はこのリポジトリの範囲外） |
 
 - 起動したときは servo が off で、首は動きません。`!servo on`（または `stackchan_chat.py --servo`）で動きます。
-- **画面に触れる、`!stop` を送る、のどちらかですぐに止まり、servo の電源が切れます。** 角度は firmware が制限します（左右 ±30°、上下 −10〜+15°）。
+- **画面に触れる、`!stop` を送る、のどちらかですぐに止まり、servo の電源が切れます。** 角度は firmware が制限します（左右 ±45°、上下 0〜+85°。下は頭が床に当たるので水平まで）。
 - 首が動くときは、指やケーブルを近づけないでください。
 
 詳しくは [`docs/hardware.md`](docs/hardware.md) を見てください。

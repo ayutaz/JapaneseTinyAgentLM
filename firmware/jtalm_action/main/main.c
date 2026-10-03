@@ -10,8 +10,8 @@
 //
 //   JTALM {"t":"gen","output":"[...]","raw":"[...]","gated":0,"ids":[...],...}
 //
-// "raw" is the decoded output; "output" is it after the confidence gate (CONFIG_JTALM_GATE_
-// PERMILLE): "[]" when the minimum token probability is below the threshold.
+// "raw" is the decoded output; "output" is it after the confidence gate (CONFIG_JTALM_GATE_PPM,
+// parts per million): "[]" when the minimum token probability is below the threshold.
 // Lines starting with '!' are commands: "!heap", "!info", "!grammar 0|1", "!gate <threshold>"
 // (0 turns it off), "!par 0|1" (split
 // matrix products across both cores), "!batch 0|1" (batched prefill; 0 runs the prompt one
@@ -223,7 +223,7 @@ static void emit_info(const lm_t *lm) {
       ",\"vocab\":%d,\"d_model\":%d,\"n_layers\":%d,\"n_heads\":%d,\"n_kv_heads\":%d"
       ",\"d_ff\":%d,\"max_seq_len\":%d,\"bits\":%d,\"group\":%d"
       ",\"arena\":\"%s\",\"arena_bytes\":%u,\"kv_bytes\":%u,\"kv_int8\":%d,\"batch\":%d"
-      ",\"grammar\":%d,\"gate\":%.3f,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
+      ",\"grammar\":%d,\"gate\":%.6g,\"par\":%d,\"batch_prefill\":%d,\"core\":%d}\n",
       app->project_name, app->idf_ver, elf_sha, app->date, app->time,
       CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ, lm->sha, (unsigned)lm->image_bytes,
       c->vocab_size, c->d_model, c->n_layers, c->n_heads, c->n_kv_heads, c->d_ff,
@@ -288,7 +288,7 @@ static int lm_init(lm_t *lm) {
     return -1;
   }
   lm->use_grammar = 1;
-  lm->gate = CONFIG_JTALM_GATE_PERMILLE / 1000.0;
+  lm->gate = CONFIG_JTALM_GATE_PPM / 1000000.0;
   lm->use_batch = 1;
   lm->use_par = 1;
   jtlm_set_parallel(run_parallel);
@@ -400,7 +400,7 @@ static void run_prompt(lm_t *lm, const char *text, size_t len) {
   fputs(",\"raw\":", stdout);
   print_json_string(lm->out, olen);
   printf(
-      ",\"gated\":%d,\"gate\":%.3f,\"min_prob\":%.9g,\"ids\":", gated, lm->gate,
+      ",\"gated\":%d,\"gate\":%.6g,\"min_prob\":%.9g,\"ids\":", gated, lm->gate,
       (double)r.min_prob
   );
   print_ids(r.ids, r.n);
@@ -477,7 +477,7 @@ static void run_command(lm_t *lm, const char *line) {
     printf("JTALM {\"t\":\"ok\",\"grammar\":%d}\n", lm->use_grammar);
   } else if (!strncmp(line, "!gate ", 6)) {
     lm->gate = atof(line + 6);
-    printf("JTALM {\"t\":\"ok\",\"gate\":%.3f}\n", lm->gate);
+    printf("JTALM {\"t\":\"ok\",\"gate\":%.6g}\n", lm->gate);
   } else if (!strncmp(line, "!par ", 5)) {
     lm->use_par = line[5] == '1';
     jtlm_set_parallel(lm->use_par ? run_parallel : NULL);
