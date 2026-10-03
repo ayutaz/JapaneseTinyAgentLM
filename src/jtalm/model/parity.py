@@ -3,8 +3,8 @@
 """Check the C reference runtime (runtime/host) against the Python implementation (M6).
 
     uv run --group train python -m jtalm.model.parity \
-        --ckpt runs/.../3m/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model \
-        --out runs/local/m6/parity --docker espressif/idf:v5.5.5
+        --ckpt runs/local/v1/3m-s0/best.pt --tokenizer tokenizer/out/action_v1_sp2048.model \
+        --out runs/local/v1/parity --docker espressif/idf:v5.5.5
 
 1. Exports the checkpoint (``jtalm.model.export``) as FP32 / INT8 / INT4.
 2. Tokenization: ``jtalm --tokenize`` against ``sentencepiece`` on every prompt of the given
@@ -50,7 +50,8 @@ from jtalm.model.grammar import ActionGrammar
 from jtalm.model.quantize import quantize_state
 from jtalm.model.transformer import ActionLM, ModelConfig, set_kv_int8
 
-DATA = PROJECT_ROOT / "datasets/action/v0"
+DATA = PROJECT_ROOT / "datasets/action/v1.0"
+EVAL = PROJECT_ROOT / "datasets/action/eval_v3/eval.jsonl"
 
 
 class Runner:
@@ -272,12 +273,12 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--ckpt", type=Path, required=True)
     parser.add_argument("--tokenizer", type=Path, required=True)
-    parser.add_argument("--cases", type=Path, default=DATA / "eval.jsonl")
+    parser.add_argument("--cases", type=Path, default=EVAL)
     parser.add_argument(
         "--token-sets",
         type=Path,
         nargs="*",
-        default=[DATA / "train.jsonl", DATA / "val.jsonl", DATA / "eval.jsonl"],
+        default=[DATA / "train.jsonl", DATA / "val.jsonl", EVAL],
     )
     parser.add_argument("--bits", type=int, nargs="+", default=[0, 8, 4])
     parser.add_argument("--group", type=int, default=64)

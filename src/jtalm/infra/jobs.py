@@ -128,7 +128,10 @@ def train_action_steps(
     tokenizer: str = TOKENIZER,
     cases: str = f"{ACTION_DATA}/eval.jsonl",
 ) -> list[str]:
-    """Train each run, then evaluate all of them on the v0 evaluation set (never changes).
+    """Train each run on ``data`` with ``tokenizer``, then evaluate all of them on ``cases``.
+
+    The defaults are the v0 tokenizer and the v0 evaluation set, so the existing v0.x jobs keep
+    their steps; a job for another schema passes its own ``tokenizer`` and ``cases``.
 
     With ``parallel`` all runs start at once on the same GPU. A 3M-20M model at batch 64 uses
     under 1GB of VRAM and leaves the GPU mostly idle, so this cuts wall-clock time several-fold

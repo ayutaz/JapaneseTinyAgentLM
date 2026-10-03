@@ -2,8 +2,9 @@
 # Copyright 2026 ayutaz
 """Train an Action LM from scratch (M4).
 
-    uv run --group train python -m jtalm.model.train --size 5m \
-        --tokenizer tokenizer/out/action_v0_sp2048.model --out runs/local/5m
+    uv run --group train python -m jtalm.model.train --size 3m \
+        --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.0 \
+        --out runs/local/v1/3m-s0
 
 The checkpoint with the best validation exact match (greedy) is kept as ``best.pt``; ties go to
 the lower validation loss. The evaluation set is never read here.
@@ -181,7 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--size", choices=sorted(SIZES), required=True)
     p.add_argument("--tokenizer", required=True)
-    p.add_argument("--data", default=str(PROJECT_ROOT / "datasets/action/v0"))
+    p.add_argument("--data", default=str(PROJECT_ROOT / "datasets/action/v1.0"))
     p.add_argument("--out", required=True)
     p.add_argument("--epochs", type=int, default=40)
     p.add_argument("--max-steps", type=int, default=0, help="override epochs (smoke tests)")

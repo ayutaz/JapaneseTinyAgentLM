@@ -3,8 +3,8 @@
 """Export an Action LM checkpoint and its tokenizer to one binary for the C runtime (M6).
 
     uv run --group train python -m jtalm.model.export \
-        --ckpt runs/.../3m/best.pt --tokenizer tokenizer/out/action_v0_sp2048.model \
-        --bits 0 8 4 --out runs/local/export
+        --ckpt runs/local/v1/3m-s0/best.pt --tokenizer tokenizer/out/action_v1_sp2048.model \
+        --bits 0 8 4 --out runs/local/v1/export
 
 writes ``<slug>_fp32.jtlm``, ``<slug>_q8_g64.jtlm``, ``<slug>_q4_g64.jtlm``. ``runtime/host``
 loads them; ``jtalm.model.parity`` compares the C runtime with ``jtalm.model.decode``.

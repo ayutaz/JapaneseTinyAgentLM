@@ -232,14 +232,22 @@ extern "C" int board_led(uint8_t r, uint8_t g, uint8_t b) {
 }
 
 extern "C" int board_led_cfg(void) {
-  if (!g_py32) return -1;
-  return M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
+  if (!g_py32 || g_gfx_lock == nullptr) return -1;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
+  int cfg = M5.In_I2C.readRegister8(kPy32Addr, kPy32RegLedCfg, kPy32Freq);
+  xSemaphoreGive(g_gfx_lock);
+  return cfg;
 }
 
+// M5.Speaker can reach the internal I2C (the CoreS3 amplifier enable), hence the lock.
 extern "C" int board_volume(int level, int beep) {
+  if (g_gfx_lock == nullptr) return -1;
+  xSemaphoreTake(g_gfx_lock, portMAX_DELAY);
   M5.Speaker.setVolume((uint8_t)lround(level * 255.0 / 100.0));
   if (beep && level > 0) M5.Speaker.tone(1000, 80);
-  return M5.Speaker.isRunning() ? 0 : -1;  // the volume is kept even when the speaker is off
+  bool running = M5.Speaker.isRunning();
+  xSemaphoreGive(g_gfx_lock);
+  return running ? 0 : -1;  // the volume is kept even when the speaker is off
 }
 
 // On the CoreS3, M5GFX sets the backlight through the AXP2101's DLDO1 (as M5.begin already

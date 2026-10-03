@@ -7,58 +7,41 @@ from jtalm.action.mapping import (
     BOW_HOLD_MS,
     BOW_LIFT_DEG,
     DEFAULT_LIMITS,
-    PITCH_LIMIT_DEG,
-    YAW_LIMIT_DEG,
+    PITCH_DEG,
+    YAW_DEG,
     Limits,
-    ServoTarget,
-    look_target,
     plan_v1,
-    servo_targets,
     to_firmware_tenths,
 )
 
 
-def test_yaw_positive_is_right() -> None:
-    assert look_target("right", "normal").yaw_deg > 0
-    assert look_target("left", "normal").yaw_deg < 0
+def look(direction: str, amount: str, start: tuple[float, float] = (0, 0)) -> tuple[float, float]:
+    (step,) = plan_v1([{"name": "look", "arguments": {"direction": direction, "amount": amount}}],
+                      start)  # fmt: skip
+    return step["yaw"], step["pitch"]
 
 
-def test_pitch_positive_is_up() -> None:
-    assert look_target("up", "normal").pitch_deg > 0
-    assert look_target("down", "normal").pitch_deg < 0
+def test_yaw_positive_is_right_and_pitch_positive_is_up() -> None:
+    assert look("right", "normal")[0] > 0
+    assert look("left", "normal")[0] < 0
+    assert look("up", "normal")[1] > 0
+    assert look("down", "normal", start=(0, 30))[1] < 30
 
 
 def test_horizontal_look_keeps_pitch_and_vertical_look_keeps_yaw() -> None:
-    assert look_target("right", "slight").pitch_deg is None
-    assert look_target("down", "slight").yaw_deg is None
-
-
-def test_center_returns_to_neutral() -> None:
-    assert look_target("center", "large") == ServoTarget(0, 0)
+    assert look("right", "slight", start=(0, 7))[1] == 7
+    assert look("up", "slight", start=(-12, 0))[0] == -12
 
 
 @pytest.mark.parametrize("amount", AMOUNTS)
-def test_angles_grow_with_amount_and_stay_within_limits(amount: str) -> None:
-    yaw = look_target("right", amount).yaw_deg
-    pitch = look_target("up", amount).pitch_deg
-    assert 0 < yaw <= YAW_LIMIT_DEG
-    assert 0 < pitch <= PITCH_LIMIT_DEG
+def test_amount_angles_stay_within_the_limits(amount: str) -> None:
+    assert 0 < YAW_DEG[amount] <= DEFAULT_LIMITS.yaw_max
+    assert 0 < PITCH_DEG[amount] <= DEFAULT_LIMITS.pitch_max
 
 
 def test_amount_order() -> None:
-    yaws = [look_target("right", a).yaw_deg for a in ("slight", "normal", "large")]
+    yaws = [look("right", a)[0] for a in ("slight", "normal", "large")]
     assert yaws == sorted(yaws) and len(set(yaws)) == 3
-
-
-def test_nod_repeats_count_times_and_returns_to_neutral() -> None:
-    targets = servo_targets({"name": "nod", "arguments": {"count": 2}})
-    assert len(targets) == 4
-    assert targets[-1].pitch_deg == 0
-    assert all(t.yaw_deg is None for t in targets)
-
-
-def test_expression_does_not_move_servos() -> None:
-    assert servo_targets({"name": "set_expression", "arguments": {"expression": "happy"}}) == []
 
 
 def test_firmware_units_are_tenths_of_degree() -> None:

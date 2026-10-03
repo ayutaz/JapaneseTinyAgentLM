@@ -3,11 +3,12 @@
 """Evaluate one checkpoint on every evaluation set at once and print one table.
 
     uv run --group train python -m jtalm.model.eval_suite --ckpt <best_q4_g64.pt> \
-        --tokenizer tokenizer/out/action_v0_sp2048.model --out runs/local/suite_v04
+        --tokenizer tokenizer/out/action_v1_sp2048.model --out runs/local/v1_action/suite_3m-s0
 
-Sets: the v0 evaluation set (LLM-written), the human-written set (human v1), and every slice
-file of evaluation set v2. Decoding uses the grammar and the confidence gate; the gate threshold
-is chosen once on ``--val`` (never on an evaluation set), as in jtalm.model.evaluate.
+Sets (schema v1): Stack-chan v1, evaluation set v3 (LLM-written), and the older sets relabeled
+under schema v1 (v0 eval, human v1, and every slice file of evaluation set v2). Decoding uses the
+grammar and the confidence gate; the gate threshold is chosen once on ``--val`` (never on an
+evaluation set), as in jtalm.model.evaluate.
 """
 
 import argparse

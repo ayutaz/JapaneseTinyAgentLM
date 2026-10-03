@@ -11,12 +11,8 @@ firmware converts degrees to raw servo positions (yaw raw decreases to the robot
 
 from dataclasses import dataclass
 
-from jtalm.action.schema import Call
-
 YAW_DEG = {"slight": 10, "normal": 20, "large": 30}
 PITCH_DEG = {"slight": 5, "normal": 10, "large": 15}
-YAW_LIMIT_DEG = 30
-PITCH_LIMIT_DEG = 15
 NOD_PITCH_DEG = 14  # 8 was too small to notice on the K151 (motion test, 2026-09-30)
 
 
@@ -26,18 +22,6 @@ class ServoTarget:
 
     yaw_deg: int | None
     pitch_deg: int | None
-
-
-def look_target(direction: str, amount: str) -> ServoTarget:
-    if direction == "center":
-        return ServoTarget(yaw_deg=0, pitch_deg=0)
-    if direction in ("left", "right"):
-        sign = 1 if direction == "right" else -1
-        return ServoTarget(yaw_deg=sign * YAW_DEG[amount], pitch_deg=None)
-    if direction in ("up", "down"):
-        sign = 1 if direction == "up" else -1
-        return ServoTarget(yaw_deg=None, pitch_deg=sign * PITCH_DEG[amount])
-    raise ValueError(f"unknown direction: {direction}")
 
 
 def nod_targets(
@@ -63,16 +47,6 @@ def nod_targets(
 def to_firmware_tenths(deg: int) -> int:
     """The official StackChan firmware takes angles in 0.1 degree units."""
     return deg * 10
-
-
-def servo_targets(call: Call) -> list[ServoTarget]:
-    """Servo targets for one validated call (``set_expression`` does not move servos)."""
-    name, args = call["name"], call["arguments"]
-    if name == "look":
-        return [look_target(args["direction"], args["amount"])]
-    if name == "nod":
-        return nod_targets(args["count"])
-    return []
 
 
 # -- schema v1 (docs/superpowers/specs/2026-10-02-action-schema-v1-design.md, section 6) --------

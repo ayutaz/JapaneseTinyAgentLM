@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from jtalm.data.build import build
 from jtalm.data.publish import prepare
 from jtalm.eval.cases import load_cases
@@ -83,14 +85,51 @@ def test_build_filters_dedups_removes_leaks_and_adds_massive(tmp_path: Path) -> 
     assert report["counts"]["eval"]["contrastive_pairs"] == 1
     assert report["rule_baseline_on_eval"]["n"] == len(evals)
 
-    manifest = {"config": CONFIG}
+    manifest = {
+        "train": {"n": 3},
+        "val": {"n": 1},
+        "inherited_train": {"n": 0, "relabeled_kept": 0},
+        "inherited_val": {"n": 0, "relabeled_kept": 0},
+        "new": {"n": 2},
+    }
     hf = tmp_path / "hf"
-    counts = prepare(out, hf, manifest)
+    writers = {"gen/train": "Apache-2.0", "gen/eval": "Apache-2.0"}
+    counts = prepare(out, hf, manifest, writers)
     assert counts["test"] == 2  # MASSIVE rows are not redistributed
     first = json.loads((hf / "test.jsonl").read_text("utf-8").splitlines()[0])
-    assert set(first) == {"id", "input", "output", "category", "language", "pair_id", "generator"}
+    assert set(first) == {
+        "id", "input", "output", "category", "language", "pair_id", "generator", "relabeled"
+    }  # fmt: skip
     card = (hf / "README.md").read_text("utf-8")
     assert card.startswith("---\nlicense: cc-by-sa-4.0")
+    assert "| `gen/train` | Apache-2.0 |" in card
+    with pytest.raises(ValueError, match="gen/eval"):  # every writer needs a recorded license
+        prepare(out, tmp_path / "hf2", manifest, {"gen/train": "Apache-2.0"})
+
+
+def test_prepare_leaves_out_massive_and_mined_corpus_rows(tmp_path: Path) -> None:
+    from jtalm.data.publish import _rows
+
+    rows = [
+        {"id": "a", "prompt": "右を向いて", "expected": LOOK_R, "category": "single",
+         "source": "synthetic:gen/train"},
+        {"id": "b", "prompt": "音量を下げて", "expected": [], "category": "no_action",
+         "source": "synthetic:gen/train+relabel:v1"},
+        {"id": "c", "prompt": "x", "expected": [], "category": "no_action",
+         "source": "massive:train:1+relabel:v1"},
+        {"id": "d", "prompt": "y", "expected": [], "category": "no_action",
+         "source": "synthetic:human:massive"},
+        {"id": "e", "prompt": "z", "expected": [], "category": "no_action",
+         "source": "synthetic:human:jesc"},
+    ]  # fmt: skip
+    path = tmp_path / "train.jsonl"
+    write_jsonl(path, rows)
+    kept, skipped = _rows(path)
+    assert [(r["id"], r["generator"], r["relabeled"]) for r in kept] == [
+        ("a", "gen/train", False),
+        ("b", "gen/train", True),
+    ]
+    assert skipped == {"massive": 1, "human:massive": 1, "human:jesc": 1}
 
 
 def test_extend_keeps_base_and_eval_and_skips_anything_already_present(tmp_path: Path) -> None:

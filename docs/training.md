@@ -443,3 +443,13 @@ uv run --group train python -m jtalm.model.release prepare \
 - `stackchan_eval` の実例の文（`datasets/action/stackchan_v1/sources.jsonl`）は第三者の文なので、リポジトリに入れていません。
 - 公開したモデルは seed 0 で、gate は 0.88506 です。結果は [`../results/v1_action/`](../results/v1_action/comparison.md)、実機での確認は [`../results/v1_action/device/`](../results/v1_action/device/README.md) にあります。
 - 費用（vast.ai）: `gen_action_v1` は disk が足りなくなって途中で止まり 1.57 時間（約 $1.68）、続きの `gen_action_v1b` が 0.89 時間（約 $0.92）、`train_action_v1`（5 seed を1枚の RTX 3090 で並列）が 0.43 時間（約 $0.09）でした。
+
+### 公開のチェックリスト（schema v1）
+
+公開は、次の順に行います。どの手順も、利用者の承認なしには実行しません。
+
+1. **利用者の承認:** `runs/release/action_3m` の中身（モデルカード、`config.json`、評価の表、firmware のイメージ）を利用者が確かめ、モデルの公開を承認する。`sha256sum -c SHA256SUMS` と `jtalm.model.release run` で、パッケージを確かめておく。
+2. **Community を off に:** 公開するリポジトリ（モデル、Space、データセット）の Community contributions（Discussions と Pull Requests）が off であることを確かめる（`jtalm.model.release publish` と `jtalm.data.publish publish` は、public にする前に off にする）。
+3. **モデルをアップロードする:** `runs/release/action_3m` を `ayousanz/JapaneseTinyAgentLM-Action-3M` に上書きでアップロードする（`uv run python -m jtalm.model.release publish runs/release/action_3m --repo ayousanz/JapaneseTinyAgentLM-Action-3M --confirm`）。v0 のモデルは、リポジトリの以前の commit に残る。
+4. **すぐに Space を更新する:** デモのページは Hugging Face のモデルの `.jtlm` と `config.json` を読むので、3. の直後に `runtime/web/jtalm.js` を作り直し（`runtime/web/build.sh`。[`../runtime/web/README.md`](../runtime/web/README.md)）、`jtalm.js` と `index.html` を Space（`ayousanz/JapaneseTinyAgentLM-Action-3M-demo`）にアップロードする。古い `jtalm.js`（schema v0 の grammar）のままでは、v1 のモデルを読めない。
+5. **データ v1.0 は別に承認を得る:** データ v1.0 を `japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth` に公開するのは、モデルとは別に利用者の承認を得てから（`uv run python -m jtalm.data.publish prepare` で `datasets/action/v1.0/hf/` を作り、データセットカードを確かめてから `publish --confirm`）。公開するのはオープンモデルが書いた文だけで、MASSIVE の行と、集めた Tatoeba・JESC・MASSIVE の負例、評価セットは含めない。

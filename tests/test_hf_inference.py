@@ -31,3 +31,12 @@ def test_standalone_grammar_equals_the_project_grammar(tmp_path) -> None:
             if nxt == ours.eos:
                 break
             ids.append(nxt)
+
+
+def test_grammar_rejects_a_tokenizer_without_the_pieces() -> None:
+    class Split:  # every piece encodes to two ids, as in a tokenizer without the grammar pieces
+        def encode(self, piece: str) -> list[int]:
+            return [1, 2]
+
+    with pytest.raises(ValueError, match="grammar piece"):
+        hf_inference.Grammar(Split())

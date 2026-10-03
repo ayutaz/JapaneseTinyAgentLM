@@ -195,7 +195,8 @@ class Grammar:
     def __init__(self, sp: spm.SentencePieceProcessor) -> None:
         def tid(piece: str) -> int:
             ids = sp.encode(piece)
-            assert len(ids) == 1, piece
+            if len(ids) != 1:
+                raise ValueError(f"the tokenizer lacks the Action grammar piece {piece!r}")
             return ids[0]
 
         calls = call_pieces()
