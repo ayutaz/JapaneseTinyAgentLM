@@ -34,7 +34,7 @@ Action LM を動かす実機、M5Stack のスタックチャン（K151）の構�
 | （partition table） | — | `0x8000` | — | |
 | nvs | data / nvs | `0x9000` | 24 KiB | |
 | phy_init | data / phy | `0xF000` | 4 KiB | |
-| factory | app / factory | `0x10000` | 1,984 KiB | app（Action schema v1 の firmware で 536,128 B） |
+| factory | app / factory | `0x10000` | 1,984 KiB | app（Action schema v1 の firmware で 536,192 B） |
 | model | data / `0x40` | `0x200000` | 14,336 KiB | `.jtlm`（v1 の 3M INT4 で 1,970,720 B） |
 
 - `model` partition は 64KB の MMU page 境界（`0x200000`）に置き、起動時に全体を1回の `esp_partition_mmap` で map します。重みは flash から直接読み、heap を使いません。

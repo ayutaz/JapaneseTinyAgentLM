@@ -232,7 +232,7 @@ C の tokenizer と生成は、PyTorch / SentencePiece と token 単位で一致
 |---|---:|---:|---|
 | nvs | 0x9000 | 0x6000 | |
 | phy_init | 0xF000 | 0x1000 | |
-| factory（app） | 0x10000 | 0x1F0000（1,984KiB） | firmware。schema v1 の firmware は 536,128 B（約 524KiB） |
+| factory（app） | 0x10000 | 0x1F0000（1,984KiB） | firmware。schema v1 の firmware は 536,192 B（約 524KiB） |
 | model（data、subtype 0x40） | **0x200000** | 0xE00000（14MB） | `.jtlm` |
 
 - 重みは `esp_partition_mmap` で model partition 全体を1回で map し、そのまま読みます。heap は使いません。

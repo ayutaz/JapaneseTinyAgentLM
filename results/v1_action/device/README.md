@@ -3,7 +3,13 @@
 Firmware Task 8 (F4), 2026-10-03. The `jtalm_action` firmware for Action schema v1 (v1 grammar,
 validator and planner; faces, base LEDs, volume, brightness, settings in NVS), built as
 `firmware/jtalm_action/build_release` (app SHA-256 `4a1e1f52…b35c`, 536,128 B), with the v1
-model in the `model` partition at `0x200000`:
+model in the `model` partition at `0x200000`.
+
+After these runs, the final review made `board_led_cfg()` (a diagnostic read of the PY32 LED
+register) and `board_volume()` take the same I2C lock as the other base and display calls. The
+release image (`stackchan_k151_jtalm_action.bin` in the model repository) is built from that
+source (app SHA-256 `f7f99952…0a76`, 536,192 B); the only change from the build measured here is
+the lock, and that build has not been run on the device. The runs below used:
 
 - model: seed 0 of the 3M x5 seeds,
   `runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt`, INT4 (group 64,
