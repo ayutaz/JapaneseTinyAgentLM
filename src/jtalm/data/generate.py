@@ -27,6 +27,7 @@ from jtalm.data import prompts
 from jtalm.data.focus import english_pool, focus_specs, sample_by_slice, slice_of
 from jtalm.data.specs import Spec, all_specs, sample_requests
 from jtalm.data.specs_v1 import all_specs_v1, paraphrase_specs
+from jtalm.data.specs_v11 import all_specs_v11
 
 PHASES = ("eval-gen", "train-gen", "eval-verify", "train-verify", "reverify")
 PAIR_N = 4
@@ -108,6 +109,8 @@ def _specs_for(cfg: dict, quota: dict, rng: random.Random) -> list[Spec]:
         return sample_by_slice(focus_specs(), cfg["slice_quota"], n, rng)
     if spec_set == "v1":
         return sample_requests(all_specs_v1(), quota, n, rng)
+    if spec_set == "v1.1":
+        return sample_requests(all_specs_v11(), quota, n, rng)
     if spec_set == "v1_paraphrase":
         return sample_requests(paraphrase_specs(), quota, n, rng)
     return sample_requests(all_specs(), quota, n, rng)

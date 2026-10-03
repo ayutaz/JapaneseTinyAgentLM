@@ -769,6 +769,55 @@ TRAIN_ACTION_V1 = JobSpec(
     uploads=[f"{ACTION_DATA_V1}/train.jsonl", f"{ACTION_DATA_V1}/val.jsonl", TOKENIZER_V1],
 )
 
+# Data v1.1 top-up (LED on without a colour, LED colours; jtalm.data.specs_v11): llm-jp writes a
+# regression eval set, ABEJA, Mistral-Nemo-JA and Qwen3 write, Qwen3 verifies. The 4 models
+# (~180GB of weights) fit in 200GB even if _drop_weights frees nothing.
+V11_RAW = "artifacts/gen_action_v11"
+V11_WRITERS = [w for w in V04_WRITERS if w[0] in ("abeja", "nemoja")]
+
+
+def _v11_steps() -> list[str]:
+    steps = [
+        "nvidia-smi > artifacts/nvidia_smi.txt",
+        sync(),
+        f"mkdir -p {V11_RAW}",
+        DISK_LOG,
+        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
+        generate("eval-gen", "configs/eval_v11_led.json", f"{V11_RAW}/raw11_eval"),
+        f"{STOP_VLLM}; {_drop_weights(EVAL_MODEL)}",
+    ]
+    for name, hf_id, mem in V11_WRITERS:
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", f"configs/action_v11_{name}.json", f"{V11_RAW}/raw11_{name}")
+        steps += [
+            DISK_LOG,
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        DISK_LOG,
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v11_qwen.json", f"{V11_RAW}/raw11_qwen"),
+    ]
+    for name in [n for n, _, _ in V11_WRITERS] + ["qwen"]:
+        out = f"{V11_RAW}/raw11_{name}"
+        verify = generate("train-verify", f"configs/action_v11_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    steps.append(generate("eval-verify", "configs/eval_v11_led.json", f"{V11_RAW}/raw11_eval"))
+    return steps
+
+
+GEN_ACTION_V11 = JobSpec(
+    name="gen_action_v11",
+    description="Data v1.1 top-up: LED on without a colour and LED colours (3 writers, "
+    "llm-jp eval slice, Qwen3 verifies)",
+    query=GEN_ACTION_V1.query,
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=3.0,
+    steps=_v11_steps(),
+)
+
 JOBS: dict[str, JobSpec] = {
     job.name: job
     for job in (
@@ -793,5 +842,6 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V1,
         GEN_ACTION_V1B,
         TRAIN_ACTION_V1,
+        GEN_ACTION_V11,
     )
 }
