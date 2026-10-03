@@ -29,7 +29,8 @@ BASE = Path("datasets/action/v1.0")
 EVAL_SETS = [
     Path("datasets/action/eval_v3/eval.jsonl"),
     Path("datasets/action/stackchan_v1/eval.jsonl"),
-    *sorted(Path("datasets/action/relabel_v1").glob("*.jsonl")),
+    *(p for p in sorted(Path("datasets/action/relabel_v1").glob("*.jsonl"))
+      if p.name != "overrides.jsonl"),  # fmt: skip
 ]
 
 

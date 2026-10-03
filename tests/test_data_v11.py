@@ -110,3 +110,17 @@ def test_build_keeps_base_and_adds_only_agreeing_new_rows(tmp_path: Path) -> Non
     assert [c.prompt for c in val] == ["ライトを赤に"]
     assert stats["new"]["n"] == 1 and stats["new"]["single:verifier_disagrees"] == 1
     assert train[-1].source == "synthetic:g"
+
+
+def test_train_job_trains_quantizes_and_evaluates_every_seed() -> None:
+    job = JOBS["train_action_v11"]
+    steps = "\n".join(job.steps)
+    for i in range(5):
+        assert f"--seed {i} --out artifacts/v11/3m-s{i}" in steps
+        assert (
+            f"--ckpt artifacts/v11/3m-s{i}/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl"
+            in steps
+        )
+    assert "--gate 0.88506 --out artifacts/v11/suite_v1_s0" in steps
+    assert "datasets/action/eval_v11_led/eval.jsonl" in job.uploads
+    assert not any("overrides" in u for u in job.uploads)
