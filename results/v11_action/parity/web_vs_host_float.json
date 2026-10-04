@@ -1,0 +1,1 @@
+{"model": "jtalm_action_3m_q4_g64.jtlm (data v1.1, seed 1)", "prompts": "Stack-chan v1 (140) + LED v1.1 (437)", "host": "runtime/host -DJTLM_ACC=float --grammar", "result": {"prompts":577,"sameOutput":577,"sameProb":577,"msPerPrompt":34.3}}

@@ -276,11 +276,11 @@ v0.5 で、実際の文で誤って動く例を学習データに加えました
 
 | 対象 | 公開 |
 |---|---|
-| データ v0 の合成文 | **[`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)**。train 7,919 / validation 425 / test 1,039（合成の文だけ）。public、利用申請制（manual gate）、CC BY-SA 4.0 |
+| データ v0 の合成文 | 最初に公開した版です。train 7,919 / validation 425 / test 1,039（合成の文だけ）。今は下の v1.1 と同じリポジトリの以前の commit にあります |
 | MASSIVE の行 | 再配布しません。v0 の公開データからも除いています。MASSIVE から取得してください |
 | データ v0.3〜v0.5.1 | 公開していません。出典、件数、sha256 は `datasets/manifests/` にあります。[`training.md`](training.md) の手順で作り直せます |
-| データ v1.0 | `japanese-data-analyze` で公開する予定です（公開の前に利用者が確認します）。出典、件数、sha256 は [`action_v1.0.json`](../datasets/manifests/action_v1.0.json) にあります |
-| データ v1.1 | `japanese-data-analyze` で公開する予定です（公開の前に利用者が確認します）。出典、件数、sha256 は [`action_v1.1.json`](../datasets/manifests/action_v1.1.json) にあります |
+| データ v1.0 | 公開しました。今は下の v1.1 と同じリポジトリの以前の commit にあります。出典、件数、sha256 は [`action_v1.0.json`](../datasets/manifests/action_v1.0.json) にあります |
+| データ v1.1 の合成文 | **[`japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth`](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)**（2026-10-04）。train 85,902 / validation 4,546（合成の文だけ）。public、利用申請制（manual gate）、CC BY-SA 4.0。出典、件数、sha256 は [`action_v1.1.json`](../datasets/manifests/action_v1.1.json) にあります |
 | Stack-chan v1、eval v3、LED v1.1 | 公開していません。Stack-chan v1 の実例の文は第三者のものなので再配布しません。manifest に件数と sha256 があります（LED v1.1 の manifest は件数だけで、sha256 は学習の job の記録 [`results/v11_action/run.json`](../results/v11_action/run.json) にあります） |
 | human v1 | 第三者のコーパスの文なので再配布しません。元のコーパスから作り直せます |
 | eval v2 | 公開していません。manifest に件数と sha256 があります |
