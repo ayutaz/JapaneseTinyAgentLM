@@ -48,8 +48,6 @@ Weak spots: relative `turn` (85.3% vs. 97.3% for `look` on single-action eval v3
 
 **Try it in the browser:** [demo (Hugging Face Space)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo), no install; the same C runtime as the device (WebAssembly) with the INT4 weights runs in the page.
 
-The demo stores every submitted prompt and inference result in a private R2 bucket for quality review and model improvement. It does not display a result if storage fails. Records expire after 90 days and are then deleted by R2 lifecycle processing. Do not enter personal information. See [`runtime/feedback-worker/`](runtime/feedback-worker/README.md) for the implementation.
-
 **Python (CPU is enough)**
 
 ```bash

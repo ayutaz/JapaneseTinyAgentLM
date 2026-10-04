@@ -1,8 +1,0 @@
-{
-  "name": "jtalm-feedback-worker",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "test": "node --test"
-  }
-}

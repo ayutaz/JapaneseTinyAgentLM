@@ -65,7 +65,7 @@ a { color: var(--accent); }
 <body>
 <main>
   <h1>JapaneseTinyAgentLM Action 3M</h1>
-  <p class="sub">日本語の依頼文 → スタックチャンの動作（JSON）。約 300 万パラメータ、推論はブラウザ内で動きます。</p>
+  <p class="sub">日本語の依頼文 → スタックチャンの動作（JSON）。約 300 万パラメータ、ブラウザの中だけで動きます。</p>
 
   <div class="card note">
     <ul>
@@ -73,16 +73,15 @@ a { color: var(--accent); }
         首を向ける（絶対・相対、角度も可）、うなずく、首を横に振る、お辞儀、表情（7種類）、LED の色、音量、画面の明るさ。</li>
       <li>動作の依頼でない文、否定された依頼、このロボットにできない依頼には <code>[]</code>（何もしない）を返すように学習しています。</li>
       <li>生成した token の確率の最小値（確信度）が閾値より低いときは、出力を <code>[]</code> に取り消します（gate）。</li>
-      <li>計算は ESP32-S3 の firmware と同じ C の runtime を WebAssembly にしたもので、重みも実機と同じ INT4 の <code>.jtlm</code> です。</li>
+      <li>計算は ESP32-S3 の firmware と同じ C の runtime を WebAssembly にしたもので、重みも実機と同じ INT4 の <code>.jtlm</code> です。入力した文はどこにも送られません。</li>
     </ul>
-    <p><strong>入力データの送信は必須です。</strong>実行するたびに入力文、モデルの出力、確信度、閾値、推論時間またはエラーを非公開の Cloudflare R2 に保存し、品質評価とモデル改善に使います。保存できないときは結果を表示しません。保存データは運営者だけが閲覧し、90日で期限切れとなった後に削除されます。氏名や連絡先などの個人情報は入力しないでください。</p>
     モデル: <a href="https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M">ayousanz/JapaneseTinyAgentLM-Action-3M</a> ・
     コード: <a href="https://github.com/ayutaz/JapaneseTinyAgentLM">GitHub</a>
   </div>
 
   <div class="card">
     <form id="form">
-      <input id="text" type="text" maxlength="500" placeholder="例: 少し右を向いてから、うなずいて" autocomplete="off" disabled>
+      <input id="text" type="text" placeholder="例: 少し右を向いてから、うなずいて" autocomplete="off" disabled>
       <button id="run" type="submit" disabled>実行</button>
     </form>
     <div class="gate">
@@ -106,7 +105,6 @@ a { color: var(--accent); }
   </div>
 
   <div class="card" id="historyCard" hidden>
-    <strong>保存済みの履歴</strong>
     <table>
       <thead><tr><th>入力</th><th>動作</th><th>確信度</th></tr></thead>
       <tbody id="history"></tbody>
@@ -117,8 +115,6 @@ a { color: var(--accent); }
 <script src="jtalm.js"></script>
 <script>
 const REPO = "https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M/resolve/main/";
-const FEEDBACK_ENDPOINT = "https://jtalm-feedback.yousan-apps.workers.dev/feedback";
-const MODEL_SHA256 = "d649c1ad0c00c40f9e0dbb4b1bc1360cfdcf14e904f16866a98c2aa8baf6f314";
 const EXAMPLES = [
   "右を向いて", "ほんの少し左を向いてくれる?", "少し上を向いてから、二回うなずいて",
   "左を見て、真ん中に戻ってきて。", "いや、下は見なくて大丈夫。上を向いてみて!", "ほら 笑顔を見せて",
@@ -138,7 +134,7 @@ const UPDOWN = { up: "上げる", down: "下げる" };
 
 function size(a) { return "degrees" in a ? `${a.degrees}度` : AMOUNT[a.amount]; }
 const $ = (id) => document.getElementById(id);
-let predict, defaultGate = 0.83673, last = null, busy = false;
+let predict, defaultGate = 0.83673, last = null;
 
 function describe(call) {
   const a = call.arguments;
@@ -179,72 +175,25 @@ function show() {
   $("json").textContent = JSON.stringify(g.actions, null, 1);
 }
 
-async function run(text) {
+function run(text) {
   text = text.trim();
-  if (!text || !predict || busy) return;
-  busy = true;
-  $("run").disabled = true;
-  $("text").disabled = true;
-  $("gate").disabled = true;
-  $("gateReset").disabled = true;
-  $("result").hidden = true;
-  last = null;
-  $("status").textContent = "推論結果を保存しています…";
-  try {
-    const gate = Number($("gate").value);
-    const t0 = performance.now();
-    let r;
-    try {
-      r = JSON.parse(predict(text));
-      if (!r.error && (!Array.isArray(r.raw) || !Number.isFinite(r.min_prob))) {
-        throw new Error("invalid inference result");
-      }
-    } catch {
-      r = { error: "client inference failed" };
-    }
-    const ms = performance.now() - t0;
-    const g = r.error ? null : gated(r, gate);
-    const payload = {
-      schema_version: 1, model_sha256: MODEL_SHA256, input: text,
-      outcome: r.error ? "error" : "success", elapsed_ms: ms,
-      ...(r.error ? { error: String(r.error).slice(0, 200) } : {
-        raw_actions: r.raw, actions: g.actions, min_prob: r.min_prob,
-        gate_threshold: gate, tokens: r.tokens,
-      }),
-    };
-    const response = await fetch(FEEDBACK_ENDPOINT, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error(`保存先が HTTP ${response.status} を返しました`);
-    const receipt = await response.json();
-    if (!receipt.id) throw new Error("保存確認を受け取れませんでした");
-    if (r.error) {
-      $("status").textContent = `入力とエラーを保存しました（記録ID: ${receipt.id}）。推論エラー: ${r.error}`;
-      return;
-    }
-    last = { text, r, ms };
-    show();
-    const tr = document.createElement("tr");
-    for (const [v, cls] of [[text, ""], [g.summary, ""], [r.min_prob.toFixed(4), "num"]]) {
-      const td = document.createElement("td");
-      td.textContent = v;
-      if (cls) td.className = cls;
-      tr.appendChild(td);
-    }
-    $("history").prepend(tr);
-    $("historyCard").hidden = false;
-    $("status").textContent = `保存しました（記録ID: ${receipt.id}）。`;
-  } catch (e) {
-    $("status").textContent = `保存できなかったため結果を表示しません。通信を確認して再実行してください。${e.message}`;
-  } finally {
-    busy = false;
-    $("run").disabled = false;
-    $("text").disabled = false;
-    $("gate").disabled = false;
-    $("gateReset").disabled = false;
-    $("text").focus();
+  if (!text || !predict) return;
+  const t0 = performance.now();
+  const r = JSON.parse(predict(text));
+  const ms = performance.now() - t0;
+  if (r.error) { $("status").textContent = `エラー: ${r.error}`; return; }
+  last = { text, r, ms };
+  show();
+  const g = gated(r, Number($("gate").value));
+  const tr = document.createElement("tr");
+  for (const [v, cls] of [[text, ""], [g.summary, ""], [r.min_prob.toFixed(4), "num"]]) {
+    const td = document.createElement("td");
+    td.textContent = v;
+    if (cls) td.className = cls;
+    tr.appendChild(td);
   }
+  $("history").prepend(tr);
+  $("historyCard").hidden = false;
 }
 
 function setGate(v) { $("gate").value = v; $("gateValue").textContent = Number(v).toFixed(3); }
@@ -272,9 +221,6 @@ setGate(defaultGate);
     ]);
     if (config && typeof config.gate_threshold === "number") defaultGate = config.gate_threshold;
     setGate(defaultGate);
-    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", model));
-    const modelSha256 = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
-    if (modelSha256 !== MODEL_SHA256) throw new Error("モデルの版が収集設定と一致しません");
     const bytes = new Uint8Array(model);
     const p = M._malloc(bytes.length);
     M.HEAPU8.set(bytes, p);

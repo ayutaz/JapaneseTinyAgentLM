@@ -87,7 +87,6 @@ backups/
 
 # ==== Browser automation artifacts ====
 .playwright-mcp/
-.wrangler/
 
 # ==== Generated Action datasets (published on Hugging Face, not in Git) ====
 datasets/action/
