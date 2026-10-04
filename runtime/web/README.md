@@ -1,6 +1,6 @@
 # ブラウザで動かす（WebAssembly）
 
-[`../host/`](../host/README.md) の C の runtime（`model.c` / `tokenizer.c` / `grammar.c`）を、Emscripten で WebAssembly にしたものです。サーバーを使わずに、ブラウザの中だけで推論します。デモのページは Hugging Face の Static Space で公開しています。
+[`../host/`](../host/README.md) の C の runtime（`model.c` / `tokenizer.c` / `grammar.c`）を、Emscripten で WebAssembly にしたものです。推論はブラウザの中だけで行います。デモのページは Hugging Face の Static Space で公開し、入力と結果は [`../feedback-worker/`](../feedback-worker/README.md) を通して非公開 R2 に保存します。保存が成功した場合だけ結果を表示します。
 
 | ファイル | 内容 |
 |---|---|

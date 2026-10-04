@@ -42,3 +42,12 @@ jobs:
       - run: make -C runtime/host
       # the same sources as a CMake library (the ESP-IDF component path is built by the firmware)
       - run: cmake -S runtime/host -B runtime/host/build/cmake && cmake --build runtime/host/build/cmake
+
+  feedback-worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test runtime/feedback-worker/test/index.test.js

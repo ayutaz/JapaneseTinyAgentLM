@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/wrangler.json",
+  "name": "jtalm-feedback",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-04",
+  "workers_dev": true,
+  "r2_buckets": [
+    { "binding": "FEEDBACK", "bucket_name": "jtalm-action-feedback" }
+  ],
+  "ratelimits": [
+    { "name": "VISITOR_LIMIT", "namespace_id": "67403211", "simple": { "limit": 30, "period": 60 } },
+    { "name": "GLOBAL_LIMIT", "namespace_id": "67403212", "simple": { "limit": 1000, "period": 60 } }
+  ]
+}
