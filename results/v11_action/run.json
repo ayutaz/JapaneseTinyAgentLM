@@ -1,0 +1,131 @@
+{
+  "job": {
+    "name": "train_action_v11",
+    "description": "Train 3M x5 seeds on data v1.1, INT4, evaluation suite (+ v1 baseline)",
+    "query": "gpu_ram>=24 compute_cap>=800 compute_cap<=900 num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=120 rentable=true direct_port_count>=1 verified=true",
+    "image": "vllm/vllm-openai:v0.30.0",
+    "disk_gb": 80,
+    "max_hours": 3.0,
+    "steps": [
+      "nvidia-smi > artifacts/nvidia_smi.txt",
+      "for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 0 --out artifacts/v11/3m-s0 > artifacts/v11-3m-s0.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 1 --out artifacts/v11/3m-s1 > artifacts/v11-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 2 --out artifacts/v11/3m-s2 > artifacts/v11-3m-s2.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 3 --out artifacts/v11/3m-s3 > artifacts/v11-3m-s3.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 4 --out artifacts/v11/3m-s4 > artifacts/v11-3m-s4.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v11/3m-s0/best.pt artifacts/v11/3m-s1/best.pt artifacts/v11/3m-s2/best.pt artifacts/v11/3m-s3/best.pt artifacts/v11/3m-s4/best.pt --tokenizer tokenizer/out/action_v1_sp2048.model --cases datasets/action/v1.1/val.jsonl --out artifacts/v11/eval",
+      "$HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s0/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s1/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s2/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s3/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s4/best.pt --bits 4",
+      "pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s0/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s0 > artifacts/v11/suite_3m-s0.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s1/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s1 > artifacts/v11/suite_3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s2/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s2 > artifacts/v11/suite_3m-s2.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s3/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s3 > artifacts/v11/suite_3m-s3.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s4/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s4 > artifacts/v11/suite_3m-s4.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt --gate 0.88506 --out artifacts/v11/suite_v1_s0 > artifacts/v11/suite_v1_s0.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail"
+    ],
+    "fetch": [
+      "artifacts"
+    ],
+    "uploads": [
+      "datasets/action/v1.1/train.jsonl",
+      "datasets/action/v1.1/val.jsonl",
+      "tokenizer/out/action_v1_sp2048.model",
+      "runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt",
+      "datasets/action/stackchan_v1/eval.jsonl",
+      "datasets/action/eval_v3/eval.jsonl",
+      "datasets/action/eval_v11_led/eval.jsonl",
+      "datasets/action/relabel_v1/v0_eval.jsonl",
+      "datasets/action/relabel_v1/human_v1.jsonl",
+      "datasets/action/relabel_v1/eval_v2_amount_words.jsonl",
+      "datasets/action/relabel_v1/eval_v2_center_phrasing.jsonl",
+      "datasets/action/relabel_v1/eval_v2_correction.jsonl",
+      "datasets/action/relabel_v1/eval_v2_english.jsonl",
+      "datasets/action/relabel_v1/eval_v2_fragments.jsonl",
+      "datasets/action/relabel_v1/eval_v2_long_preface.jsonl",
+      "datasets/action/relabel_v1/eval_v2_negation_forms.jsonl",
+      "datasets/action/relabel_v1/eval_v2_numbers.jsonl",
+      "datasets/action/relabel_v1/eval_v2_order_words.jsonl",
+      "datasets/action/relabel_v1/eval_v2_orthography.jsonl",
+      "datasets/action/relabel_v1/eval_v2_question_forms.jsonl",
+      "datasets/action/relabel_v1/eval_v2_unexecutable.jsonl"
+    ]
+  },
+  "started_utc": "20261003T181302Z",
+  "uploads": {
+    "datasets/action/v1.1/train.jsonl": "f1d04bf20fa5dac194cd018b69b969b2623e83e5c02a441609caaccb60532e34",
+    "datasets/action/v1.1/val.jsonl": "fca3266bc683ab972cf436b4c74685f1c3c4385358539b5ad5a45c2749a4fa57",
+    "tokenizer/out/action_v1_sp2048.model": "80eae3c8ef151273cddafe45f4f5432c2bafefac07b294bbd0cc6f19558b7314",
+    "runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt": "4b1fe44663f288c67d3f89edb650e7d2dc20e05a82822524679cb6eee7a899af",
+    "datasets/action/stackchan_v1/eval.jsonl": "94eedae0362083e0f537068f18811f2a3b28cd31332257a40706fdb30548c6f2",
+    "datasets/action/eval_v3/eval.jsonl": "d4e2236e4017d0ad86c11176f5252e486cf98d6b4b640d9916362d20b4249ff3",
+    "datasets/action/eval_v11_led/eval.jsonl": "7dbdfb0fef0e780ae141dd67df59ba5bfba08ff40dce9d22747f6a1efca665a9",
+    "datasets/action/relabel_v1/v0_eval.jsonl": "4a7191015c914e5965258903287b41c2c28d088095f4562774af727099317339",
+    "datasets/action/relabel_v1/human_v1.jsonl": "29f22d00433ea2282bc1afab783dd91f1d9ab7d897c9c2a76ced1090f72a08e7",
+    "datasets/action/relabel_v1/eval_v2_amount_words.jsonl": "294a70f4dc0c3cea9083078969d4fb6cfc3f0c71b0077a805a319ed0526dab11",
+    "datasets/action/relabel_v1/eval_v2_center_phrasing.jsonl": "d347aef09d59e2d23e7befc66d52f10f1f37617760766e5a42634c47aec565c8",
+    "datasets/action/relabel_v1/eval_v2_correction.jsonl": "117a5e3a8765192ca97deb92381999fede6d51cdf3bec770372b07a01ccb50bd",
+    "datasets/action/relabel_v1/eval_v2_english.jsonl": "3845ee82937b95f603742429e533bb63567344201c98f3b87e0311807c62dd51",
+    "datasets/action/relabel_v1/eval_v2_fragments.jsonl": "5d64ee19fce5bf87ef131116ad5746ae31966767d658f38f9690be50a7e6b515",
+    "datasets/action/relabel_v1/eval_v2_long_preface.jsonl": "b819031e62088f0e444b71e8ec8f2ead60293e7aab5028243927b325769ebc51",
+    "datasets/action/relabel_v1/eval_v2_negation_forms.jsonl": "4727162eee1ccf0666675c776fa5b8ad584edf8430452872ecda3de8928307b1",
+    "datasets/action/relabel_v1/eval_v2_numbers.jsonl": "0ecfda51ae59c29d9b556b58bf39f42355d52c30c05218bcf6d61d2052ec95ae",
+    "datasets/action/relabel_v1/eval_v2_order_words.jsonl": "ab0017823f31134361860f9894543b688f2f4f22ce12dd075040ef6f27cd11c4",
+    "datasets/action/relabel_v1/eval_v2_orthography.jsonl": "db4d93e44840405b45e3c65bc082399e174ec7b7a85243d19218722ad081d31b",
+    "datasets/action/relabel_v1/eval_v2_question_forms.jsonl": "1985698a4f347e2e5bac6f49385d0d6f5a8e1311d746de90043abdf5f1fab889",
+    "datasets/action/relabel_v1/eval_v2_unexecutable.jsonl": "feb5e321cfe09b759bac800af7c92b1e004b99dd397b583013afe2ae6fb52b4f"
+  },
+  "commit": "176e6e687a2d8ed002b95b0615b8e6f5d032d8b7",
+  "offer": {
+    "id": 48399575,
+    "gpu_name": "RTX 3090",
+    "gpu_ram": 24576,
+    "dph_total": 0.2394814814814815,
+    "geolocation": "New Zealand, NZ"
+  },
+  "instance_id": 54046280,
+  "driver_version": "595.84",
+  "cuda_max_good": 13.2,
+  "steps": [
+    {
+      "cmd": "curl -LsSf https://astral.sh/uv/0.12.20/install.sh | sh",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "mkdir -p /root/work && tar -xf /root/code.tar -C /root/work",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "mkdir -p /root/work/artifacts",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "cd /root/work && nvidia-smi > artifacts/nvidia_smi.txt",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "cd /root/work && for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev --group train && exit 0; sleep 15; done; exit 1",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 0 --out artifacts/v11/3m-s0 > artifacts/v11-3m-s0.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 1 --out artifacts/v11/3m-s1 > artifacts/v11-3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 2 --out artifacts/v11/3m-s2 > artifacts/v11-3m-s2.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 3 --out artifacts/v11/3m-s3 > artifacts/v11-3m-s3.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.train --tokenizer tokenizer/out/action_v1_sp2048.model --data datasets/action/v1.1 --size 3m --lr 1e-3 --epochs 12 --seed 4 --out artifacts/v11/3m-s4 > artifacts/v11-3m-s4.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "exit": 0,
+      "sec": 817
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.evaluate --ckpt artifacts/v11/3m-s0/best.pt artifacts/v11/3m-s1/best.pt artifacts/v11/3m-s2/best.pt artifacts/v11/3m-s3/best.pt artifacts/v11/3m-s4/best.pt --tokenizer tokenizer/out/action_v1_sp2048.model --cases datasets/action/v1.1/val.jsonl --out artifacts/v11/eval",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s0/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s1/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s2/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s3/best.pt --bits 4 && $HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.quantize --ckpt artifacts/v11/3m-s4/best.pt --bits 4",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && pids=(); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s0/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s0 > artifacts/v11/suite_3m-s0.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s1/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s1 > artifacts/v11/suite_3m-s1.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s2/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s2 > artifacts/v11/suite_3m-s2.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s3/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s3 > artifacts/v11/suite_3m-s3.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt artifacts/v11/3m-s4/best_q4_g64.pt --val datasets/action/v1.1/val.jsonl --out artifacts/v11/suite_3m-s4 > artifacts/v11/suite_3m-s4.log 2>&1) & pids+=($!); ($HOME/.local/bin/uv run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer tokenizer/out/action_v1_sp2048.model --ckpt runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt --gate 0.88506 --out artifacts/v11/suite_v1_s0 > artifacts/v11/suite_v1_s0.log 2>&1) & pids+=($!); fail=0; for p in ${pids[@]}; do wait $p || fail=1; done; exit $fail",
+      "exit": 0,
+      "sec": 580
+    }
+  ],
+  "status": "succeeded",
+  "destroyed": true,
+  "hours": 0.702,
+  "failed_starts": [],
+  "cost_usd_estimate": 0.168
+}

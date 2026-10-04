@@ -31,7 +31,7 @@ datasets:
 
 *English summary at the end.*
 
-> **この版は Action schema v1 です（2026年10月）。** 首の向きを角度でも指定でき、相対の移動、斜め、首振り、お辞儀、表情 7種類、LED の色、音量、画面の明るさを扱います。前の版（schema v0。`look`、`set_expression`、`nod` の3つだけ）は、このリポジトリの commit 履歴に残っています。v0 と v1 では tokenizer が違うので、`.jtlm` と firmware は同じ版のものを組み合わせてください（下の「スタックチャンで動かす」）。
+> **この版は Action schema v1 のデータ v1.1 です（2026年10月）。** 首の向きを角度でも指定でき、相対の移動、斜め、首振り、お辞儀、表情 7種類、LED の色、音量、画面の明るさを扱います。v1.1 では、色を言わずに LED を点ける依頼（「ライトをつけて」「LEDを点灯して」など）を白で点けるようにしました。v1.0 はこれを何もしないか、消灯と読んでいました。前の版（schema v0。`look`、`set_expression`、`nod` の3つだけ）は、このリポジトリの commit 履歴に残っています。v0 と v1 では tokenizer が違うので、`.jtlm` と firmware は同じ版のものを組み合わせてください（下の「スタックチャンで動かす」）。
 
 ## できること
 
@@ -65,6 +65,7 @@ datasets:
 | 首を横に振って | `shake(count=1)` |
 | お辞儀して | `bow()` |
 | 右を向いてから、2回うなずいて | `look(right, normal)`, `nod(count=2)` |
+| ライトをつけて | `set_led(white)` |
 | 寝室のライトをつけて | `[]` |
 | エアコンを25度にして | `[]` |
 | 笑わないでね | `[]` |
@@ -117,7 +118,7 @@ uv を使う場合は、インストールせずに `uv run --with torch --with 
 | `confidence` | 生成した token の確率の最小値。{{GATE}} 未満のときは、`actions` を `[]` にしています |
 | `raw` | gate をかける前のモデルの出力 |
 
-`inference.py` は、評価に使ったコードと同じ計算をする単体のスクリプト（約 300 行、Apache-2.0）です。評価セット全 6,748 文で、gate の前と後の出力が、評価したときの出力と完全に一致することを確かめています（`confidence` は小数4桁に丸めた値）。
+`inference.py` は、評価に使ったコードと同じ計算をする単体のスクリプト（約 300 行、Apache-2.0）です。評価セット全 7,185 文で、gate の前と後の出力が、評価したときの出力と完全に一致することを確かめています（`confidence` は小数4桁に丸めた値）。
 
 ## ロボットにつなぐ
 
@@ -250,6 +251,7 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 | eval v3 (LLM) | 1,816件。llm-jp-3.1-13b-instruct4（学習データを書いたモデルとは別）が書き、Qwen3 が確かめた。新しい動作、数値の表記、絶対と相対、紛らわしい `[]` を含む |
 | v0 eval (LLM) | 前の版の評価セット（1,189件）。v1 で正解が変わる文だけを付け直した |
 | human v1 | 人が書いた公開コーパスの文（JESC、Tatoeba、YJ AmbigDialogue、J-CRe3、対話システムライブコンペ 3、MASSIVE）。v1 で付け直して、依頼 65件、依頼でない文 1,092件。学習には使っていない |
+| LED v1.1 (LLM) | 437件。LED の点灯（色の指定なし）、色、消灯、2動作、否定、言い直し、ロボット以外の明かり（`[]`）。データ v1.1 と同じ spec から llm-jp-3.1-13b-instruct4 が書き、Qwen3 が確かめた |
 | v2/* | 苦手になりやすい12の型（言い回し、量、数、否定、言い直し、順序、断片、できない依頼、表記、疑問形、前置き、英語）。llm-jp-3.1-13b-instruct4 が書き、Qwen3 が確かめた。v1 で付け直した |
 
 ### 誤差の範囲
@@ -259,40 +261,42 @@ INT4、文法による制約、gate {{GATE}} での結果です（%）。exact �
 - **評価セットの大きさ:** 下の1つ目の表は、公開したモデルについて、評価の文を復元抽出し直して求めた 95% の区間です（2,000回）。Stack-chan v1 は 140件、人が書いた依頼文は 65件しかないので、区間が広くなります。
 - **学習の seed:** 同じデータと設定で seed だけを変えて5回学習し、それぞれを同じ方法（INT4、文法、validation で決めた gate）で評価しました。下の2つ目の表は、5回の平均 ± 標準偏差です。
 
-**公開したのは seed 0 です。** 評価の前に、公開するのは seed 0 と決めていました（評価セットで seed を選んでいません）。seed 0 は、Stack-chan v1 では 5つの中で最も低く（seed ごとに 92.9 / 94.3 / 95.0 / 95.0 / 95.0%）、人が書いた依頼文では seed 1 と並んで最も高い値でした（93.8 / 93.8 / 89.2 / 90.8 / 90.8%）。この版の実力は、5回の平均で見てください。
+**公開したのは seed 1 です。** v1.0 と違い、seed は5つの評価の結果を見比べて選びました（Stack-chan v1、人が書いた依頼文、依頼でない文への誤動作、LED v1.1 の釣り合いがよいもの）。評価セットで選んだので、seed 1 の数値は少し楽観的です。seed ごとの値は、Stack-chan v1 が 92.1 / 92.9 / 94.3 / 93.6 / 92.9%、人が書いた依頼文が 90.8 / 93.8 / 89.2 / 92.3 / 92.3%、LED v1.1 が 90.2 / 91.5 / 91.3 / 89.2 / 91.1% でした。この版の実力は、5回の平均で見てください。
 
 {{EXTRA}}
 
 ## 学習
 
 - **構造:** decoder-only の Transformer（d_model 192、7層、GQA 6/2 head、SwiGLU 512、RoPE、RMSNorm、入出力の埋め込みを共有）。最大 128 token。
-- **学習:** 88,720文（action v1.0）、12 epoch、lr 1e-3、1 GPU（RTX 3090）で約13分。validation の完全一致が最も高い epoch を採用しました。
+- **学習:** 91,616文（action v1.1）、12 epoch、lr 1e-3、1 GPU（RTX 3090、5 seed を並列）。validation の完全一致が最も高い epoch を採用しました。
 - **量子化:** 2次元の重みを INT4（group 64、scale は fp16）。評価の数値は量子化した後のものです。
 
 ## 学習データ
 
 | 出典 | 件数 | ライセンス |
 |---|---:|---|
-| オープンモデルが書いた合成文（正解を先に決め、Qwen3-30B-A3B-Instruct-2507 が温度 0 で確かめたものだけを残した） | 83,006 | 書いたモデルはすべて Apache-2.0 または MIT |
+| オープンモデルが書いた合成文（正解を先に決め、Qwen3-30B-A3B-Instruct-2507 が温度 0 で確かめたものだけを残した） | 85,902 | 書いたモデルはすべて Apache-2.0 または MIT |
 | JESC（映画・ドラマの字幕、主に何もしない例） | 3,221 | CC BY-SA 4.0 |
 | Tatoeba の日本語文（主に何もしない例） | 1,370 | CC BY 2.0 FR |
 | Amazon MASSIVE（ja-JP、主に何もしない例） | 1,123 | CC BY 4.0 |
 
 - **前の版のデータ（v0.5.1）を引き継ぎました。** Qwen3 が schema v1 で読み直し、前の正解と一致した文だけを残しました（train 58,418件）。前の版で `[]` だった文のうち、LED、音量、明るさの依頼だとはっきり分かる文（「LED」「音量」「画面」などの語がある文）だけを、新しい正解に付け直しました（train 47件、validation 3件）。v1 の Qwen3 は 11 の tool で答えが揺れやすく、付け直しの候補の多くが誤りだったため、付け直しはこの範囲に絞り、それ以外の不一致の文は除きました。
 - **新しい動作の文を足しました**（31,897件。train と validation の合計）。正解を先に決めた spec（角度の数値と表記の揺れ、絶対と相対、斜め、首振り、お辞儀、表情、LED、音量、明るさ、紛らわしい `[]`）を、Qwen3、calm3、ABEJA-Qwen2.5、Mistral-Nemo-Japanese、ELYZA-Shortcut が書き、Qwen3 が温度 0 で確かめて、正解と一致した文だけを残しました。
+- **v1.1 では LED の文を足しました**（3,048件。train と validation の合計）。v1.0 は色を言わない「ライトをつけて」を白とする文が2件しかなく、「つけるんじゃなく消して」のような言い直しの文（正解は消灯）と、部屋の照明を点ける `[]` の文が多かったため、「LEDつけて」「LEDを点灯して」を消灯と読んでいました。色を言わない点灯（白）、色ごとの「光って」「点灯して」、消灯、2動作、否定、言い直し、ロボット以外の明かりを点ける `[]` の spec を、Qwen3、ABEJA-Qwen2.5、Mistral-Nemo-Japanese が書き、Qwen3 が温度 0 で確かめて、正解と一致した文だけを残しました。
 - 合成文を書いたモデル: Qwen/Qwen3-30B-A3B-Instruct-2507、cyberagent/calm3-22b-chat、abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0、cyberagent/Mistral-Nemo-Japanese-Instruct-2408、elyza/ELYZA-Shortcut-1.0-Qwen-32B、ibm-granite/granite-3.3-8b-instruct（以上 Apache-2.0）、sbintuitions/sarashina2.2-3b-instruct-v0.1（MIT）。
 - 人が書いた文のうち「何もしない」例の一部は、前の版のモデルが誤って動いた文を集め、Qwen3 が「何もしない」と確かめたものです。
 - 評価セットの文と重なる文は学習データから除きました。Tatoeba と JESC は、hash で固定した約2割と評価セットの文を評価用に取り分け、学習には使っていません。
-- 合成データの最初の版（v0）は [japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) で公開しています。
+- 合成データは [japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) で公開しています。
 
 ## 限界と用途
 
-- **`turn`（今の向きからの移動）は `look` より弱めです。** eval v3 の1動作の文で、`look` は 97.4 ± 1.3%、`turn` は 84.3 ± 2.0% でした。`turn` の誤りは、`look` と答えるものと、gate で止まるものがほぼ半分ずつです。Stack-chan v1 には `turn` の文がありません。
-- **角度や数値のある文は、gate で止まりやすいです。** Stack-chan v1 で、正解に数値がある文の 7.3 ± 4.1%（seed 0 は 9.1%）が gate で `[]` になりました（eval v3 は 3.3 ± 0.5%）。学習データにない値（例:「18度」を 180 と読みかけて止まる）は、どの評価セットでも測れていません。
-- **「首を振って」は、うなずき（`nod`）と首振り（`shake`）のどちらにも読めます。** 前の版の評価セット（v2/numbers）は「首を振って」を `nod` としていて、これがそのセットの依頼の正解率が 62.5 ± 7.6% に下がった主な原因の1つです（依頼 63件のうち「首…振」を含む 21件で、seed ごとの誤りは 7 / 17 / 7 / 13 / 13件。ほかの 42件では 13 / 13 / 11 / 13 / 11件）。
-- **eval v3 には、1動作だけの LED、音量、明るさの文と、範囲の外の値（「音量を150%に」など）の文がありません。** これらは validation（モデルの選択に使ったもの）でだけ確かめています。
-- **英語は扱えません。** 英語の依頼の正解率は約7%です。
-- **ひらがなだけの文や、言い直しの文は弱めです**（表記 約83%、言い直し 約86%）。
+- **`turn`（今の向きからの移動）は `look` より弱めです。** eval v3 の1動作の文で、`look` は 97.3 ± 0.7%、`turn` は 85.3 ± 2.3% でした。`turn` の誤りは、`look` と答えるものと、gate で止まるものがほぼ半分ずつです。Stack-chan v1 には `turn` の文がありません。
+- **角度や数値のある文は、gate で止まりやすいです。** Stack-chan v1 で、正解に数値がある文（11件）の 10.9 ± 7.6%（seed 1 は 2件、18.2%）が gate で `[]` になりました（eval v3 は 3.0 ± 1.2%）。学習データにない値（例:「18度」を 180 と読みかけて止まる）は、どの評価セットでも測れていません。
+- **「首を振って」は、うなずき（`nod`）と首振り（`shake`）のどちらにも読めます。** 前の版の評価セット（v2/numbers）は「首を振って」を `nod` としていて、これがそのセットの依頼の正解率が 67.3 ± 8.8% に下がった主な原因の1つです（依頼のうち「首…振」を含む 21件で、seed ごとの誤りは 6 / 5 / 18 / 5 / 7件。ほかの依頼では 10 / 15 / 12 / 12 / 13件）。
+- **eval v3 には、1動作だけの音量、明るさの文と、範囲の外の値（「音量を150%に」など）の文がありません。** これらは validation（モデルの選択に使ったもの）でだけ確かめています。1動作の LED は LED v1.1 で確かめています。
+- **LED は、ひらがなの色（「あかにして」）や「けして」が弱めです。** LED v1.1 で、seed 1 の誤り 37件の多くは gate で `[]` になったもので、「ライトけしてー」を白で点けた誤りが1件ありました。
+- **英語は扱えません。** 英語の依頼の正解率は約4%です。
+- **ひらがなだけの文や、言い直しの文は弱めです**（表記 約84%、言い直し 約84%）。
 - 決まった 11 の動作しか選べません。会話や質問への答えはしません。
 - 文字の入力を前提にしています。音声認識の誤りへの強さは評価していません。
 - **用途:** 小型ロボットや玩具で、日本語の短い指示から安全な範囲の動作を選ぶこと。人の安全にかかわる機械の制御、医療、監視などには使わないでください。出力は必ず schema と角度の上限で検証してから動かしてください（firmware はそうしています）。
@@ -321,4 +325,4 @@ hf download ayousanz/JapaneseTinyAgentLM-Action-3M --local-dir JapaneseTinyAgent
 python JapaneseTinyAgentLM-Action-3M/inference.py 顔を右に45度向いて
 ```
 
-`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (6,748 of 6,748 evaluation prompts, before and after the gate). Training, evaluation and firmware source: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM). **Try it in the browser:** [demo (Hugging Face Space)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo), no install; the same C runtime as the device (WebAssembly) with the INT4 weights runs in the page.
+`inference.py` is a self-contained script (Apache-2.0) that reproduces the evaluated outputs exactly (7,185 of 7,185 evaluation prompts, before and after the gate). Training, evaluation and firmware source: [GitHub](https://github.com/ayutaz/JapaneseTinyAgentLM). **Try it in the browser:** [demo (Hugging Face Space)](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo), no install; the same C runtime as the device (WebAssembly) with the INT4 weights runs in the page.

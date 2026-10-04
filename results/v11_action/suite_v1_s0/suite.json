@@ -1,0 +1,199 @@
+{
+  "ckpt": "runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt",
+  "kv_int8": false,
+  "gate": {
+    "threshold": 0.88506
+  },
+  "sets": {
+    "Stack-chan v1": {
+      "n": 140,
+      "exact": 0.9285714285714286,
+      "requests_exact": 0.8666666666666667,
+      "false_actions": 0,
+      "n_empty": 65,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": 0.09090909090909091,
+      "by_source": {
+        "user": {
+          "n": 4,
+          "exact": 1.0
+        },
+        "verbatim": {
+          "n": 97,
+          "exact": 0.9484536082474226
+        },
+        "paraphrase": {
+          "n": 39,
+          "exact": 0.8717948717948718
+        }
+      },
+      "by_tool": {
+        "look": {
+          "n": 52,
+          "exact": 0.8653846153846154
+        }
+      }
+    },
+    "eval v3 (LLM)": {
+      "n": 1816,
+      "exact": 0.9520925110132159,
+      "requests_exact": 0.9318001586042823,
+      "false_actions": 1,
+      "n_empty": 555,
+      "false_action_rate": 0.0018018018018018018,
+      "critical_error_rate": 0.0005506607929515419,
+      "numeric_gated_rate": 0.035233160621761656
+    },
+    "v0 eval (LLM)": {
+      "n": 1189,
+      "exact": 0.9091673675357443,
+      "requests_exact": 0.8236301369863014,
+      "false_actions": 5,
+      "n_empty": 605,
+      "false_action_rate": 0.008264462809917356,
+      "critical_error_rate": 0.004205214465937763,
+      "numeric_gated_rate": null
+    },
+    "human v1": {
+      "n": 1157,
+      "exact": 0.9939498703543648,
+      "requests_exact": 0.9384615384615385,
+      "false_actions": 3,
+      "n_empty": 1092,
+      "false_action_rate": 0.0027472527472527475,
+      "critical_error_rate": 0.0025929127052722557,
+      "numeric_gated_rate": null
+    },
+    "LED v1.1 (LLM)": {
+      "n": 437,
+      "exact": 0.41647597254004576,
+      "requests_exact": 0.3070652173913043,
+      "false_actions": 0,
+      "n_empty": 69,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": 0.25
+    },
+    "v2/amount_words": {
+      "n": 278,
+      "exact": 0.8489208633093526,
+      "requests_exact": 0.8489208633093526,
+      "false_actions": 0,
+      "n_empty": 0,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/center_phrasing": {
+      "n": 223,
+      "exact": 0.9461883408071748,
+      "requests_exact": 0.9461883408071748,
+      "false_actions": 0,
+      "n_empty": 0,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/correction": {
+      "n": 44,
+      "exact": 0.8409090909090909,
+      "requests_exact": 0.8409090909090909,
+      "false_actions": 0,
+      "n_empty": 0,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/english": {
+      "n": 70,
+      "exact": 0.4857142857142857,
+      "requests_exact": 0.10526315789473684,
+      "false_actions": 2,
+      "n_empty": 32,
+      "false_action_rate": 0.0625,
+      "critical_error_rate": 0.02857142857142857,
+      "numeric_gated_rate": null
+    },
+    "v2/fragments": {
+      "n": 182,
+      "exact": 1.0,
+      "requests_exact": null,
+      "false_actions": 0,
+      "n_empty": 182,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/long_preface": {
+      "n": 247,
+      "exact": 0.8744939271255061,
+      "requests_exact": 0.8744939271255061,
+      "false_actions": 0,
+      "n_empty": 0,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/negation_forms": {
+      "n": 168,
+      "exact": 1.0,
+      "requests_exact": null,
+      "false_actions": 0,
+      "n_empty": 168,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/numbers": {
+      "n": 167,
+      "exact": 0.874251497005988,
+      "requests_exact": 0.6825396825396826,
+      "false_actions": 1,
+      "n_empty": 104,
+      "false_action_rate": 0.009615384615384616,
+      "critical_error_rate": 0.005988023952095809,
+      "numeric_gated_rate": null
+    },
+    "v2/order_words": {
+      "n": 296,
+      "exact": 0.9459459459459459,
+      "requests_exact": 0.9459459459459459,
+      "false_actions": 0,
+      "n_empty": 0,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/orthography": {
+      "n": 282,
+      "exact": 0.8404255319148937,
+      "requests_exact": 0.8235294117647058,
+      "false_actions": 0,
+      "n_empty": 27,
+      "false_action_rate": 0.0,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/question_forms": {
+      "n": 203,
+      "exact": 0.8620689655172413,
+      "requests_exact": 0.8620689655172413,
+      "false_actions": 0,
+      "n_empty": 0,
+      "false_action_rate": null,
+      "critical_error_rate": 0.0,
+      "numeric_gated_rate": null
+    },
+    "v2/unexecutable": {
+      "n": 286,
+      "exact": 0.993006993006993,
+      "requests_exact": 0.0,
+      "false_actions": 1,
+      "n_empty": 285,
+      "false_action_rate": 0.0035087719298245615,
+      "critical_error_rate": 0.0034965034965034965,
+      "numeric_gated_rate": null
+    }
+  }
+}

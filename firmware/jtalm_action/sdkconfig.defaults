@@ -37,4 +37,4 @@ CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU1=n
 
 # Confidence gate: outputs whose min token probability is below 0.88506 become []
 # (x 1/1000000; chosen on validation for the v1 3M INT4 model, results/v1_action/suite_3m-s0)
-CONFIG_JTALM_GATE_PPM=885060
+CONFIG_JTALM_GATE_PPM=836730

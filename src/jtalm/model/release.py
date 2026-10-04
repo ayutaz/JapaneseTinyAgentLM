@@ -195,7 +195,7 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument(
         "--tokenizer", type=Path, default=PROJECT_ROOT / "tokenizer/out/action_v1_sp2048.model"
     )
-    p.add_argument("--data-version", default="action v1.0")
+    p.add_argument("--data-version", default="action v1.1")
     p.add_argument(
         "--firmware-build", type=Path, default=FIRMWARE_DIR / "build_release",
         help="ESP-IDF build directory of firmware/jtalm_action",
