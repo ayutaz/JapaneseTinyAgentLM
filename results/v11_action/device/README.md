@@ -29,4 +29,22 @@ Stack-chan v1, 100 of eval v3, 60 of human v1) and 100 prompts of the LED v1.1 s
   The v1.0 run on its 300 cases had a median of 1,042 ms; the per-token times are the same.
 - The 1,500-prompt long run was done with v1.0 only (`../../v1_action/device/`); v1.1 uses the
   same firmware with different weights.
-- A visual check of the LED colours on the device is recorded below once it is done.
+
+## LED check by the user (2026-10-04)
+
+With the servos off, ten prompts were sent through `firmware/tools/stackchan_chat.py` seven
+seconds apart while the user watched the base LEDs. The device's replies and what the user saw
+agreed with the expected result for all ten:
+
+| prompt | reply | LEDs / sound |
+|---|---|---|
+| ライトを消して | LED off | off |
+| ライトをつけて | LED white | white |
+| ライトを消して | LED off | off |
+| LEDを点灯して | LED white | white |
+| 赤く光って | LED red | red |
+| 部屋の電気をつけて | nothing | stays red |
+| ライトを消して | LED off | off |
+| ライトをオンにして | LED white | white |
+| LEDライトの色を青にして | LED blue | blue |
+| 音声の音量を50にして | volume 50 | confirmation beep |

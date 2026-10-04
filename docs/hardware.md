@@ -111,7 +111,7 @@ LM の出力を首の動き、表情、LED、音量、明るさに変える部�
 | Watchdog | 監視の task（core 1、LM より高い優先度、50ms ごと）が、計画の予定時間 + 2 秒（始点への移動の時間を足す）を過ぎても終わらない実行と、計画がないのに torque が 3 秒以上入っている状態を止める。タッチは 100ms ごとに見る |
 | servo の driver | 自前（Apache-2.0）。ping、torque、goal、現在位置の読み取り。応答は checksum と ID を確かめる。register と byte の順は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした（コードは copy していない） |
 
-firmware の計画は、`firmware/tools/dispatch_check.py` が Python（`jtalm.action.parse_output` と `jtalm.action.mapping.plan_v1`）で計算し直したものと一致することを確かめています。Action schema v1 では、host で build した validator と planner（`firmware/tools/act_host.c`）で 3,000件、実機の `!act` で 600件の validator の判定と計画、data v1.0 のモデルの実機の出力 300件の計画（[`results/v1_action/device/`](../results/v1_action/device/README.md)）、採用した data v1.1 のモデルの実機の出力 400件の計画（[`results/v11_action/device/`](../results/v11_action/device/)）がすべて一致しました。実機で首を動かし、向き、量（`degrees` と斜めを含む）、うなずき、首振り、お辞儀、2つの依頼の順序、否定や雑談で動かないこと、タッチと `!stop` で止まること（首振りの途中のタッチ、お辞儀の 0.5 秒の静止中の `!stop`）、顔、LED の色、確認音と明るさを目で確かめました（2026-10-02〜03。data v1.0 のモデル）。data v1.1 のモデルで LED の色を目で確かめるのは、まだです。
+firmware の計画は、`firmware/tools/dispatch_check.py` が Python（`jtalm.action.parse_output` と `jtalm.action.mapping.plan_v1`）で計算し直したものと一致することを確かめています。Action schema v1 では、host で build した validator と planner（`firmware/tools/act_host.c`）で 3,000件、実機の `!act` で 600件の validator の判定と計画、data v1.0 のモデルの実機の出力 300件の計画（[`results/v1_action/device/`](../results/v1_action/device/README.md)）、採用した data v1.1 のモデルの実機の出力 400件の計画（[`results/v11_action/device/`](../results/v11_action/device/)）がすべて一致しました。実機で首を動かし、向き、量（`degrees` と斜めを含む）、うなずき、首振り、お辞儀、2つの依頼の順序、否定や雑談で動かないこと、タッチと `!stop` で止まること（首振りの途中のタッチ、お辞儀の 0.5 秒の静止中の `!stop`）、顔、LED の色、確認音と明るさを目で確かめました（2026-10-02〜03。data v1.0 のモデル）。data v1.1 のモデルでは、servo を off にしたまま、LED の点灯（色を言わない「ライトをつけて」「LEDを点灯して」「ライトをオンにして」が白）、消灯、赤、部屋の照明の依頼で変わらないこと、青、音量の確認音を、利用者が目と耳で確かめました（2026-10-04、10文）。
 
 ## 表情
 
@@ -234,5 +234,4 @@ quad の PSRAM と QIO の flash はほぼ同じ速さで、理論値（4 bit ×
 
 - 消費電流（LM を連続で動かしたとき、servo を動かしたとき）。
 - 数時間以上の連続実行と、servo を動かしながらの連続実行（72分・3,567件の連続実行では、出力がすべて PC と一致し、reset もエラーもなく、chip の温度は 57.6℃ で頭打ちでした。[`results/v051_action/long_run/`](../results/v051_action/long_run/README.md)。v1 の firmware と data v1.0 のモデルでは 29分・1,500件で、出力と計画がすべて PC と一致し、reset もエラーもなく、温度は 50.6〜51.6℃ でした。[`results/v1_action/device/`](../results/v1_action/device/README.md)。data v1.1 のモデルでは 400件だけで、長い連続実行はしていません）。
-- data v1.1 のモデルでの LED の色の目視（利用者による確認）。
 - `-DJTLM_BATCH=8` にしたときの速度。
