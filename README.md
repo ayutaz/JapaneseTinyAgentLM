@@ -77,7 +77,7 @@
 
 **ブラウザで試す:** [デモ（Hugging Face Space）](https://huggingface.co/spaces/ayousanz/JapaneseTinyAgentLM-Action-3M-demo)。インストール不要で、実機と同じ C の runtime（WebAssembly）と INT4 の重みがブラウザの中で動きます。
 
-デモでは、実行した入力文と推論結果をモデルの品質評価・改善のため非公開の R2 に毎回保存します。保存に失敗したときは結果を表示しません。保存期間は90日です。個人情報を入力しないでください。実装と運用手順は [`runtime/feedback-worker/`](runtime/feedback-worker/README.md) を参照してください。
+デモでは、実行した入力文と推論結果をモデルの品質評価・改善のため非公開の R2 に毎回保存します。保存に失敗したときは結果を表示しません。記録は90日で期限切れとなり、その後に削除されます。個人情報を入力しないでください。実装と運用手順は [`runtime/feedback-worker/`](runtime/feedback-worker/README.md) を参照してください。
 
 ### Python（PC）
 

@@ -75,7 +75,7 @@ a { color: var(--accent); }
       <li>生成した token の確率の最小値（確信度）が閾値より低いときは、出力を <code>[]</code> に取り消します（gate）。</li>
       <li>計算は ESP32-S3 の firmware と同じ C の runtime を WebAssembly にしたもので、重みも実機と同じ INT4 の <code>.jtlm</code> です。</li>
     </ul>
-    <p><strong>入力データの送信は必須です。</strong>実行するたびに入力文、モデルの出力、確信度、閾値、推論時間またはエラーを非公開の Cloudflare R2 に保存し、品質評価とモデル改善に使います。保存できないときは結果を表示しません。保存データは運営者だけが閲覧し、90日後に削除します。氏名や連絡先などの個人情報は入力しないでください。</p>
+    <p><strong>入力データの送信は必須です。</strong>実行するたびに入力文、モデルの出力、確信度、閾値、推論時間またはエラーを非公開の Cloudflare R2 に保存し、品質評価とモデル改善に使います。保存できないときは結果を表示しません。保存データは運営者だけが閲覧し、90日で期限切れとなった後に削除されます。氏名や連絡先などの個人情報は入力しないでください。</p>
     モデル: <a href="https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M">ayousanz/JapaneseTinyAgentLM-Action-3M</a> ・
     コード: <a href="https://github.com/ayutaz/JapaneseTinyAgentLM">GitHub</a>
   </div>
