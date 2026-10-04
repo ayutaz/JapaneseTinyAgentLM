@@ -59,11 +59,11 @@ decoder-only Transformer です（`src/jtalm/model/transformer.py`）。
 | 5M INT4 | 93.3% | 2.69MB | 約 3.0MB | 1.79 秒 |
 | 20M（FP、PC のみ） | 95.0%（1 seed） | 10.5MB | — | 実機に載らない |
 
-- 実機の速度は、data v0.4 のモデルで比べたときの計測です。採用した schema v1 の 3M は、中央値 1,042 ms です（[`results/v1_action/device/`](../results/v1_action/device/README.md)。評価に使った文と、出力の token 数が違います）。
+- 実機の速度は、data v0.4 のモデルで比べたときの計測です。採用した schema v1 の 3M（data v1.1）は、中央値 1,069 ms です（[`results/v11_action/device/`](../results/v11_action/device/)。評価に使った文と、出力の token 数が違います）。
 - 3M は 5M より精度が高く、実機でも速い。20M との差は +0.7 point で、20M は INT4 でも LM の容量の目安（1.5〜5MB）を超える。
 - data v0 のモデルでは 20M も 3M とほぼ同じ精度（83.9% と 84.4%）だった。精度が足りない原因は capacity ではなくデータの側と判断し、データの書き手を増やした（[`data.md`](data.md)）。
 
-採用したモデルは、Action schema v1 の data v1.0（train 88,720 件 / validation 4,678 件）で、seed 0、12 epoch、lr 1e-3 で学習しました（前の版は data v0.5.1 の train 66,809 件）。手順は [`training.md`](training.md) にあります。
+採用したモデルは、Action schema v1 の data v1.1（train 91,616 件 / validation 4,830 件。data v1.0 に LED の文を足したもの）で、12 epoch、lr 1e-3 で学習した 5 seed のうちの seed 1 です。seed は評価セットの結果を見比べて選びました（[`evaluation.md`](evaluation.md)）。前の版は data v1.0（train 88,720 件）の seed 0、schema v0 では data v0.5.1（train 66,809 件）の seed 0 でした。手順は [`training.md`](training.md) にあります。
 
 ## Tokenizer と系列の形式
 
@@ -72,7 +72,7 @@ decoder-only Transformer です（`src/jtalm/model/transformer.py`）。
 | 形式 | SentencePiece unigram、語彙 **2,048**、byte fallback あり、`nmt_nfkc` 正規化、数字は1文字ずつ、先頭の `▁` は付けない |
 | 特殊 token | `<unk>` 0、`<s>` 1、`</s>` 2、`<pad>` 3、制御用の `<act>` と `<out>` |
 | 1 token にまとめる断片 | 出力の JSON の固定の断片（`[]`、call の頭 `{"name":"look","arguments":{"direction":"`、引数の間の `","degrees":`、閉じ `"}}`、引数のない call `{"name":"bow","arguments":{}}` など）、enum の値（`left`、`up_left`、`slight`、`sleepy`、`light_blue` など）、**数字 `0`〜`9`**。user-defined symbol として登録する（`jtalm.model.format.JSON_PIECES`、`ENUM_VALUES`、`DIGITS`）。v0 では `0`、`4`、`6`〜`9` が語彙になく byte に分かれていたので、v1 で数字をすべて1 token にした |
-| 学習に使った文 | data v1.0 の学習データと validation の入力文と出力、MASSIVE ja-JP の train の発話（合わせて 198,005行）。評価セットは使わない |
+| 学習に使った文 | data v1.0 の学習データと validation の入力文と出力、MASSIVE ja-JP の train の発話（合わせて 198,005行）。評価セットは使わない。data v1.1 でも同じ tokenizer を使う |
 | 語彙を選んだ理由 | 出力の token 数は語彙によらず同じなので、入力側で比べた。v0 のとき、2k は未知の日本語（MASSIVE の dev）での byte fallback が 4k / 8k より少なく（1.3%。4k は 2.0%、8k は 2.2%）、embedding が最も小さい（d192 で 0.39M）。v1 も 2k にした（MASSIVE の dev の byte fallback は 1.0%） |
 
 1件の系列は次の形です（`jtalm.model.format`）。
@@ -115,7 +115,7 @@ Tokenizer はモデルの学習より先に固定しました（v1 の `action_v
 - `direction`（`look` と `turn`）は left / right / up / down / up_left / up_right / down_left / down_right。`look` だけ center も使えます。`degrees` は斜めの方向では、左右と上下の両方をその角度にします。
 - `look` の center は `amount` が `normal` のときだけ許します（`degrees` は付けられません。正規化では、center の `amount` を `normal` にそろえます）。
 - 数値は JSON の整数（引用符なし）で、先頭の 0 は許しません（`0` そのものは `level` でだけ使える）。
-- 言い方と出力の対応（データと評価で守る規則）: 「もう」「さらに」「もっと」「そこから」のように今の向きを基準にする語がある文は `turn`、それ以外は `look`。「45」「４５」「四十五」「45°」「45%」は同じ値。「半分」は 50、「最大」は 100、「消音」「ミュート」は `set_volume 0`。「LED」「内蔵ライト」「ライト」だけの文は `set_led`、「部屋の」「照明」「電気」がある文は `[]`。「エアコンを25度に」のように角度・音量でない「度」「%」は `[]`。
+- 言い方と出力の対応（データと評価で守る規則）: 「もう」「さらに」「もっと」「そこから」のように今の向きを基準にする語がある文は `turn`、それ以外は `look`。「45」「４５」「四十五」「45°」「45%」は同じ値。「半分」は 50、「最大」は 100、「消音」「ミュート」は `set_volume 0`。「LED」「内蔵ライト」「ライト」だけの文は `set_led`（色を言わずに点ける「ライトをつけて」は white）、「部屋の」「照明」「電気」がある文は `[]`。「エアコンを25度に」のように角度・音量でない「度」「%」は `[]`。
 - schema の本体は `src/jtalm/action/action_schema_v1.json`（`jtalm.action.schema.TOOLS` の表から生成）です。`jtalm.action.validate()` が schema の検査に加えて重複の禁止を確かめます。設計の詳細は [`superpowers/specs/2026-10-02-action-schema-v1-design.md`](superpowers/specs/2026-10-02-action-schema-v1-design.md) にあります。
 - このプロジェクトの規則（最大2個、重複の禁止）は TinyLM-Bench より厳しいので、同じ出力でも schema 妥当の数はベンチより少なくなることがあります。厳格一致の数は変わりません。
 
@@ -137,6 +137,9 @@ Tokenizer はモデルの学習より先に固定しました（v1 の `action_v
 
 お辞儀して
 → [{"name":"bow","arguments":{}}]
+
+ライトをつけて
+→ [{"name":"set_led","arguments":{"color":"white"}}]
 
 寝室のライトをつけて
 → []
@@ -176,9 +179,9 @@ grammar が保証するのは構造と値の範囲だけです。「左を向い
 - 指標は、生成した各 token の確率の**最小値**（`min_prob`）です。確率は grammar で制約する**前**の softmax で求めるので、grammar が強制した token は確信度を下げます（`jtalm.model.decode`）。
 - `min_prob` が閾値を下回ったら、call 単位ではなく**出力全体**を `[]` にします。確信度の低い出力で動かないほうを安全側とします。
 - 閾値は **validation だけ**で選びます。評価セットでは選びません。規則は「validation の完全一致の低下が 0.5 point 以内に収まる最大の閾値」です（`jtalm.model.evaluate --modes gate`）。
-- 採用したモデル（schema v1、seed 0）の閾値は **0.88506** です（data v1.0 の validation 4,678 件で選んだ値。validation の完全一致は gate なし 98.3%、gate あり 97.8%）。閾値はモデルごとに選び直します（前の版の v0.5.1 は 0.86808）。
-- 数値は桁ごとに確率が割れやすいので、数値のある文は gate で止まりやすくなります（Stack-chan v1 で数値のある文の 7.3 ± 4.1%。[`evaluation.md`](evaluation.md) の「弱いところ」）。
-- firmware では標準で有効です。build 時の `CONFIG_JTALM_GATE_PPM`（100万分率。v1 の firmware の既定は 885060 = 0.88506）と、実行中の serial command `!gate <閾値>`（0 で無効）で変えられます。
+- 採用したモデル（schema v1、data v1.1、seed 1）の閾値は **0.83673** です（data v1.1 の validation 4,830 件で選んだ値。validation の完全一致は gate なし 98.0%、gate あり 97.5%）。閾値はモデルごとに選び直します（data v1.0 の seed 0 は 0.88506、schema v0 の v0.5.1 は 0.86808）。
+- 数値は桁ごとに確率が割れやすいので、数値のある文は gate で止まりやすくなります（Stack-chan v1 で数値のある文の 10.9 ± 7.6%。[`evaluation.md`](evaluation.md) の「弱いところ」）。
+- firmware では標準で有効です。build 時の `CONFIG_JTALM_GATE_PPM`（100万分率。今の firmware の既定は 836730 = 0.83673。data v1.0 のときは 885060）と、実行中の serial command `!gate <閾値>`（0 で無効）で変えられます。
 - validation の書き手が1つしかないと、閾値がほぼ 1 に選ばれて gate が逆効果になりました（data v0）。書き手の多い validation を使うことが、閾値の選び方に効きます。
 
 gate の効果（誤って動く割合の変化など）は [`evaluation.md`](evaluation.md) にあります。
@@ -220,7 +223,7 @@ gate の効果（誤って動く割合の変化など）は [`evaluation.md`](ev
 
 ### PyTorch との一致
 
-C の tokenizer と生成は、PyTorch / SentencePiece と token 単位で一致します（評価セット 1,189 件、3M / 5M × FP32 / INT8 / INT4）。schema v1 の採用モデル（INT4）では、v1 の評価セットと validation の 11,426 件で、`double` と `float` の累積、grammar あり・なしのどれも一致し、WebAssembly 版も一致しました（[`results/v1_action/parity/`](../results/v1_action/parity/README.md)）。実機の出力も 300 / 300 件一致しました（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。確かめ方と結果の詳細は [`../runtime/host/README.md`](../runtime/host/README.md) の「Python との一致の確認」にあります。
+C の tokenizer と生成は、PyTorch / SentencePiece と token 単位で一致します（評価セット 1,189 件、3M / 5M × FP32 / INT8 / INT4）。schema v1 の data v1.0 のモデル（INT4）では、v1 の評価セットと validation の 11,426 件で、`double` と `float` の累積、grammar あり・なしのどれも一致し、WebAssembly 版も一致しました（[`results/v1_action/parity/`](../results/v1_action/parity/README.md)）。採用した data v1.1 のモデル（INT4）では、Stack-chan v1 の 140 件と LED v1.1 の 437 件で C の runtime が PyTorch と一致し（[`results/v11_action/parity/`](../results/v11_action/parity/)）、実機の出力も 400 / 400 件一致しました（[`results/v11_action/device/`](../results/v11_action/device/)）。確かめ方と結果の詳細は [`../runtime/host/README.md`](../runtime/host/README.md) の「Python との一致の確認」にあります。
 
 ## ESP32-S3 での配置
 
@@ -248,12 +251,12 @@ C の tokenizer と生成は、PyTorch / SentencePiece と token 単位で一致
 | tokenizer の作業領域 | 32KB | 内部 SRAM |
 
 - firmware は状態全体（3M で 584,704 B）を内部 SRAM に置こうとし、入らなければ KV cache だけを PSRAM に置きます（3M ではこの形になる）。
-- 画面と dispatcher を載せた状態で、読み込み後の内部 SRAM の空きは 116,831 B、200 件の依頼の後は 99,039 B でした（v0.4 の firmware）。speaker、LED、NVS を加えた schema v1 の firmware では、初期化の後が 89,891 B、1,500 件の連続実行の後が 85,783 B です（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
+- 画面と dispatcher を載せた状態で、読み込み後の内部 SRAM の空きは 116,831 B、200 件の依頼の後は 99,039 B でした（v0.4 の firmware）。speaker、LED、NVS を加えた schema v1 の firmware では、初期化の後が 89,891 B、1,500 件の連続実行の後が 85,783 B です（data v1.0 のモデル。[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
 - **INT8 の KV cache**（`-DJTLM_KV_INT8=1`、firmware では `CONFIG_JTLM_KV_INT8=y`）にすると、KV cache は 129,024 B になり、PSRAM を 330KB 減らせます。位置と KV head ごとに f32 の scale を1つ持ちます。3M では評価セット 4,794 件の gate 後の出力が f32 と同じで、実機の応答は約 2% 遅くなりました。PSRAM には余裕があるので、公開している firmware は f32 のままです（[`results/v051_action/kv_int8/`](../results/v051_action/kv_int8/README.md)）。
 
 ### 速くするための工夫
 
-prompt をまとめて処理する prefill（最大 16 token）と、行列積を2つの core に分ける並列化を使います。どちらも計算の値を変えません。実機では1回の依頼が中央値 1,042 ms、p90 1,746 ms です（schema v1 の採用モデル、300件。[`results/v1_action/device/`](../results/v1_action/device/README.md)）。工夫の内容と効果は [`hardware.md`](hardware.md) の「速くするために行ったこと」にあります。
+prompt をまとめて処理する prefill（最大 16 token）と、行列積を2つの core に分ける並列化を使います。どちらも計算の値を変えません。実機では1回の依頼が中央値 1,069 ms、p90 1,746 ms です（schema v1 の採用モデル、400件。[`results/v11_action/device/`](../results/v11_action/device/)）。工夫の内容と効果は [`hardware.md`](hardware.md) の「速くするために行ったこと」にあります。
 
 ## Action から servo へ
 

@@ -6,7 +6,7 @@ Action LM の学習データと評価データについて、作り方、出典�
 
 | 項目 | 内容 |
 |---|---|
-| 正解ラベル | **label-first**。Action schema の組み合わせから、意図（spec）と正解の JSON をプログラムで先に決める（`jtalm.data.specs`、`jtalm.data.focus`、schema v1 は `jtalm.data.specs_v1`） |
+| 正解ラベル | **label-first**。Action schema の組み合わせから、意図（spec）と正解の JSON をプログラムで先に決める（`jtalm.data.specs`、`jtalm.data.focus`、schema v1 は `jtalm.data.specs_v1`、データ v1.1 の LED の文は `jtalm.data.specs_v11`） |
 | 文章 | spec の意味の日本語の文を、**ライセンスが両立するオープンモデル**（Apache-2.0 / MIT）に書かせる。または、ライセンスが両立する**人が書いたコーパス**から取る |
 | 検証 | すべての文を **Qwen3-30B-A3B-Instruct-2507 が温度 0** で Action の JSON に変換し、先に決めた正解と一致した文だけを残す |
 | 使わない出力 | 学習データの文章と正解、評価データの文章に、Claude や ChatGPT などの出力を使わない（評価データの正解の例外は、下の「スタックチャン実例セット v1」と「評価セットの付け直し」の 19件。Claude が直し方を提案し、利用者が決めた）。これらのサービスは、出力を AI モデルの学習に使うことを利用規約で制限しているため |
@@ -31,12 +31,12 @@ Action LM の学習データと評価データについて、作り方、出典�
 
 | モデル | ライセンス | 役割 | 使った版 |
 |---|---|---|---|
-| `Qwen/Qwen3-30B-A3B-Instruct-2507`（bf16、61GB） | Apache-2.0 | 学習データを書く。**すべての文の検証役**（温度 0）。v1.0 では、引き継いだ文と前の評価セットを schema v1 で読み直し（reverify）、Stack-chan v1 の正解も付ける | v0〜v1.0 |
-| `llm-jp/llm-jp-3.1-13b-instruct4`（bf16、約27GB） | Apache-2.0 | **評価セットだけ**を書く（v0 eval、eval v2、eval v3、Stack-chan v1 の言い換え）。学習データは書かない | 評価セット |
+| `Qwen/Qwen3-30B-A3B-Instruct-2507`（bf16、61GB） | Apache-2.0 | 学習データを書く。**すべての文の検証役**（温度 0）。v1.0 では、引き継いだ文と前の評価セットを schema v1 で読み直し（reverify）、Stack-chan v1 の正解も付ける | v0〜v1.1 |
+| `llm-jp/llm-jp-3.1-13b-instruct4`（bf16、約27GB） | Apache-2.0 | **評価セットだけ**を書く（v0 eval、eval v2、eval v3、Stack-chan v1 の言い換え、LED v1.1）。学習データは書かない | 評価セット |
 | `cyberagent/calm3-22b-chat`（bf16、45GB） | Apache-2.0 | 学習データを書く | v0.3〜v1.0 |
 | `sbintuitions/sarashina2.2-3b-instruct-v0.1`（bf16、6.7GB） | MIT | 学習データを書く | v0.3〜v0.5.1（v1.0 に引き継ぎ） |
-| `abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0`（bf16、65GB） | Apache-2.0 | 学習データを書く | v0.4〜v1.0 |
-| `cyberagent/Mistral-Nemo-Japanese-Instruct-2408`（bf16、25GB） | Apache-2.0 | 学習データを書く | v0.4〜v1.0 |
+| `abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0`（bf16、65GB） | Apache-2.0 | 学習データを書く | v0.4〜v1.1 |
+| `cyberagent/Mistral-Nemo-Japanese-Instruct-2408`（bf16、25GB） | Apache-2.0 | 学習データを書く | v0.4〜v1.1 |
 | `ibm-granite/granite-3.3-8b-instruct`（bf16、16GB） | Apache-2.0 | 学習データを書く | v0.4（v1.0 に引き継ぎ） |
 | `elyza/ELYZA-Shortcut-1.0-Qwen-32B`（bf16、65GB） | Apache-2.0 | 学習データを書く | v0.4〜v1.0 |
 
@@ -73,7 +73,7 @@ Action LM の学習データと評価データについて、作り方、出典�
 
 ## データの版
 
-学習データの件数（train / validation）です。v0〜v0.5.1 は v0 の評価セット（1,189件、sha256 `24120eb2…`）を共有します。v1.0 は、それを schema v1 で付け直したものと、新しい eval v3、Stack-chan v1 で評価します。
+学習データの件数（train / validation）です。v0〜v0.5.1 は v0 の評価セット（1,189件、sha256 `24120eb2…`）を共有します。v1.0 と v1.1 は、それを schema v1 で付け直したものと、新しい eval v3、Stack-chan v1 で評価します（v1.1 は LED v1.1 も）。
 
 | 版 | train | validation | 加えたもの | manifest |
 |---|---:|---:|---|---|
@@ -82,7 +82,8 @@ Action LM の学習データと評価データについて、作り方、出典�
 | v0.4 | 47,450 | 2,497 | 書き手を7つに（ABEJA、Mistral-Nemo-JA、granite、ELYZA を追加） | [`action_v0.4.json`](../datasets/manifests/action_v0.4.json) |
 | v0.5 | 64,136 | 3,375 | 弱点を狙った文（eval v2 と同じパターン。英語を除く11）と、間違えやすい例 | [`action_v0.5.json`](../datasets/manifests/action_v0.5.json) |
 | v0.5.1（v0 で採用） | 66,809 | 3,515 | 命令形、「下さい」、言い直しの追加 | [`action_v0.5.1.json`](../datasets/manifests/action_v0.5.1.json) |
-| **v1.0**（採用、Action schema v1） | **88,720** | **4,678** | v0.5.1 を schema v1 で読み直して引き継ぎ、新しい動作の文を5つの書き手で追加 | [`action_v1.0.json`](../datasets/manifests/action_v1.0.json) |
+| v1.0（Action schema v1） | 88,720 | 4,678 | v0.5.1 を schema v1 で読み直して引き継ぎ、新しい動作の文を5つの書き手で追加 | [`action_v1.0.json`](../datasets/manifests/action_v1.0.json) |
+| **v1.1**（採用、Action schema v1） | **91,616** | **4,830** | v1.0 をそのまま引き継ぎ、LED の点灯（色を言わない → white）と色の文を3つの書き手で追加 | [`action_v1.1.json`](../datasets/manifests/action_v1.1.json) |
 
 train のカテゴリ別の件数:
 
@@ -94,6 +95,7 @@ train のカテゴリ別の件数:
 | v0.5 | 17,495 | 13,231 | 9,502 | 19,717 | 4,191 |
 | v0.5.1 | 19,436 | 13,231 | 9,502 | 19,717 | 4,923 |
 | v1.0 | 27,421 | 23,384 | 10,374 | 22,615 | 4,926 |
+| v1.1 | 28,861 | 24,202 | 10,502 | 22,973 | 5,078 |
 
 ### v0
 
@@ -126,7 +128,7 @@ train のカテゴリ別の件数:
 - この2つのパターン（`imperative_forms`、`kanji_kudasai`）は学習データだけにあり、評価セットにはありません。
 - 設定は `configs/action_v051_*.json` です。
 
-### v1.0（採用、Action schema v1）
+### v1.0（Action schema v1）
 
 schema v1（11 の動作。[architecture.md](architecture.md) の「Action schema v1」）のためのデータです。tokenizer も作り直しました。組み立ては `jtalm.data.build_v1` です。
 
@@ -153,6 +155,32 @@ schema v1（11 の動作。[architecture.md](architecture.md) の「Action schem
 - tokenizer `action_v1_sp2048` は、v1.0 の train と validation の入力文と出力、MASSIVE ja-JP の train の発話で学習しました（[`tokenizer_action_v1.json`](../datasets/manifests/tokenizer_action_v1.json)）。
 - 設定は `configs/action_v1_{qwen,calm3,abeja,nemoja,elyza}.json`、`configs/eval_v3.json`、`configs/stackchan_v1_paraphrase.json` です。
 
+### v1.1（採用、Action schema v1）
+
+v1.0 で公開したモデルは、色を言わずに LED を点ける依頼に `[]` を返し（「ライトをつけて」）、「LEDつけて」「LEDを点灯して」「内蔵ライトをつけて」を消灯（`set_led off`）、「ライトをオンにして」をオレンジと読んでいました。データ v1.0 には、色を言わない点灯を `set_led white` とする文が2件しかなく、ほかの機器の明かり（部屋、スタンド、リビングのライト）を点ける `[]` の文が 40件、「LEDをつけるんじゃなく、消灯してね」のような言い直しの文（正解は消灯）が 14件ありました。`set_led` の色も blue（391件）と off（371件）に偏り、red は 12件だけで、「赤く光って」は gate で止まりました。v1.1 では、この型の文を足しました。組み立ては `jtalm.data.build_v11` です。
+
+1. **v1.0 を引き継ぐ:** v1.0 の train と validation は、そのまま残しました。
+2. **LED の文を足す:** `jtalm.data.specs_v11` が spec と正解を先に決めます（label-first は v1.0 と同じ）。
+   - 色を言わない点灯は white: 「つけて」「点けて」、「点灯して」、「オンにして」、「光らせて」「光って」、「LEDつけて」「ライトオン」のような短い言い方。1動作の依頼の約半分がこの点灯になるように重みを付けた
+   - 色ごとの「光って」「点灯して」「つけて」と、消灯（「消して」「オフにして」「消灯して」「切って」）
+   - 2動作: LED の色か点灯と、うなずき、右を向く、正面を向く、お辞儀、happy、音量 50 の組
+   - 否定（「ライトはつけないで」→ `[]`）、言い直し（消灯 → 点灯、点灯 → 消灯、点灯 → 赤、青 → 点灯）
+   - no_action: ロボット以外の明かりを点ける依頼（部屋の照明、スタンド、懐中電灯、車のライトなど）と、明かりの様子を話す文
+
+   Qwen3、ABEJA-Qwen2.5、Mistral-Nemo-JA が 1,432文ずつ書き、Qwen3 が温度 0 で確かめて、正解と一致した 3,048件（train 2,896、validation 152）を残しました。書き手ごとに Qwen3 1,005件、ABEJA 1,004件、Mistral-Nemo-JA 1,039件、カテゴリごとに single 1,518、multi_action 859、negation 135、correction 155、no_action 381 です。除いた文（検証役の不一致、否定との矛盾、重複）の内訳は manifest にあります。新しい文の 5% を validation に分けました。
+3. **重複と漏れ:** 新しい文から、すべての評価セット（eval v3、Stack-chan v1、付け直した前の評価セット、LED v1.1）と重なる文を除きました。
+
+| 項目 | 件数 |
+|---|---:|
+| train | 91,616（single 28,861、multi_action 24,202、negation 10,502、correction 5,078、no_action 22,973） |
+| validation | 4,830（single 1,515、multi_action 1,265、negation 562、correction 255、no_action 1,233） |
+| うち v1.0 から引き継いだ文（train / validation） | 88,720 / 4,678 |
+| 新しい文（train / validation） | 2,896 / 152 |
+
+- 生成は vast.ai の GPU（A100 PCIE 80GB 1枚）の job `gen_action_v11` で行いました（0.509 時間、約 $0.41。[`results/v11_action/gen_run.json`](../results/v11_action/gen_run.json)）。同じ job で、llm-jp が LED v1.1 の評価セットを書きました（下の「LED v1.1」）。
+- tokenizer は v1.0 と同じ `action_v1_sp2048` です。
+- 設定は `configs/action_v11_{qwen,abeja,nemoja}.json`、`configs/eval_v11_led.json` です。
+
 ## 評価セット
 
 どの評価セットも、学習にもモデルの選択（確信度の gate（confidence gate）の閾値、checkpoint の選択）にも使いません。閾値と checkpoint は validation で選びます。結果は [`evaluation.md`](evaluation.md) にあります。
@@ -176,6 +204,10 @@ schema v1（11 の動作。[architecture.md](architecture.md) の「Action schem
 schema v1 の動作を網羅的に測るセットです（1,816件。`configs/eval_v3.json`）。v1 の spec（`jtalm.data.specs_v1`）から、llm-jp-3.1-13b-instruct4 が書き、Qwen3 が温度 0 で確かめて、正解と一致した文だけを残しました（single 877、multi_action 341、negation 171、correction 43、no_action 384）。
 
 - **欠け:** single の枠（書かせた 1,600件）が `look` と `turn` の spec で埋まったため、1動作だけの nod、shake、bow、表情、LED、音量、明るさの文と、範囲の外の値の文がありません。`set_volume` / `set_brightness` の値は、2動作や言い直しの文の中にだけあります。全角の数字は 16件にしか残らず、漢数字の指定も書き手があまり守らなかったので、数値の表記はほとんどが算用数字です（[`evaluation.md`](evaluation.md) の「弱いところ」）。
+
+### LED v1.1（LLM が書いた文、データ v1.1）
+
+LED の点灯、色、消灯を測るセットです（437件。`datasets/action/eval_v11_led/eval.jsonl`、`configs/eval_v11_led.json`）。データ v1.1 と同じ spec（`jtalm.data.specs_v11`）から、llm-jp-3.1-13b-instruct4 が書き、Qwen3 が温度 0 で確かめて、正解と一致した文だけを残しました（single 278、multi_action 80、negation 20、correction 10、no_action 49）。データ v1.0 の train と validation にすでにある文は除きました。v1.1 の学習データからは、このセットと重なる文を除いています。記録は [`action_v1.1.json`](../datasets/manifests/action_v1.1.json) の `eval_v11_led` です。
 
 ### 評価セットの付け直し（v0 eval、human v1、eval v2 → schema v1）
 
@@ -238,6 +270,7 @@ v0.5 で、実際の文で誤って動く例を学習データに加えました
 - **既存の版との重複:** `--base` で版を重ねるときは、前の版の train、validation、v0 eval と重なる文を除きます。
 - **評価セット同士:** eval v2 は、v0.4 の学習データ、v0 eval、human v1 と重なる文を除いて作りました。
 - **v1.0:** `jtalm.data.build_v1` は、eval v3、Stack-chan v1、付け直した前の評価セットのすべての文と重なる文を、引き継いだ文と新しい文の両方から除きます。
+- **v1.1:** `jtalm.data.build_v11` は、LED v1.1 からデータ v1.0 にある文を除き、新しい文から、LED v1.1 を含むすべての評価セットと重なる文を除きます。
 
 ## Hugging Face で公開しているもの
 
@@ -247,7 +280,8 @@ v0.5 で、実際の文で誤って動く例を学習データに加えました
 | MASSIVE の行 | 再配布しません。v0 の公開データからも除いています。MASSIVE から取得してください |
 | データ v0.3〜v0.5.1 | 公開していません。出典、件数、sha256 は `datasets/manifests/` にあります。[`training.md`](training.md) の手順で作り直せます |
 | データ v1.0 | `japanese-data-analyze` で公開する予定です（公開の前に利用者が確認します）。出典、件数、sha256 は [`action_v1.0.json`](../datasets/manifests/action_v1.0.json) にあります |
-| Stack-chan v1、eval v3 | 公開していません。Stack-chan v1 の実例の文は第三者のものなので再配布しません。manifest に件数と sha256 があります |
+| データ v1.1 | `japanese-data-analyze` で公開する予定です（公開の前に利用者が確認します）。出典、件数、sha256 は [`action_v1.1.json`](../datasets/manifests/action_v1.1.json) にあります |
+| Stack-chan v1、eval v3、LED v1.1 | 公開していません。Stack-chan v1 の実例の文は第三者のものなので再配布しません。manifest に件数と sha256 があります（LED v1.1 の manifest は件数だけで、sha256 は学習の job の記録 [`results/v11_action/run.json`](../results/v11_action/run.json) にあります） |
 | human v1 | 第三者のコーパスの文なので再配布しません。元のコーパスから作り直せます |
 | eval v2 | 公開していません。manifest に件数と sha256 があります |
 | モデルの重み | [`ayousanz/JapaneseTinyAgentLM-Action-3M`](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)（CC BY-SA 4.0）。tokenizer も含みます |

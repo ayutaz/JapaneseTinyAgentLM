@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2026 ayutaz
-"""Prepare and publish the synthetic Action dataset (data v1.0) to Hugging Face (manual gate).
+"""Prepare and publish the synthetic Action dataset (data v1.1) to Hugging Face (manual gate).
 
 ``prepare`` writes the Hugging Face files: only sentences written by the open models. MASSIVE rows
 are not redistributed, and the mined hard negatives (Tatoeba, JESC, MASSIVE sentences) are left
@@ -27,8 +27,8 @@ from jtalm.infra.env import read_secret
 from jtalm.infra.hf import community_disabled, disable_community
 
 REPO_ID = "japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth"
-DATASET_VERSION = "action-v1.0"
-# Data split file -> Hugging Face split. A version without an evaluation file (v1.0) has no test.
+DATASET_VERSION = "action-v1.1"
+# Data split file -> Hugging Face split. A version without an evaluation file (v1.x) has no test.
 SPLITS = {"train": "train", "val": "validation", "eval": "test"}
 RELABEL = "+relabel:v1"  # source suffix of a row whose label is the verifier's schema v1 reading
 # Every writer of a published sentence must be listed here with its license.
@@ -71,8 +71,13 @@ def _rows(path: Path) -> tuple[list[dict], Counter]:
 
 
 def prepare(
-    data_dir: Path, hf_dir: Path, manifest: dict, writers: dict[str, str] = WRITERS
+    data_dir: Path,
+    hf_dir: Path,
+    manifest: dict,
+    writers: dict[str, str] = WRITERS,
+    topup: dict | None = None,
 ) -> dict[str, int]:
+    """``manifest`` is data v1.0's (jtalm.data.build_v1); ``topup`` is data v1.1's (build_v11)."""
     hf_dir.mkdir(parents=True, exist_ok=True)
     counts: dict[str, int] = {}
     by_cat: dict[str, Counter] = {}
@@ -97,7 +102,7 @@ def prepare(
         relabeled[split] = sum(r["relabeled"] for r in rows)
         languages |= {r["language"] for r in rows}
     card = dataset_card(
-        counts, by_cat, by_writer, relabeled, skipped, sorted(languages), manifest, writers
+        counts, by_cat, by_writer, relabeled, skipped, sorted(languages), manifest, writers, topup
     )
     (hf_dir / "README.md").write_text(card, encoding="utf-8")
     return counts
@@ -116,8 +121,10 @@ def dataset_card(
     languages: list[str],
     manifest: dict,
     writers: dict[str, str],
+    topup: dict | None = None,
 ) -> str:
     splits = list(counts)
+    version = "v1.1" if topup else "v1.0"
     head = "| | " + " | ".join(splits) + " |\n|---|" + "---:|" * len(splits)
 
     def cells(f) -> str:
@@ -141,7 +148,19 @@ def dataset_card(
         f"  - split: {s}\n    path: {s}.jsonl" for s in splits
     )  # the configs list only the splits of this version
     built = " / ".join(
-        f"{s} {_n(manifest[k]['n'])}" for k, s in (("train", "train"), ("val", "validation"))
+        f"{s} {_n((topup or manifest)[k]['n'])}"
+        for k, s in (("train", "train"), ("val", "validation"))
+    )
+    topup_step = (
+        ""
+        if not topup
+        else f"""4. **v1.1: LED の文を足す:** v1.0 では、色を言わずに LED を点ける依頼（「ライトをつけて」）を白とする文が
+   2件しかなく、ほかの明かりを点ける `[]` の文と、「つけるんじゃなく消して」のような言い直し（正解は消灯）の文が
+   多かったため、学習したモデルは「LEDつけて」を消灯と読んでいました。v1.1 では、色を言わない点灯（白）、色ごとの
+   「光って」「点灯して」、消灯、2動作、否定、言い直し、ロボット以外の明かりを点ける `[]` の spec を、3つの書き手
+   （Qwen3、ABEJA、Mistral-Nemo-JA）に書かせ、Qwen3 が正解と一致を確かめた {_n(topup["new"]["n"])} 件
+   （train と validation の合計）を v1.0 に足しました。v1.0 の行は変えていません。
+"""
     )
     inherited = f"{_n(manifest['inherited_train']['n'])} / {_n(manifest['inherited_val']['n'])}"
     relabel_kept = (
@@ -180,8 +199,8 @@ configs:
 # JapaneseTinyAgentLM Action Synth ({DATASET_VERSION})
 
 小さな卓上ロボット（M5Stack StackChan K151）への日本語の発話を、ロボットの動作の JSON に変換する
-**Japanese Action LM** のための合成データセットです。この版（データ v1.0）は **Action schema v1**
-（11 の動作）のものです。前の版（v0、3つの動作）は、このリポジトリの以前の commit にあります。
+**Japanese Action LM** のための合成データセットです。この版（データ {version}）は **Action schema v1**
+（11 の動作）のものです。前の版（v1.0、v0。v0 は3つの動作）は、このリポジトリの以前の commit にあります。
 Synthetic Japanese utterances paired with robot action calls (Action schema v1, 11 tools), for
 training a tiny on-device Action LM (ESP32-S3). Project: JapaneseTinyAgentLM.
 
@@ -217,7 +236,7 @@ training a tiny on-device Action LM (ESP32-S3). Project: JapaneseTinyAgentLM.
 {cat_table}
 | **合計** | {" | ".join(f"**{_n(counts[s])}**" for s in splits)} |
 
-組み立てたデータ v1.0 は {built} 件です。このうち、次の行は含めていません。
+組み立てたデータ {version} は {built} 件です。このうち、次の行は含めていません。
 
 {head}
 | MASSIVE ja-JP の発話（負例） | {cells(lambda s: skip(s, "massive") + skip(s, "human:massive"))} |
@@ -261,7 +280,7 @@ training a tiny on-device Action LM (ESP32-S3). Project: JapaneseTinyAgentLM.
    紛らわしい `[]`（部屋の照明、エアコンの温度、「度」や「%」が角度でない文、命令でない文）です。Qwen3 が
    温度 0 で各文を JSON に変換し、正解と一致した {_n(manifest["new"]["n"])} 件（train と validation の合計）を
    残しました。新しい文の 5% を validation に分けました。
-4. **検査:** 長さ、文字化け、否定との矛盾を調べ、重複と、評価セットと重なる文を除きました。
+{topup_step}{"5" if topup else "4"}. **検査:** 長さ、文字化け、否定との矛盾を調べ、重複と、評価セットと重なる文を除きました。
 
 prompt version: 新しい文の生成と、すべての文の検証（読み直し）は `{PROMPT_VERSION}` です。引き継いだ文は、
 以前の版の prompt（`action-v0.2`〜`action-v0.5.1`）で書かれました。
@@ -316,17 +335,23 @@ def publish(hf_dir: Path, repo_id: str) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["prepare", "publish"])
-    parser.add_argument("--data", type=Path, default=Path("datasets/action/v1.0"))
-    parser.add_argument("--hf-dir", type=Path, default=Path("datasets/action/v1.0/hf"))
+    parser.add_argument("--data", type=Path, default=Path("datasets/action/v1.1"))
+    parser.add_argument("--hf-dir", type=Path, default=Path("datasets/action/v1.1/hf"))
     parser.add_argument(
         "--manifest", type=Path, default=Path("datasets/manifests/action_v1.0.json")
+    )
+    parser.add_argument(  # empty string: publish data v1.0 alone
+        "--topup-manifest", type=Path, default=Path("datasets/manifests/action_v1.1.json")
     )
     parser.add_argument("--repo", default=REPO_ID)
     parser.add_argument("--confirm", action="store_true", help="required to publish")
     args = parser.parse_args()
     if args.action == "prepare":
         manifest = json.loads(args.manifest.read_text(encoding="utf-8"))
-        print(prepare(args.data, args.hf_dir, manifest))
+        topup = None
+        if str(args.topup_manifest) not in ("", "."):
+            topup = json.loads(args.topup_manifest.read_text(encoding="utf-8"))
+        print(prepare(args.data, args.hf_dir, manifest, topup=topup))
     elif not args.confirm:
         parser.error("publishing is public; pass --confirm after reviewing the dataset card")
     else:

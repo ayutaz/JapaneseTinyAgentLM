@@ -22,25 +22,27 @@ output: [{"name":"set_led","arguments":{"color":"blue"}}]
 The output is a list of up to two calls to the 11 tools of Action schema v1: `look` (absolute) and `turn` (relative to the current pose) with a direction (including diagonals) and either an amount or `degrees` (1–180); `nod` / `shake` (count 1–5); `bow`; `set_expression` (happy / sad / surprised / neutral / angry / sleepy / doubt); `set_led` (10 colors); `set_volume` / `set_brightness` (level 0–100); `adjust_volume` / `adjust_brightness` (up / down by an amount or `by` 1–100). Non-requests, negated requests, devices the robot does not have (the room light, the air conditioner) and requests the robot cannot perform give `[]` (do nothing).
 
 - Decoding is constrained by the action schema, so the output is always valid JSON.
-- A confidence gate (0.88506, chosen on validation only) turns low-confidence outputs into `[]`.
-- The `.jtlm` file (INT4 weights + tokenizer) is 2.0 MB (1,970,720 bytes); the weights alone are 1.68 MB. The median latency on the device is 1.04 s per request.
+- A confidence gate (0.83673, chosen on validation only) turns low-confidence outputs into `[]`.
+- The `.jtlm` file (INT4 weights + tokenizer) is 2.0 MB (1,970,720 bytes); the weights alone are 1.68 MB. The median latency on the device is 1.07 s per request.
+- This is data v1.1: turning the LED on without naming a color (「ライトをつけて」, 「LEDを点灯して」) now gives white; the data v1.0 model returned nothing or even "off" for these.
 - The previous release (Action schema v0: `look`, `set_expression`, `nod` only) is in the Git history and [`results/v051_action/`](results/v051_action/).
 
 ## Results
 
-INT4 + grammar + gate, mean ± standard deviation over five training seeds (the released model is seed 0, fixed before evaluation):
+INT4 + grammar + gate, mean ± standard deviation over five training seeds. The chosen model is seed 1, picked after comparing the five seeds on the evaluation sets, so its own numbers are slightly optimistic; use the five-seed means:
 
 | Evaluation | Cases | Result |
 |---|---:|---|
 | The user's four everyday requests (「LEDライトの色を青にして」 etc.) | 4 | **4 / 4** (all seeds) |
-| Everyday Stack-chan phrasings (public examples and paraphrases, exact match) | 140 | **94.4 ± 0.9%** (seed 0: 92.9%) |
+| Everyday Stack-chan phrasings (public examples and paraphrases, exact match) | 140 | **93.1 ± 0.8%** (seed 1: 92.9%) |
 | False actions on its confusable non-requests (room light, air conditioner, ...) | 65 | **0** (all seeds) |
-| Human-written requests | 65 | **91.7 ± 2.1%** (seed 0: 93.8%) |
-| False actions on human-written non-requests | 1,092 | **0.1 ± 0.1%** |
-| LLM-written evaluation set eval v3 (exact match) | 1,816 | **95.3 ± 0.5%** |
-| Device (ESP32-S3) vs. PC (PyTorch) output | 300 | 300 / 300 identical (motion plans too) |
+| Human-written requests | 65 | **91.7 ± 1.8%** (seed 1: 93.8%) |
+| False actions on human-written non-requests | 1,092 | **0.1 ± 0.2%** |
+| LLM-written evaluation set eval v3 (exact match) | 1,816 | **95.2 ± 0.5%** |
+| LLM-written LED set (LED on, colors, off; exact match) | 437 | **90.7 ± 0.9%** (data v1.0: 41.6%) |
+| Device (ESP32-S3) vs. PC (PyTorch) output | 400 | 400 / 400 identical (motion plans too) |
 
-Weak spots: relative `turn` (84.3% vs. 97.4% for `look` on single-action eval v3 cases), numeric requests stopped by the gate (7.3 ± 4.1% of them on the Stack-chan set), 「首を振って」 (nod or shake), and English (about 7% of requests correct; Japanese only). Details: [`docs/evaluation.md`](docs/evaluation.md) and [`results/v1_action/comparison.md`](results/v1_action/comparison.md); device measurements: [`results/v1_action/device/`](results/v1_action/device/README.md). The documents in `docs/` are written in Japanese.
+Weak spots: relative `turn` (85.3% vs. 97.3% for `look` on single-action eval v3 cases), numeric requests stopped by the gate (10.9 ± 7.6% of them on the Stack-chan set), 「首を振って」 (nod or shake), LED colors written in hiragana (「あかにして」), and English (about 4% of requests correct; Japanese only). The data v1.0 model (seed 0, fixed before evaluation) had 94.4 ± 0.9% on the Stack-chan set and 91.7 ± 2.1% on human-written requests over five seeds. Details: [`docs/evaluation.md`](docs/evaluation.md) and [`results/v11_action/seeds_3m.md`](results/v11_action/seeds_3m.md); device measurements: [`results/v11_action/device/`](results/v11_action/device/). The documents in `docs/` are written in Japanese.
 
 ## Quick start
 

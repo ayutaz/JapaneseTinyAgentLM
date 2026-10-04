@@ -1,9 +1,10 @@
 # 評価
 
-Action LM の評価の定義、評価セット、採用モデルの結果、誤差の範囲、ここまでの判断の根拠をまとめます。表の数値はすべて [`results/`](../results/README.md) のファイルから取っており、各表の下に出典のファイルを書いています。採用モデルの実機の値（出力の一致と応答時間）は [`results/v1_action/device/`](../results/v1_action/device/README.md) にあります。
+Action LM の評価の定義、評価セット、採用モデルの結果、誤差の範囲、ここまでの判断の根拠をまとめます。表の数値はすべて [`results/`](../results/README.md) のファイルから取っており、各表の下に出典のファイルを書いています。採用モデルの実機の値（出力の一致と応答時間）は [`results/v11_action/device/`](../results/v11_action/device/) にあります。
 
-- 採用モデル: **Action schema v1** の 3M（3,148,608 params）、データ v1.0、seed 0、INT4（group 64、fp16 scale）、grammar + 確信度の gate（confidence gate）0.88506。モデルの構成は [architecture.md](architecture.md)、データは [data.md](data.md)、再現の手順は [training.md](training.md) を参照してください。
-- 前の版（schema v0、データ v0.5.1、gate 0.868）の結果は、下の「前の版（schema v0）の結果」以降に残しています。
+- 採用モデル: **Action schema v1** の 3M（3,148,608 params）、データ v1.1、seed 1、INT4（group 64、fp16 scale）、grammar + 確信度の gate（confidence gate）0.83673。モデルの構成は [architecture.md](architecture.md)、データは [data.md](data.md)、再現の手順は [training.md](training.md) を参照してください。
+- **seed 1 は、5つの seed の評価セットの結果を見比べて選びました**（下の「採用モデル（データ v1.1）の結果」）。そのため seed 1 の数値は少し楽観的です。期待できる性能としては、5 seed の平均を引用してください。
+- データ v1.0（seed 0、gate 0.88506）の結果は「前の版（データ v1.0）の結果」に、schema v0（データ v0.5.1、gate 0.868）の結果は「前の版（schema v0）の結果」以降に残しています。
 - 公開モデル: [ayousanz/JapaneseTinyAgentLM-Action-3M](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)
 
 ## 指標の定義
@@ -33,13 +34,14 @@ Action LM の評価の定義、評価セット、採用モデルの結果、誤�
 |---|---:|---|
 | **スタックチャン実例セット v1**（Stack-chan v1） | 140 | スタックチャンで実際に使われている言い方。公開されているスタックチャンの例（M5Stack 公式ドキュメント、StackChan-Pocket-Core2、stackchan-live、AI_StackChan2_FuncCall など）の文そのまま 97件、利用者が普段使う4文、llm-jp が書いた首の動きの言い換え 39件。動作 75件、`[]` 65件（部屋の照明、エアコンの温度、命令でない文など、紛らわしい文を含む）。正解は Qwen3（v1 の検証役）が付けた。そのうち 6件の正解と、除いた言い換え1件は、Claude が検証役の正解を見直して疑わしいものを挙げ、直し方を提案し、利用者がその提案の表を承認して決めた（全件を利用者が1件ずつ確かめたわけではない）。利用者の4文は利用者自身の文（[data.md](data.md) の「スタックチャン実例セット v1」）。schema v1 から |
 | **eval v3**（LLM が書いた文） | 1,816 | llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証した。schema v1 の新しい動作、数値の表記、絶対と相対、紛らわしい `[]` を含む。schema v1 から |
+| **LED v1.1**（LLM が書いた文） | 437 | データ v1.1 と同じ spec から llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証した。LED の点灯（色を言わない。正解は white）、色、消灯、2動作、否定、言い直し、ロボット以外の明かり（`[]`）。single 278、multi_action 80、negation 20、correction 10、no_action 49。データ v1.1 から |
 | v0 eval（LLM が書いた文） | 1,189 | llm-jp-3.1-13b-instruct4 が書き、Qwen3 が検証した文と MASSIVE の test。single 335、multi_action 192、negation 270、no_action 337、correction 55。英語 35件、対比ペア 80組。学習データとは書き手を分けている |
 | human v1（人が書いた文） | 1,159（v1: 1,157） | Tatoeba、JESC、YJ AmbigDialogue、J-CRe3、DSLC3、MASSIVE から抜き出した文。依頼 62件、否定の依頼 9件、負例 1,088件（`[]` が正解の入力は計 1,097件）。schema v1 で付け直すと、依頼 65件、`[]` 1,092件 |
 | eval v2（12パターン） | 2,446 | 弱点を調べるためのパターン別の文。llm-jp-3.1 が書き、Qwen3 が検証した。パターンは下の表 |
 | TinyLM-Bench 16件 | 16 | 既存モデルとの比較用（英語 8、日本語 8）。モデルの選定には使っていない |
 
 - schema v1 のモデルは、v0 eval、human v1、eval v2 を **v1 で付け直したもの**（`datasets/action/relabel_v1/`）で評価します。v0 の正しい出力は v1 でも正しいので、付け直したのは v1 で正解が変わる文（音量、LED など）と、Claude が検証役の正解を見直して直し方を提案し、利用者がその提案を承認した 13件だけです（[data.md](data.md) の「評価セットの付け直し」）。
-- Stack-chan v1 には `turn`（相対の移動）の文がありません。eval v3 には、1動作だけの LED、音量、明るさの文と、範囲の外の値の文がありません（下の「弱いところ」）。
+- Stack-chan v1 には `turn`（相対の移動）の文がありません。eval v3 には、1動作だけの LED、音量、明るさの文と、範囲の外の値の文がありません（下の「弱いところ」）。1動作の LED は LED v1.1 で測ります。
 
 eval v2 のパターン:
 
@@ -58,19 +60,119 @@ eval v2 のパターン:
 | question_forms | 203 | 疑問形の依頼（「〜してくれる？」など） |
 | unexecutable | 286 | 方向の語を含むが実行できない依頼（物を取る・運ぶ、道順の説明など。正解は `[]`） |
 
-出典: 件数は [`results/v051_action/suite_3m/suite.md`](../results/v051_action/suite_3m/suite.md)、[`results/v1_action/suite_3m-s0/suite.md`](../results/v1_action/suite_3m-s0/suite.md)
+出典: 件数は [`results/v051_action/suite_3m/suite.md`](../results/v051_action/suite_3m/suite.md)、[`results/v1_action/suite_3m-s0/suite.md`](../results/v1_action/suite_3m-s0/suite.md)、[`results/v11_action/suite_3m-s1/suite.md`](../results/v11_action/suite_3m-s1/suite.md)
 
 ## Decoding と gate の評価方法
 
 - **Grammar:** Action schema に合う token だけを選べるようにした greedy decoding です。出力は必ず schema に合います（[architecture.md](architecture.md)）。
 - **Gate:** 生成した token の確率の最小値（grammar の mask をかける前の確率）が閾値より小さいとき、出力を `[]` に置き換えます。
-- **閾値の選び方:** validation だけで選びます。validation の exact が gate なしから 0.5 point 以上下がらない範囲で、最も大きい閾値を取ります（`jtalm.model.evaluate.select_gate`）。評価セットは閾値の選択に使いません。採用モデル（schema v1、seed 0）では 0.88506（データ v1.0 の validation 4,678件の exact は gate なし 98.3%、gate あり 97.8%）で、firmware の既定値は `CONFIG_JTALM_GATE_PPM=885060`（100万分率）です。前の版（v0.5.1）は 0.86808 で、v0 の firmware の既定値は千分率の `CONFIG_JTALM_GATE_PERMILLE=868` でした。
+- **閾値の選び方:** validation だけで選びます。validation の exact が gate なしから 0.5 point 以上下がらない範囲で、最も大きい閾値を取ります（`jtalm.model.evaluate.select_gate`）。評価セットは閾値の選択に使いません。採用モデル（データ v1.1、seed 1）では 0.83673（データ v1.1 の validation 4,830件の exact は gate なし 98.0%、gate あり 97.5%）で、firmware の既定値は `CONFIG_JTALM_GATE_PPM=836730`（100万分率）です。データ v1.0 の seed 0 は 0.88506（validation 4,678件で gate なし 98.3%、gate あり 97.8%。firmware の既定値は 885060）でした。前の版（v0.5.1）は 0.86808 で、v0 の firmware の既定値は千分率の `CONFIG_JTALM_GATE_PERMILLE=868` でした。
 
-## 採用モデル（Action schema v1）の結果
+## 採用モデル（データ v1.1）の結果
 
-3M、データ v1.0、INT4 + grammar + gate。gate の閾値は各 seed の validation で選びました（seed 0〜4: 0.885、0.908、0.862、0.940、0.904）。5 seed（0〜4）を学習し、**公開したのは seed 0** です。seed 0 を公開することは評価の前に決めた規則（v0 と同じく seed 0）で、評価セットで seed を選んでいません。seed 0 は、Stack-chan v1 では 5つの中で最も低い値です（92.9%。ほかの seed は 94.3〜95.0%）。
+3M、データ v1.1（データ v1.0 に LED の文 3,048件を足したもの。[data.md](data.md) の「v1.1」）、INT4 + grammar + gate。gate の閾値は各 seed の validation で選びました（seed 0〜4: 0.748、0.837、0.847、0.909、0.922）。5 seed（0〜4）を学習し、**採用したのは seed 1** です。
+
+**seed 1 は評価セットの結果を見て選びました。** v1.0 では seed 0 を公開することを評価の前に決めていましたが、v1.1 では、5つの seed の評価セットの結果（Stack-chan v1、人が書いた依頼、人が書いた依頼でない文での誤動作、LED v1.1）を見比べて、釣り合いのよい seed 1 を選びました。評価セットで選んだので、seed 1 の数値は少し楽観的です。期待できる性能としては、5 seed の平均を引用してください。
+
+| seed | gate | Stack-chan v1 exact | human v1 の依頼 | human v1 の false actions | LED v1.1 exact | eval v3 の false actions |
+|---|---:|---:|---:|---:|---:|---:|
+| 0 | 0.74773 | 92.1 | 90.8 | 0 / 1,092 | 90.2 | 4 / 555 |
+| **1（採用）** | 0.83673 | 92.9 | **93.8** | 0 / 1,092 | **91.5** | 2 / 555 |
+| 2 | 0.84673 | **94.3** | 89.2 | 2 / 1,092 | 91.3 | 2 / 555 |
+| 3 | 0.90937 | 93.6 | 92.3 | 4 / 1,092 | 89.2 | 2 / 555 |
+| 4 | 0.92170 | 92.9 | 92.3 | 0 / 1,092 | 91.1 | 3 / 555 |
+
+出典: [`results/v11_action/suite_3m-s0/`](../results/v11_action/suite_3m-s0/suite.md) 〜 [`suite_3m-s4/`](../results/v11_action/suite_3m-s4/suite.md)（単位は %）
 
 ### 完了の条件（設計の 2 章）
+
+| # | 条件 | 目標 | seed 1 | 5 seed の平均 ± SD | 満たした seed |
+|---|---|---|---|---|---|
+| 1 | 利用者の4文（「LEDライトの色を青にして」「音声の音量を50にして」「頭を90度上に向けて」「顔を右に45度向いて」）が期待どおり | 4 / 4 | 4 / 4 | 4.0 / 4 | 5 / 5 |
+| 2a | Stack-chan v1 の完全一致 | 90% 以上 | 92.9 | 93.1 ± 0.8 | 5 / 5 |
+| 2b | Stack-chan v1 の `[]` の文（65件）で誤って動いた件数 | 0 | 0 | 0（seed ごとに 0、0、0、0、0） | 5 / 5 |
+| 3 | human v1 の依頼でない文（1,092件）で誤って動いた割合 | 0.5% 以下 | 0.0 | 0.1 ± 0.2 | 5 / 5 |
+| 4 | human v1 の依頼（65件）の完全一致 | v0.5.1 の 85.2 ± 6.4 から下がらない | 93.8 | 91.7 ± 1.8 | 5 / 5 |
+| 5 | 実機（INT4、ESP32-S3）と PyTorch の出力が一致 | 一致 | 400 / 400 | — | — |
+| 6 | 実機の応答時間の中央値 | 2 秒以内 | 1,069 ms | — | — |
+
+出典: [`results/v11_action/seeds_3m.md`](../results/v11_action/seeds_3m.md)、[`results/v11_action/suite_3m-s1/suite.md`](../results/v11_action/suite_3m-s1/suite.md)（条件 1〜4）、[`results/v11_action/device/`](../results/v11_action/device/)（条件 5、6）
+
+- 5 seed の平均を v1.0 と比べると、Stack-chan v1 は 94.4 ± 0.9% から 93.1 ± 0.8% に少し下がり、eval v3（95.3 → 95.2%）、人が書いた依頼（91.7 → 91.7%）、人が書いた文の false actions（0.1 → 0.1%）はほぼ同じです。
+- 実機の 400件は、v1.0 で使った 300件（Stack-chan v1 の 140件と、eval v3・human v1 から選んだ 160件）に、LED v1.1 から無作為に選んだ 100件（`random.Random(0)`）を加えたものです（下の「実機と PC の一致」）。
+
+### LED の点灯（データ v1.1 で直したこと）
+
+v1.0 のモデルは、色を言わずに LED を点ける依頼に `[]` を返し（「ライトをつけて」）、「LEDつけて」「LEDを点灯して」「内蔵ライトをつけて」を消灯（`set_led off`）、「ライトをオンにして」をオレンジと読んでいました。データ v1.0 には、色を言わない点灯を白とする文が2件しかなく、ほかの機器の明かりを点ける `[]` の文（40件）と、「LEDをつけるんじゃなく、消灯してね」のような言い直しの文（正解は消灯、14件）のほうが多かったためです。LED の色も blue（391件）と off（371件）に偏り、red は 12件だけだったので、「赤く光って」は gate で止まりました。データ v1.1 で、この型の文を足しました（[data.md](data.md) の「v1.1」）。
+
+| セット | 件数 | v1.0 seed 0 | v1.1 seed 1 | v1.1 の 5 seed |
+|---|---:|---:|---:|---:|
+| LED v1.1 の exact | 437 | 41.6 | 91.5 [89.0, 94.1] | **90.7 ± 0.9** |
+| LED v1.1 の requests exact | 368 | 30.7 | 90.2 | 89.1 ± 1.1 |
+| LED v1.1 の false actions | 69 | 0.0 | 1.4（1件） | 1.2 ± 0.6 |
+
+出典: [`results/v11_action/suite_v1_s0/suite.md`](../results/v11_action/suite_v1_s0/suite.md)（v1.0 の seed 0 を同じ instance で評価したもの）、[`results/v11_action/ci_3m.md`](../results/v11_action/ci_3m.md)、[`results/v11_action/seeds_3m.md`](../results/v11_action/seeds_3m.md)（単位は %）
+
+- v1.0 の seed 0 と v1.1 の seed 1 の paired bootstrap（B − A）は、LED v1.1 の exact が **+49.9 point [+44.9, +54.7]**、Stack-chan v1 が +0.0 [−3.6, +2.9]、eval v3 が −0.1 [−0.9, +0.8]、人が書いた依頼が +0.0 [−7.7, +6.2] でした（[`diff_v1s0_v11s1.md`](../results/v11_action/diff_v1s0_v11s1.md)）。seed 1 は評価セットで選んだので、この差も少し楽観的です。
+- 確認用の言い方（「ライトをつけて」「LEDをつけて」「内蔵ライトをつけて」「ライトを点けて」「LEDライトをつけて」「ライトをオンにして」「LEDを点灯して」「ライトオン」「ライトを光らせて」「光って」→ white、「赤く光って」→ red、「部屋の電気をつけて」「スタンドライトをつけて」「ライトはつけないで」→ `[]`）は、v1.1 の 5 seed のすべてで正解でした。v1.0 はこれらに `[]` か、off やオレンジを返していました。利用者の4文も 5 seed とも正解です。
+- seed 1 が LED v1.1 で依頼でない文に動いたのは、「点灯させてもいいですか?」を白で点けた1件です。
+
+### 評価セットごとの結果
+
+| セット | 件数 | exact: seed 1 | exact: 5 seed | requests exact: 5 seed | false actions: 5 seed | numeric gated: 5 seed |
+|---|---:|---:|---:|---:|---:|---:|
+| Stack-chan v1 | 140 | 92.9 | **93.1 ± 0.8** | 87.2 ± 1.5 | **0.0 ± 0.0** | 10.9 ± 7.6 |
+| eval v3（LLM） | 1,816 | 95.2 | **95.2 ± 0.5** | 93.3 ± 0.7 | 0.5 ± 0.2 | 3.0 ± 1.2 |
+| LED v1.1（LLM） | 437 | 91.5 | **90.7 ± 0.9** | 89.1 ± 1.1 | 1.2 ± 0.6 | 8.8 ± 8.4 |
+| v0 eval（LLM、v1 で付け直し） | 1,189 | 91.9 | 91.9 ± 0.3 | 84.0 ± 0.6 | 0.5 ± 0.1 | — |
+| human v1（v1 で付け直し） | 1,157 | 99.7 | 99.4 ± 0.2 | **91.7 ± 1.8** | **0.1 ± 0.2** | — |
+| v2/amount_words | 278 | 88.8 | 87.0 ± 2.0 | 87.0 ± 2.0 | — | — |
+| v2/center_phrasing | 223 | 93.7 | 93.6 ± 0.7 | 93.6 ± 0.7 | — | — |
+| v2/correction | 44 | 86.4 | 83.6 ± 3.7 | 83.6 ± 3.7 | — | — |
+| v2/english | 70 | 45.7 | 46.3 ± 1.3 | 4.2 ± 2.4 | 3.8 ± 4.1 | — |
+| v2/fragments | 182 | 100.0 | 99.9 ± 0.2 | — | 0.1 ± 0.2 | — |
+| v2/long_preface | 247 | 90.3 | 86.6 ± 2.4 | 86.6 ± 2.4 | — | — |
+| v2/negation_forms | 168 | 100.0 | 100.0 ± 0.0 | — | 0.0 ± 0.0 | — |
+| v2/numbers | 167 | 88.0 | 87.3 ± 3.1 | 67.3 ± 8.8 | 0.6 ± 0.5 | — |
+| v2/order_words | 296 | 94.9 | 95.4 ± 0.5 | 95.4 ± 0.5 | — | — |
+| v2/orthography | 282 | 87.2 | 83.7 ± 2.3 | 82.0 ± 2.6 | 0.0 ± 0.0 | — |
+| v2/question_forms | 203 | 89.2 | 87.2 ± 1.8 | 87.2 ± 1.8 | — | — |
+| v2/unexecutable | 286 | 99.7 | 99.4 ± 0.4 | 100.0 ± 0.0 | 0.6 ± 0.4 | — |
+
+出典: [`results/v11_action/suite_3m-s1/suite.md`](../results/v11_action/suite_3m-s1/suite.md)、[`results/v11_action/seeds_3m.md`](../results/v11_action/seeds_3m.md)、numeric gated は `suite_3m-s0`〜`s4` の `suite.json`（単位は %。「—」はそのセットに該当する入力がないもの。LED v1.1 の数値のある文は、音量 50 を含む2動作の 16件だけ）。seed 1 の 95% bootstrap 区間は [`results/v11_action/ci_3m.md`](../results/v11_action/ci_3m.md) にあります（例: Stack-chan v1 の exact 92.9 [87.9, 96.4]、human v1 の依頼 93.8 [87.7, 98.5]、LED v1.1 の exact 91.5 [89.0, 94.1]）。
+
+- seed 1 は、v2 の表記の揺れ（87.2%）、前置き（90.3%）など、いくつかのセットで 5 seed の平均より高い値です。評価セットで選んだ seed なので、平均のほうを見てください。
+
+Stack-chan v1 の内訳（5 seed の平均 ± SD、seed 1）:
+
+| 内訳 | 件数 | seed 1 | 5 seed |
+|---|---:|---:|---:|
+| 公開されている例の文そのまま | 97 | 93.8 | 93.4 ± 1.2 |
+| 利用者の4文 | 4 | 100.0 | 100.0 ± 0.0 |
+| llm-jp の言い換え | 39 | 89.7 | 91.8 ± 2.1 |
+| 正解に `look` がある文 | 52 | 90.4 | 90.8 ± 2.5 |
+
+- seed 1 が Stack-chan v1 で間違えた 10件のうち 9件は、gate で `[]` になったものです。そのうち4件（「少し小さくして」「音量を少し大きくして」「頭を左に18度動かして」「ロボット、左10度くらいをむいて。」）は gate の前の出力が正解でした（v1.0 の seed 0 は「18度」を gate の前に 180 と読んでいました）。gate で止まらなかった誤りは、「左下の方へちょっとだけ首を動かしてごらん。」（正解は `look`、出力は `turn`）の1件です。
+
+### 弱いところ
+
+| 項目 | 内容 |
+|---|---|
+| `turn` と `look` | eval v3 の1動作の文で、`look` は 97.3 ± 0.7%（603件）、`turn` は 85.3 ± 2.3%（274件）。`turn` の誤りは、`look` と答えるもの（seed ごとに 274件中 14〜23件）と、gate で止まるもの（7.4 ± 2.6%）がほぼ半分ずつ。Stack-chan v1 には `turn` の文がないので、実際の言い方での `turn` は測れていない |
+| 数値の止まり率 | 正解に数値がある文のうち gate で `[]` になった割合は、Stack-chan v1 で 10.9 ± 7.6%（seed 1 は 18.2%、11件中 2件。どちらも gate の前は正解）、eval v3 で 3.0 ± 1.2%。Stack-chan v1 は 11件しかないので、seed による差が大きい。学習データにない値は、どの評価セットでも測れていない |
+| 「首を振って」 | うなずき（`nod`）と首振り（`shake`）のどちらにも読める。v2/numbers の依頼の正解率は 67.3 ± 8.8% で、依頼 63件のうち「首…振」を含む 21件では seed ごとの誤りが 6 / 5 / 18 / 5 / 7件、ほかの 42件では 10 / 15 / 12 / 12 / 13件 |
+| LED | ひらがなの色（「あかにして」）と「けして」が弱い。seed 1 の LED v1.1 の誤り 37件のうち 29件は `[]`（gate で止まった 9件と、gate の前から `[]` だった 20件）、8件は違う動作で、「ライトけしてー」を白で点けたもの、「あかにしてね。うなずいて。」の LED を落としてうなずきだけにしたものなど |
+| eval v3 の欠け | v1.0 と同じ（下の「弱いところ（データ v1.0）」）。1動作の LED は LED v1.1 で測った。1動作だけの音量、明るさ、範囲の外の値の文は、まだ validation（モデルの選択に使ったもの）でしか確かめていない |
+| 表記と言い直し | 表記の揺れ（orthography）83.7 ± 2.3%、言い直し 83.6 ± 3.7%。v1.0（82.9 ± 1.3%、85.9 ± 1.9%）と同じ程度 |
+| 英語 | 英語の依頼の正解は 4.2 ± 2.4%。**日本語専用**として扱ってください |
+
+出典: [`results/v11_action/seeds_3m.md`](../results/v11_action/seeds_3m.md)、[`results/v11_action/suite_3m-s0/`](../results/v11_action/suite_3m-s0/suite.md)〜`s4`。`turn` と LED の誤りの内訳は、学習の job の評価の出力（`runs/vast/train_action_v11-<日時>/artifacts/v11/suite_3m-s*/*_predictions.jsonl`。Git の管理外）から数えました。
+
+## 前の版（データ v1.0）の結果
+
+データ v1.0（Hugging Face で最初に公開した schema v1 のモデル）の結果です。3M、データ v1.0、INT4 + grammar + gate。gate の閾値は各 seed の validation で選びました（seed 0〜4: 0.885、0.908、0.862、0.940、0.904）。5 seed（0〜4）を学習し、**公開したのは seed 0** です。seed 0 を公開することは評価の前に決めた規則（v0 と同じく seed 0）で、評価セットで seed を選んでいません。seed 0 は、Stack-chan v1 では 5つの中で最も低い値です（92.9%。ほかの seed は 94.3〜95.0%）。
+
+### 完了の条件（データ v1.0）
 
 | # | 条件 | 目標 | seed 0 | 5 seed の平均 ± SD | 満たした seed |
 |---|---|---|---|---|---|
@@ -87,7 +189,7 @@ eval v2 のパターン:
 - 条件 4 の比較相手（v0.5.1 の 85.2 ± 6.4%）は、human v1 の v0 の正解（依頼 62件）で測った値です。v1 で付け直すと依頼は 65件になるので、2つのセットは少し違います。
 - 利用者の4文の出力は、5 seed とも期待どおりで、seed 0 の確信度（`min_prob`）はどれも 0.999 以上でした。
 
-### 評価セットごとの結果
+### 評価セットごとの結果（データ v1.0）
 
 | セット | 件数 | exact: seed 0 | exact: 5 seed | requests exact: 5 seed | false actions: 5 seed | numeric gated: 5 seed |
 |---|---:|---:|---:|---:|---:|---:|
@@ -121,7 +223,7 @@ Stack-chan v1 の内訳（5 seed の平均 ± SD、seed 0）:
 
 - seed 0 が Stack-chan v1 で間違えた 10件のうち 6件は、gate で `[]` になったものです。そのうち2件（「左に頭を回して。」など）は gate の前の出力が正解で、「頭を左に18度動かして」は gate の前が 180度でした。gate で止まらなかった誤りは、「興味津々な顔して」（正解は doubt、出力は surprised）、「ひだりうえをむいて」（左上を左と読む）などの4件です。全件は [`comparison.md`](../results/v1_action/comparison.md) にあります。
 
-### 弱いところ
+### 弱いところ（データ v1.0）
 
 | 項目 | 内容 |
 |---|---|
@@ -234,9 +336,10 @@ v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decodin
 | v0.4 | 47,450 | 書き手 7 | 94.2 / 94.4 | 94.4 | 88.7 | 1.1 | 18.2 |
 | v0.5 | 64,136 | 弱点のパターン別の文、間違えやすい負例 | 96.0 / 94.9 | 94.5 | 83.9 | 0.1 | 0.7 |
 | v0.5.1 | 66,809 | 命令形、「下さい」、言い直しの追加 | 94.7 / 94.7 | 93.8 | 91.9 | 0.0 | 0.3 |
-| **v1.0**（schema v1） | **88,720** | 11 の動作。v0.5.1 を v1 で読み直して引き継ぎ、新しい動作の文を加えた。tokenizer も作り直し | — | 90.9（v1 の正解） | **93.8**（v1 の正解、65件） | 0.3 | 0.4 |
+| v1.0（schema v1） | 88,720 | 11 の動作。v0.5.1 を v1 で読み直して引き継ぎ、新しい動作の文を加えた。tokenizer も作り直し | — | 90.9（v1 の正解） | 93.8（v1 の正解、65件） | 0.3 | 0.4 |
+| **v1.1**（schema v1） | **91,616** | LED の点灯（色を言わない → white）と色の文を加えた。tokenizer は v1.0 と同じ | — | 91.9（v1 の正解） | **93.8**（v1 の正解、65件） | 0.0 | 0.4 |
 
-出典: gate なしは [`m4_action_v0`](../results/m4_action_v0/comparison.md)、[`v03_action`](../results/v03_action/comparison.md)、[`v04_action`](../results/v04_action/comparison.md)、[`v05_action`](../results/v05_action/comparison.md)、[`v051_action`](../results/v051_action/comparison.md) の `comparison.md`。採用の decoding（INT4 + grammar + gate、seed 0、閾値は各版の validation で選択: v0.4 は 0.97004、v0.5 は 0.82278、v0.5.1 は 0.86808）は [`suite_v04/suite.md`](../results/suite_v04/suite.md)、[`v05_action/suite_3m/suite.md`](../results/v05_action/suite_3m/suite.md)、[`v051_action/suite_3m/suite.md`](../results/v051_action/suite_3m/suite.md)。human v1 と eval v2 は v0.4 の後に作ったので、それより前の版の値はありません。v1.0 の行は schema v1 で付け直した評価セットの値で（[`v1_action/suite_3m-s0/suite.md`](../results/v1_action/suite_3m-s0/suite.md)、gate 0.88506）、v1.0 では FP32 の gate なしの評価はしていません。
+出典: gate なしは [`m4_action_v0`](../results/m4_action_v0/comparison.md)、[`v03_action`](../results/v03_action/comparison.md)、[`v04_action`](../results/v04_action/comparison.md)、[`v05_action`](../results/v05_action/comparison.md)、[`v051_action`](../results/v051_action/comparison.md) の `comparison.md`。採用の decoding（INT4 + grammar + gate、seed 0、閾値は各版の validation で選択: v0.4 は 0.97004、v0.5 は 0.82278、v0.5.1 は 0.86808）は [`suite_v04/suite.md`](../results/suite_v04/suite.md)、[`v05_action/suite_3m/suite.md`](../results/v05_action/suite_3m/suite.md)、[`v051_action/suite_3m/suite.md`](../results/v051_action/suite_3m/suite.md)。human v1 と eval v2 は v0.4 の後に作ったので、それより前の版の値はありません。v1.0 の行は schema v1 で付け直した評価セットの値で（[`v1_action/suite_3m-s0/suite.md`](../results/v1_action/suite_3m-s0/suite.md)、gate 0.88506）、v1.0 では FP32 の gate なしの評価はしていません。v1.1 の行は seed 1 の値です（[`v11_action/suite_3m-s1/suite.md`](../results/v11_action/suite_3m-s1/suite.md)、gate 0.83673）。v1.1 の seed 1 は評価セットの結果を見て選んだので、ほかの行（seed 0）より少し楽観的です。5 seed の平均では、人が書いた依頼は v1.0 と v1.1 のどちらも 91.7% です。
 
 - v0.4 のモデルは、実行できない依頼の 18.2% で誤って動きました。v0.5 で、その種の文と、人が書いた大量の文で誤って動いた例（Qwen3 で `[]` と確かめたもの）を学習に加え、ほぼ解消しました。
 - v0.5 では人が書いた依頼が下がりました（命令形の確信度が低く gate で止まる、「下さい」を「下」と読む）。v0.5.1 で、その言い方を加えて戻しました。
@@ -269,7 +372,7 @@ v0 eval のカテゴリ別の値（採用したモデル seed 0、INT4。decodin
 | 5M v0（grammar なし） | 79.6 | 79.6 | 79.5 | 同上 |
 | 3M v0.4 seed 0（grammar あり） | 94.2 | 94.2 | 94.3 | [`v04_quant`](../results/v04_quant/comparison.md) |
 
-3M INT4 の `.jtlm` は、v0.5.1 で 1,971,456 B、v1（tokenizer を作り直した）で 1,970,720 B です（どちらも tokenizer を含む）。
+3M INT4 の `.jtlm` は、v0.5.1 で 1,971,456 B、v1（tokenizer を作り直した）で 1,970,720 B です（どちらも tokenizer を含む。データ v1.1 のモデルも同じ大きさ）。
 
 **Grammar は精度を変えずに致命的な誤りを減らす。** 3M v0 で exact は 84.4% のまま、critical errors が 2.6% → 0.8% になりました（不正な出力と重複がなくなる）。grammar で防げるのは構造の誤りだけで、tool や引数の選び間違いは防げません。出典: [`m5_grammar_on_m4/comparison.md`](../results/m5_grammar_on_m4/comparison.md)
 
@@ -329,10 +432,12 @@ TinyLM-Bench は、作者が本プロジェクトとは別に行った、既存�
 
 ## 実機と PC の一致
 
-採用モデル（schema v1、seed 0、INT4）では、C runtime（PC。`double` と `float` の累積）と WebAssembly の出力が、v1 のすべての評価セットと validation の 11,426件で PyTorch と一致しました（grammar あり・なしの両方。[`results/v1_action/parity/`](../results/v1_action/parity/README.md)）。実機の出力も、Stack-chan v1 の 140件と eval v3・human v1 から選んだ 160件の計 300件で、gate の前と後とも PyTorch と 300 / 300 一致し、dispatcher の動きの計画も Python の `plan_v1` と 300 / 300 一致しました（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。そのため、上の評価結果はそのまま実機の値になります。確かめ方と詳細は [runtime/host/README.md](../runtime/host/README.md) の「Python との一致の確認」にあります。
+採用モデル（データ v1.1、seed 1、INT4）では、C runtime（PC、INT4）の出力が、Stack-chan v1 の 140件と LED v1.1 の 437件で PyTorch と一致しました（出力と grammar。[`results/v11_action/parity/`](../results/v11_action/parity/)）。公開用の単体の推論スクリプト `inference.py` も、評価セット全 7,185件で、gate の前と後の出力を評価のときと同じに再現します。実機の出力も、400件（v1.0 で使った 300件と、LED v1.1 から無作為に選んだ 100件）で、token 列、gate の前と後の出力とも PyTorch と 400 / 400 一致し（gate で `[]` になった 23件のどれも、確信度は閾値から 1e-4 以内ではない）、dispatcher の動きの計画も Python の `plan_v1` と 400 / 400 一致しました（fault と error はなし。[`results/v11_action/device/`](../results/v11_action/device/)）。そのため、上の評価結果はそのまま実機の値になります。確かめ方と詳細は [runtime/host/README.md](../runtime/host/README.md) の「Python との一致の確認」にあります。
 
-採用モデルの実機での応答時間は中央値 1,042 ms、p90 1,746 ms です（decode 約 105 ms/token、prefill 約 46 ms/token。300件。[`results/v1_action/device/`](../results/v1_action/device/README.md)）。1,500件の連続実行でも、出力はすべて PyTorch と一致しました。前の版（v0.5.1）は中央値 1,276 ms、p90 1,860 ms でした（[`results/v051_action/device/`](../results/v051_action/device/README.md)。評価に使った文が違います）。速度とメモリの詳細は [hardware.md](hardware.md) にあります。
+データ v1.0 のモデル（seed 0）では、C runtime（`double` と `float` の累積）と WebAssembly の出力が、v1 のすべての評価セットと validation の 11,426件で PyTorch と一致しました（grammar あり・なしの両方。[`results/v1_action/parity/`](../results/v1_action/parity/README.md)）。実機でも 300 / 300 一致し、1,500件の連続実行でも出力はすべて PyTorch と一致しました（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。v1.1 は重みが違うだけで、firmware と runtime は同じです（gate の既定値だけを変えた）。1,500件の連続実行は v1.0 のモデルでだけ行いました。
+
+採用モデルの実機での応答時間は中央値 1,069 ms、p90 1,746 ms、最大 2,753 ms です（decode 約 105 ms/token、prefill 約 46 ms/token。400件。[`results/v11_action/device/`](../results/v11_action/device/)）。v1.0 のモデルは 300件で中央値 1,042 ms、前の版（v0.5.1）は中央値 1,276 ms、p90 1,860 ms でした（[`results/v1_action/device/`](../results/v1_action/device/README.md)、[`results/v051_action/device/`](../results/v051_action/device/README.md)。評価に使った文が違います）。速度とメモリの詳細は [hardware.md](hardware.md) にあります。
 
 ## 再現の方法
 
-評価の表（`jtalm.model.evaluate`）、全評価セットの表（`jtalm.model.eval_suite`）、誤差の範囲（`jtalm.eval.bootstrap`）、言い換えへの一貫性（`jtalm.eval.consistency`）を作るコマンドは、[training.md](training.md) の「11. 評価」にあります。評価セットの作り方は、同じ文書の「6. 人が書いた評価セット（human v1）」「7. 評価セット v2」「13. Action schema v1」と [data.md](data.md) にあります（作り直すには GPU が要ります）。実機での一致の確認は、[firmware/README.md](../firmware/README.md) の「ツール」にある `lm_serial.py` で行います。
+評価の表（`jtalm.model.evaluate`）、全評価セットの表（`jtalm.model.eval_suite`）、誤差の範囲（`jtalm.eval.bootstrap`）、言い換えへの一貫性（`jtalm.eval.consistency`）を作るコマンドは、[training.md](training.md) の「11. 評価」にあります。評価セットの作り方は、同じ文書の「6. 人が書いた評価セット（human v1）」「7. 評価セット v2」「13. Action schema v1」「14. データ v1.1」と [data.md](data.md) にあります（作り直すには GPU が要ります）。実機での一致の確認は、[firmware/README.md](../firmware/README.md) の「ツール」にある `lm_serial.py` で行います。

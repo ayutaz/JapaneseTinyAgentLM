@@ -111,7 +111,7 @@ LM の出力を首の動き、表情、LED、音量、明るさに変える部�
 | Watchdog | 監視の task（core 1、LM より高い優先度、50ms ごと）が、計画の予定時間 + 2 秒（始点への移動の時間を足す）を過ぎても終わらない実行と、計画がないのに torque が 3 秒以上入っている状態を止める。タッチは 100ms ごとに見る |
 | servo の driver | 自前（Apache-2.0）。ping、torque、goal、現在位置の読み取り。応答は checksum と ID を確かめる。register と byte の順は stackchan-idf の `components/scs_servo`（BSL-1.0）を参考にした（コードは copy していない） |
 
-firmware の計画は、`firmware/tools/dispatch_check.py` が Python（`jtalm.action.parse_output` と `jtalm.action.mapping.plan_v1`）で計算し直したものと一致することを確かめています。Action schema v1 では、host で build した validator と planner（`firmware/tools/act_host.c`）で 3,000件、実機の `!act` で 600件の validator の判定と計画、v1 のモデルの実機の出力 300件の計画（[`results/v1_action/device/`](../results/v1_action/device/README.md)）がすべて一致しました。実機で首を動かし、向き、量（`degrees` と斜めを含む）、うなずき、首振り、お辞儀、2つの依頼の順序、否定や雑談で動かないこと、タッチと `!stop` で止まること（首振りの途中のタッチ、お辞儀の 0.5 秒の静止中の `!stop`）、顔、LED の色、確認音と明るさを目で確かめました（2026-10-02〜03）。
+firmware の計画は、`firmware/tools/dispatch_check.py` が Python（`jtalm.action.parse_output` と `jtalm.action.mapping.plan_v1`）で計算し直したものと一致することを確かめています。Action schema v1 では、host で build した validator と planner（`firmware/tools/act_host.c`）で 3,000件、実機の `!act` で 600件の validator の判定と計画、data v1.0 のモデルの実機の出力 300件の計画（[`results/v1_action/device/`](../results/v1_action/device/README.md)）、採用した data v1.1 のモデルの実機の出力 400件の計画（[`results/v11_action/device/`](../results/v11_action/device/)）がすべて一致しました。実機で首を動かし、向き、量（`degrees` と斜めを含む）、うなずき、首振り、お辞儀、2つの依頼の順序、否定や雑談で動かないこと、タッチと `!stop` で止まること（首振りの途中のタッチ、お辞儀の 0.5 秒の静止中の `!stop`）、顔、LED の色、確認音と明るさを目で確かめました（2026-10-02〜03。data v1.0 のモデル）。data v1.1 のモデルで LED の色を目で確かめるのは、まだです。
 
 ## 表情
 
@@ -133,18 +133,19 @@ M5GFX で、320×240 の RGB565 の frame（153,600 B、PSRAM）に描いてか�
 
 ### 速度
 
-Action schema v1 の 3M（seed 0、INT4、grammar と gate 0.88506）を、v1 の firmware（LED、speaker、NVS を含む）で動かした結果です。スタックチャン実例セット v1 の 140件と、eval v3 と human v1 から選んだ 160件、合わせて 300件で、gate の前の出力も後の出力も PC の PyTorch と 300 / 300 一致し、dispatcher の計画も Python の `plan_v1` と 300 / 300 一致しました。計測の記録は [`results/v1_action/device/`](../results/v1_action/device/README.md) にあります。
+採用した Action schema v1 の 3M（data v1.1、seed 1、INT4、grammar と gate 0.83673）を、v1 の firmware（LED、speaker、NVS を含む。gate の既定値を 836730 にして build し直した release の image）で動かした結果です。スタックチャン実例セット v1 の 140件、eval v3 と human v1 から選んだ 160件（ここまでは data v1.0 のときと同じ 300件）、LED v1.1 から無作為に選んだ 100件、合わせて 400件で、token 列、gate の前の出力、後の出力が PC の PyTorch と 400 / 400 一致し（gate で `[]` になった 23件のどれも、確信度は閾値から 1e-4 以内ではない）、dispatcher の計画も Python の `plan_v1` と 400 / 400 一致しました（fault と error はなし）。計測の記録は [`results/v11_action/device/`](../results/v11_action/device/) にあります。data v1.0 のモデル（seed 0、gate 0.88506）の記録は [`results/v1_action/device/`](../results/v1_action/device/README.md) にあります。
 
-| 項目 | v1（300件） | v0.5.1（v0 の評価セットの先頭 300件） |
-|---|---:|---:|
-| 1件の応答時間（中央値） | 1,042 ms | 1,276 ms |
-| 1件の応答時間（p90） | 1,746 ms | 1,860 ms |
-| 1件の応答時間（最大） | 2,753 ms | 2,456 ms |
-| Decode（生成の2 token 目以降、1 token ずつ） | 105.4 ms/token | 105.2 ms/token |
-| Prefill（prompt の全 token をまとめて） | 45.9 ms/token | 45.8 ms/token |
-| 生成する token 数（平均） | 5.2 | 8.4 |
+| 項目 | v1、data v1.1（400件） | v1、data v1.0（300件） | v0.5.1（v0 の評価セットの先頭 300件） |
+|---|---:|---:|---:|
+| 1件の応答時間（中央値） | 1,069 ms | 1,042 ms | 1,276 ms |
+| 1件の応答時間（p90） | 1,746 ms | 1,746 ms | 1,860 ms |
+| 1件の応答時間（最大） | 2,753 ms | 2,753 ms | 2,456 ms |
+| Decode（生成の2 token 目以降、1 token ずつ） | 105.2 ms/token | 105.4 ms/token | 105.2 ms/token |
+| Prefill（prompt の全 token をまとめて） | 45.8 ms/token | 45.9 ms/token | 45.8 ms/token |
+| prompt の token 数（平均） | 14.2 | 14.3 | — |
+| 生成する token 数（平均） | 5.4 | 5.2 | 8.4 |
 
-内訳の目安は、prefill（約 14 token）が約 0.6 秒、生成が 1 token あたり約 0.1 秒です。v1 の tokenizer は JSON を少ない token で書くので、v0.5.1 より中央値が短くなりました。何もしない（`[]`）応答は短く、生成も 1〜2 token で終わります。speaker、LED、NVS を足しても速度は変わりません（prompt と生成の token 数が同じ依頼どうしで比べた差は平均 +1.1 ms、+0.11%）。画面と dispatcher は LM と並行して動きます。
+data v1.1 と v1.0 で中央値が違うのは、使った文が違う（v1.1 は LED v1.1 の 100件を加えた）ためで、1 token あたりの時間は同じです。内訳の目安は、prefill（約 14 token）が約 0.6 秒、生成が 1 token あたり約 0.1 秒です。v1 の tokenizer は JSON を少ない token で書くので、v0.5.1 より中央値が短くなりました。何もしない（`[]`）応答は短く、生成も 1〜2 token で終わります。speaker、LED、NVS を足しても速度は変わりません（prompt と生成の token 数が同じ依頼どうしで比べた差は平均 +1.1 ms、+0.11%）。画面と dispatcher は LM と並行して動きます。
 
 v0.5.1 の 3M（データ v0.5.1、gate 0.868）の記録は [`results/v051_action/device/`](../results/v051_action/device/README.md) にあります。
 
@@ -197,7 +198,7 @@ v0.5.1 の 3M（データ v0.5.1、gate 0.868）の記録は [`results/v051_acti
 | task の stack（LM 16KB、行列積の worker 6KB、dispatcher 6KB、監視 4KB、serial の読み取り 3KB） | 約 35KB | 内部 SRAM |
 
 - token ごとの確保はありません。上の表の firmware（v0.4 のモデル）では、1件目の処理の後は空きが変わりませんでした。
-- Action schema v1 の firmware（speaker、LED、NVS を含む）では、画面と dispatcher の初期化後の内部 SRAM の空きが 89,891 B、1,500件の連続実行の後が 85,783 B で、上の表より約 13KB 少なくなります。1件目の後の 86,467 B から 400件目までに約 700 B 減って 85,783 B になり、その後は最後まで一定でした（途中で2回 85,651 B になり、85,783 B に戻った）。減り続けることはありません（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
+- Action schema v1 の firmware（speaker、LED、NVS を含む）では、data v1.0 のモデルで、画面と dispatcher の初期化後の内部 SRAM の空きが 89,891 B、1,500件の連続実行の後が 85,783 B で、上の表より約 13KB 少なくなります。1件目の後の 86,467 B から 400件目までに約 700 B 減って 85,783 B になり、その後は最後まで一定でした（途中で2回 85,651 B になり、85,783 B に戻った）。減り続けることはありません（[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
 - 5M は読み込み後の内部 SRAM の空きが約 90KB（画面なし）まで減ります。`-DJTLM_BATCH=8` で activation を半分にできます（結果は変わりません。速度への影響は未計測）。
 
 ### 読み出し帯域
@@ -232,5 +233,6 @@ quad の PSRAM と QIO の flash はほぼ同じ速さで、理論値（4 bit ×
 ## 未確認の事項
 
 - 消費電流（LM を連続で動かしたとき、servo を動かしたとき）。
-- 数時間以上の連続実行と、servo を動かしながらの連続実行（72分・3,567件の連続実行では、出力がすべて PC と一致し、reset もエラーもなく、chip の温度は 57.6℃ で頭打ちでした。[`results/v051_action/long_run/`](../results/v051_action/long_run/README.md)。v1 の firmware とモデルでは 29分・1,500件で、出力と計画がすべて PC と一致し、reset もエラーもなく、温度は 50.6〜51.6℃ でした。[`results/v1_action/device/`](../results/v1_action/device/README.md)）。
+- 数時間以上の連続実行と、servo を動かしながらの連続実行（72分・3,567件の連続実行では、出力がすべて PC と一致し、reset もエラーもなく、chip の温度は 57.6℃ で頭打ちでした。[`results/v051_action/long_run/`](../results/v051_action/long_run/README.md)。v1 の firmware と data v1.0 のモデルでは 29分・1,500件で、出力と計画がすべて PC と一致し、reset もエラーもなく、温度は 50.6〜51.6℃ でした。[`results/v1_action/device/`](../results/v1_action/device/README.md)。data v1.1 のモデルでは 400件だけで、長い連続実行はしていません）。
+- data v1.1 のモデルでの LED の色の目視（利用者による確認）。
 - `-DJTLM_BATCH=8` にしたときの速度。
