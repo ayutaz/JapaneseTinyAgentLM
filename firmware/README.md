@@ -191,7 +191,7 @@ USB-Serial/JTAG の console を使います。PC 側は 115200 bps で開いて�
 `gen` の行の形（値は省略）:
 
 ```text
-JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"normal\"}}]","raw":"…","gated":0,"gate":0.88506,"min_prob":…,"ids":[…],"prompt_ids":[…],"n_prompt":…,"n_gen":…,…,"total_ms":…}
+JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"right\",\"amount\":\"normal\"}}]","raw":"…","gated":0,"gate":0.83673,"min_prob":…,"ids":[…],"prompt_ids":[…],"n_prompt":…,"n_gen":…,…,"total_ms":…}
 ```
 
 ### Command
@@ -221,7 +221,7 @@ JTALM {"t":"gen","output":"[{\"name\":\"look\",\"arguments\":{\"direction\":\"ri
 
 生成した token の確率の最小値（`min_prob`。grammar で制約する前の確率）が閾値より小さいと、`output` を `[]` にします（`jtalm.model.evaluate` の `gate` と同じ比較）。`raw` には gate の前の出力が残ります。
 
-- 既定値は `CONFIG_JTALM_GATE_PPM=885060`（100万分率。0.88506）です。Action schema v1 の 3M INT4（seed 0）の validation だけで選んだ閾値 0.88506（[`results/v1_action/suite_3m-s0/`](../results/v1_action/suite_3m-s0/suite.md)）と同じ値です。v0 の firmware は千分率の `CONFIG_JTALM_GATE_PERMILLE=868` でした。
+- 既定値は `CONFIG_JTALM_GATE_PPM=836730`（100万分率。0.83673）です。採用モデル（Action schema v1、データ v1.1 の 3M INT4、seed 1）の validation だけで選んだ閾値 0.83673（[`results/v11_action/suite_3m-s1/`](../results/v11_action/suite_3m-s1/suite.md)）と同じ値です。データ v1.0 のモデル（seed 0）のときは `885060`（0.88506）、v0 の firmware は千分率の `CONFIG_JTALM_GATE_PERMILLE=868` でした。
 - 定義は `jtalm_action/main/Kconfig.projbuild`（menu「JapaneseTinyAgentLM」）、既定値は `jtalm_action/sdkconfig.defaults` にあります。`idf.py menuconfig` で変えるか、`sdkconfig.defaults` を変えて生成済みの `sdkconfig` を消してから build し直します。
 - 実行中は `!gate <閾値>` で変えられます（再起動で既定値に戻ります）。
 - 別のモデルを書き込むときは、そのモデルの validation で選んだ閾値にしてください。

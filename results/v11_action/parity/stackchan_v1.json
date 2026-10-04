@@ -1,0 +1,69 @@
+{
+  "ckpt": "runs\\vast\\train_action_v11-20261003T181302Z\\artifacts\\v11\\3m-s1\\best.pt",
+  "cases": "datasets\\action\\stackchan_v1\\eval.jsonl",
+  "kv_int8": false,
+  "tokenization": {
+    "train.jsonl": {
+      "n": 88720,
+      "match": 88720,
+      "mismatches": []
+    },
+    "val.jsonl": {
+      "n": 4678,
+      "match": 4678,
+      "mismatches": []
+    },
+    "eval.jsonl": {
+      "n": 1816,
+      "match": 1816,
+      "mismatches": []
+    },
+    "fuzz": {
+      "n": 5000,
+      "match": 5000,
+      "mismatches": []
+    },
+    "decode_fuzz": {
+      "n": 5000,
+      "match": 5000,
+      "mismatches": []
+    }
+  },
+  "generation": {
+    "int4": {
+      "file": "3m-s1_q4_g64.jtlm",
+      "bytes": 1970720,
+      "first_logits": {
+        "n": 140,
+        "max_abs_diff": 1.049041748046875e-05,
+        "max_abs_logit": 17.49785804748535
+      },
+      "plain": {
+        "n": 140,
+        "token_match": 140,
+        "output_match": 140,
+        "exact_python": 0.9571428571428572,
+        "exact_c": 0.9571428571428572,
+        "min_prob_max_abs_diff": 1.9076104126325433e-06,
+        "c_summary": "140 prompts, 2200 forward tokens (705 generated) in 3.178 s: 692.2 tok/s",
+        "python_seconds": 1.68,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.9571428571428572,
+        "fake_quant_output_match": 140
+      },
+      "grammar": {
+        "n": 140,
+        "token_match": 140,
+        "output_match": 140,
+        "exact_python": 0.9571428571428572,
+        "exact_c": 0.9571428571428572,
+        "min_prob_max_abs_diff": 1.9076104126325433e-06,
+        "c_summary": "140 prompts, 2200 forward tokens (705 generated) in 3.121 s: 704.9 tok/s",
+        "python_seconds": 1.45,
+        "mismatches": [],
+        "exact_fake_quant_f32_scale": 0.9571428571428572,
+        "fake_quant_output_match": 140
+      }
+    }
+  }
+}

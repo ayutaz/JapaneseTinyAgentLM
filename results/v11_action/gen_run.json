@@ -1,0 +1,171 @@
+{
+  "job": {
+    "name": "gen_action_v11",
+    "description": "Data v1.1 top-up: LED on without a colour and LED colours (3 writers, llm-jp eval slice, Qwen3 verifies)",
+    "query": "gpu_ram>=79 num_gpus=1 cuda_vers>=13.0 reliability>0.98 inet_down>=1000 disk_space>=200 rentable=true direct_port_count>=1 verified=true",
+    "image": "vllm/vllm-openai:v0.30.0",
+    "disk_gb": 200,
+    "max_hours": 3.0,
+    "steps": [
+      "nvidia-smi > artifacts/nvidia_smi.txt",
+      "for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev && exit 0; sleep 15; done; exit 1",
+      "mkdir -p artifacts/gen_action_v11",
+      "df -h /",
+      "VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve llm-jp/llm-jp-3.1-13b-instruct4 --port 8000 --gpu-memory-utilization 0.9 --max-model-len 4096 --served-model-name llmjp > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null",
+      "$HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase eval-gen --config configs/eval_v11_led.json --workers 256 --out artifacts/gen_action_v11/raw11_eval",
+      "pkill -f '[v]llm serve' || true; for i in $(seq 1 60); do nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -q . || break; sleep 5; done; M=models--llm-jp--llm-jp-3.1-13b-instruct4; for py in \"$(sed -n \"1s/^#! *//p\" \"$(command -v vllm)\" 2>/dev/null)\" python3; do D=\"$($py -c \"import os; from huggingface_hub import constants as c; h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) or os.path.join(h, 'hub')); print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))\" 2>/dev/null)\"; [ -n \"$D\" ] && break; done; HUB=\"$(echo \"$D\" | sed -n 1p)\"; XET=\"$(echo \"$D\" | sed -n 2p)\"; HUB=\"${HUB:-$HOME/.cache/huggingface/hub}\"; XET=\"${XET:-$HOME/.cache/huggingface/xet}\"; echo \"drop $M: hub=$HUB xet=$XET\"; df -h / | tail -n 1; for i in $(seq 1 12); do P=\"$({ grep -lF \"/models--llm-jp--llm-jp-3.1-13b-instruct4/\" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname \"*/models--llm-jp--llm-jp-3.1-13b-instruct4/*\"; } 2>/dev/null | cut -d/ -f3 | sort -u | xargs)\"; [ -z \"$P\" ] && break; sleep 5; done; if [ -n \"$P\" ]; then echo \"still held by: $P\"; ps -o pid,etime,args -p \"$P\"; kill -9 $P; sleep 5; fi; rm -rf \"$HUB/$M\" \"$XET\" \"$HOME/.cache/huggingface/hub/$M\" \"$HOME/.cache/huggingface/xet\"; find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune -o -type d -name \"$M\" -prune -exec rm -rf {} + 2>/dev/null; df -h / | tail -n 1; du -sh \"$HUB\" \"$XET\" $HOME/.cache/* 2>/dev/null; echo \"deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c \"(deleted)\")\"; true",
+      "df -h /",
+      "(VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0 --port 8000 --gpu-memory-utilization 0.92 --max-model-len 4096 --served-model-name abeja > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null) && ($HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-gen --config configs/action_v11_abeja.json --workers 256 --out artifacts/gen_action_v11/raw11_abeja) || echo 'writer abeja failed' >> artifacts/failed_writers.txt",
+      "pkill -f '[v]llm serve' || true; for i in $(seq 1 60); do nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -q . || break; sleep 5; done; M=models--abeja--ABEJA-Qwen2.5-32b-Japanese-v1.0; for py in \"$(sed -n \"1s/^#! *//p\" \"$(command -v vllm)\" 2>/dev/null)\" python3; do D=\"$($py -c \"import os; from huggingface_hub import constants as c; h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) or os.path.join(h, 'hub')); print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))\" 2>/dev/null)\"; [ -n \"$D\" ] && break; done; HUB=\"$(echo \"$D\" | sed -n 1p)\"; XET=\"$(echo \"$D\" | sed -n 2p)\"; HUB=\"${HUB:-$HOME/.cache/huggingface/hub}\"; XET=\"${XET:-$HOME/.cache/huggingface/xet}\"; echo \"drop $M: hub=$HUB xet=$XET\"; df -h / | tail -n 1; for i in $(seq 1 12); do P=\"$({ grep -lF \"/models--abeja--ABEJA-Qwen2.5-32b-Japanese-v1.0/\" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname \"*/models--abeja--ABEJA-Qwen2.5-32b-Japanese-v1.0/*\"; } 2>/dev/null | cut -d/ -f3 | sort -u | xargs)\"; [ -z \"$P\" ] && break; sleep 5; done; if [ -n \"$P\" ]; then echo \"still held by: $P\"; ps -o pid,etime,args -p \"$P\"; kill -9 $P; sleep 5; fi; rm -rf \"$HUB/$M\" \"$XET\" \"$HOME/.cache/huggingface/hub/$M\" \"$HOME/.cache/huggingface/xet\"; find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune -o -type d -name \"$M\" -prune -exec rm -rf {} + 2>/dev/null; df -h / | tail -n 1; du -sh \"$HUB\" \"$XET\" $HOME/.cache/* 2>/dev/null; echo \"deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c \"(deleted)\")\"; true",
+      "df -h /",
+      "(VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve cyberagent/Mistral-Nemo-Japanese-Instruct-2408 --port 8000 --gpu-memory-utilization 0.9 --max-model-len 4096 --served-model-name nemoja > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null) && ($HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-gen --config configs/action_v11_nemoja.json --workers 256 --out artifacts/gen_action_v11/raw11_nemoja) || echo 'writer nemoja failed' >> artifacts/failed_writers.txt",
+      "pkill -f '[v]llm serve' || true; for i in $(seq 1 60); do nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -q . || break; sleep 5; done; M=models--cyberagent--Mistral-Nemo-Japanese-Instruct-2408; for py in \"$(sed -n \"1s/^#! *//p\" \"$(command -v vllm)\" 2>/dev/null)\" python3; do D=\"$($py -c \"import os; from huggingface_hub import constants as c; h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) or os.path.join(h, 'hub')); print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))\" 2>/dev/null)\"; [ -n \"$D\" ] && break; done; HUB=\"$(echo \"$D\" | sed -n 1p)\"; XET=\"$(echo \"$D\" | sed -n 2p)\"; HUB=\"${HUB:-$HOME/.cache/huggingface/hub}\"; XET=\"${XET:-$HOME/.cache/huggingface/xet}\"; echo \"drop $M: hub=$HUB xet=$XET\"; df -h / | tail -n 1; for i in $(seq 1 12); do P=\"$({ grep -lF \"/models--cyberagent--Mistral-Nemo-Japanese-Instruct-2408/\" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname \"*/models--cyberagent--Mistral-Nemo-Japanese-Instruct-2408/*\"; } 2>/dev/null | cut -d/ -f3 | sort -u | xargs)\"; [ -z \"$P\" ] && break; sleep 5; done; if [ -n \"$P\" ]; then echo \"still held by: $P\"; ps -o pid,etime,args -p \"$P\"; kill -9 $P; sleep 5; fi; rm -rf \"$HUB/$M\" \"$XET\" \"$HOME/.cache/huggingface/hub/$M\" \"$HOME/.cache/huggingface/xet\"; find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune -o -type d -name \"$M\" -prune -exec rm -rf {} + 2>/dev/null; df -h / | tail -n 1; du -sh \"$HUB\" \"$XET\" $HOME/.cache/* 2>/dev/null; echo \"deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c \"(deleted)\")\"; true",
+      "df -h /",
+      "VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve Qwen/Qwen3-30B-A3B-Instruct-2507 --port 8000 --gpu-memory-utilization 0.92 --max-model-len 4096 --served-model-name qwen > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null",
+      "$HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-gen --config configs/action_v11_qwen.json --workers 256 --out artifacts/gen_action_v11/raw11_qwen",
+      "if [ -s artifacts/gen_action_v11/raw11_abeja/train_gen.jsonl ]; then $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-verify --config configs/action_v11_abeja.json --workers 256 --out artifacts/gen_action_v11/raw11_abeja; fi",
+      "if [ -s artifacts/gen_action_v11/raw11_nemoja/train_gen.jsonl ]; then $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-verify --config configs/action_v11_nemoja.json --workers 256 --out artifacts/gen_action_v11/raw11_nemoja; fi",
+      "if [ -s artifacts/gen_action_v11/raw11_qwen/train_gen.jsonl ]; then $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-verify --config configs/action_v11_qwen.json --workers 256 --out artifacts/gen_action_v11/raw11_qwen; fi",
+      "$HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase eval-verify --config configs/eval_v11_led.json --workers 256 --out artifacts/gen_action_v11/raw11_eval"
+    ],
+    "fetch": [
+      "artifacts"
+    ],
+    "uploads": []
+  },
+  "started_utc": "20261003T165440Z",
+  "uploads": {},
+  "commit": "ea11f13a8ceac16c72eb5a9543f4f08b4a158af6",
+  "offer": {
+    "id": 50994068,
+    "gpu_name": "A100 PCIE",
+    "gpu_ram": 81920,
+    "dph_total": 0.7996481481481481,
+    "geolocation": "Japan, JP"
+  },
+  "instance_id": 54038640,
+  "driver_version": "595.71.05",
+  "cuda_max_good": 13.2,
+  "steps": [
+    {
+      "cmd": "curl -LsSf https://astral.sh/uv/0.12.20/install.sh | sh",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "mkdir -p /root/work && tar -xf /root/code.tar -C /root/work",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "mkdir -p /root/work/artifacts",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && nvidia-smi > artifacts/nvidia_smi.txt",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && for i in 1 2 3; do $HOME/.local/bin/uv sync --locked --no-dev && exit 0; sleep 15; done; exit 1",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && mkdir -p artifacts/gen_action_v11",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && df -h /",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve llm-jp/llm-jp-3.1-13b-instruct4 --port 8000 --gpu-memory-utilization 0.9 --max-model-len 4096 --served-model-name llmjp > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null",
+      "exit": 0,
+      "sec": 179
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase eval-gen --config configs/eval_v11_led.json --workers 256 --out artifacts/gen_action_v11/raw11_eval",
+      "exit": 0,
+      "sec": 55
+    },
+    {
+      "cmd": "cd /root/work && pkill -f '[v]llm serve' || true; for i in $(seq 1 60); do nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -q . || break; sleep 5; done; M=models--llm-jp--llm-jp-3.1-13b-instruct4; for py in \"$(sed -n \"1s/^#! *//p\" \"$(command -v vllm)\" 2>/dev/null)\" python3; do D=\"$($py -c \"import os; from huggingface_hub import constants as c; h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) or os.path.join(h, 'hub')); print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))\" 2>/dev/null)\"; [ -n \"$D\" ] && break; done; HUB=\"$(echo \"$D\" | sed -n 1p)\"; XET=\"$(echo \"$D\" | sed -n 2p)\"; HUB=\"${HUB:-$HOME/.cache/huggingface/hub}\"; XET=\"${XET:-$HOME/.cache/huggingface/xet}\"; echo \"drop $M: hub=$HUB xet=$XET\"; df -h / | tail -n 1; for i in $(seq 1 12); do P=\"$({ grep -lF \"/models--llm-jp--llm-jp-3.1-13b-instruct4/\" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname \"*/models--llm-jp--llm-jp-3.1-13b-instruct4/*\"; } 2>/dev/null | cut -d/ -f3 | sort -u | xargs)\"; [ -z \"$P\" ] && break; sleep 5; done; if [ -n \"$P\" ]; then echo \"still held by: $P\"; ps -o pid,etime,args -p \"$P\"; kill -9 $P; sleep 5; fi; rm -rf \"$HUB/$M\" \"$XET\" \"$HOME/.cache/huggingface/hub/$M\" \"$HOME/.cache/huggingface/xet\"; find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune -o -type d -name \"$M\" -prune -exec rm -rf {} + 2>/dev/null; df -h / | tail -n 1; du -sh \"$HUB\" \"$XET\" $HOME/.cache/* 2>/dev/null; echo \"deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c \"(deleted)\")\"; true",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "cd /root/work && df -h /",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "cd /root/work && (VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0 --port 8000 --gpu-memory-utilization 0.92 --max-model-len 4096 --served-model-name abeja > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null) && ($HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-gen --config configs/action_v11_abeja.json --workers 256 --out artifacts/gen_action_v11/raw11_abeja) || echo 'writer abeja failed' >> artifacts/failed_writers.txt",
+      "exit": 0,
+      "sec": 316
+    },
+    {
+      "cmd": "cd /root/work && pkill -f '[v]llm serve' || true; for i in $(seq 1 60); do nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -q . || break; sleep 5; done; M=models--abeja--ABEJA-Qwen2.5-32b-Japanese-v1.0; for py in \"$(sed -n \"1s/^#! *//p\" \"$(command -v vllm)\" 2>/dev/null)\" python3; do D=\"$($py -c \"import os; from huggingface_hub import constants as c; h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) or os.path.join(h, 'hub')); print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))\" 2>/dev/null)\"; [ -n \"$D\" ] && break; done; HUB=\"$(echo \"$D\" | sed -n 1p)\"; XET=\"$(echo \"$D\" | sed -n 2p)\"; HUB=\"${HUB:-$HOME/.cache/huggingface/hub}\"; XET=\"${XET:-$HOME/.cache/huggingface/xet}\"; echo \"drop $M: hub=$HUB xet=$XET\"; df -h / | tail -n 1; for i in $(seq 1 12); do P=\"$({ grep -lF \"/models--abeja--ABEJA-Qwen2.5-32b-Japanese-v1.0/\" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname \"*/models--abeja--ABEJA-Qwen2.5-32b-Japanese-v1.0/*\"; } 2>/dev/null | cut -d/ -f3 | sort -u | xargs)\"; [ -z \"$P\" ] && break; sleep 5; done; if [ -n \"$P\" ]; then echo \"still held by: $P\"; ps -o pid,etime,args -p \"$P\"; kill -9 $P; sleep 5; fi; rm -rf \"$HUB/$M\" \"$XET\" \"$HOME/.cache/huggingface/hub/$M\" \"$HOME/.cache/huggingface/xet\"; find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune -o -type d -name \"$M\" -prune -exec rm -rf {} + 2>/dev/null; df -h / | tail -n 1; du -sh \"$HUB\" \"$XET\" $HOME/.cache/* 2>/dev/null; echo \"deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c \"(deleted)\")\"; true",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "cd /root/work && df -h /",
+      "exit": 0,
+      "sec": 31
+    },
+    {
+      "cmd": "cd /root/work && (VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve cyberagent/Mistral-Nemo-Japanese-Instruct-2408 --port 8000 --gpu-memory-utilization 0.9 --max-model-len 4096 --served-model-name nemoja > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null) && ($HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-gen --config configs/action_v11_nemoja.json --workers 256 --out artifacts/gen_action_v11/raw11_nemoja) || echo 'writer nemoja failed' >> artifacts/failed_writers.txt",
+      "exit": 0,
+      "sec": 246
+    },
+    {
+      "cmd": "cd /root/work && pkill -f '[v]llm serve' || true; for i in $(seq 1 60); do nvidia-smi --query-compute-apps=pid --format=csv,noheader | grep -q . || break; sleep 5; done; M=models--cyberagent--Mistral-Nemo-Japanese-Instruct-2408; for py in \"$(sed -n \"1s/^#! *//p\" \"$(command -v vllm)\" 2>/dev/null)\" python3; do D=\"$($py -c \"import os; from huggingface_hub import constants as c; h = getattr(c, 'HF_HOME', None) or os.path.expanduser('~/.cache/huggingface'); print(getattr(c, 'HF_HUB_CACHE', None) or getattr(c, 'HUGGINGFACE_HUB_CACHE', None) or os.path.join(h, 'hub')); print(getattr(c, 'HF_XET_CACHE', None) or os.path.join(h, 'xet'))\" 2>/dev/null)\"; [ -n \"$D\" ] && break; done; HUB=\"$(echo \"$D\" | sed -n 1p)\"; XET=\"$(echo \"$D\" | sed -n 2p)\"; HUB=\"${HUB:-$HOME/.cache/huggingface/hub}\"; XET=\"${XET:-$HOME/.cache/huggingface/xet}\"; echo \"drop $M: hub=$HUB xet=$XET\"; df -h / | tail -n 1; for i in $(seq 1 12); do P=\"$({ grep -lF \"/models--cyberagent--Mistral-Nemo-Japanese-Instruct-2408/\" /proc/[0-9]*/maps; find /proc/[0-9]*/fd -lname \"*/models--cyberagent--Mistral-Nemo-Japanese-Instruct-2408/*\"; } 2>/dev/null | cut -d/ -f3 | sort -u | xargs)\"; [ -z \"$P\" ] && break; sleep 5; done; if [ -n \"$P\" ]; then echo \"still held by: $P\"; ps -o pid,etime,args -p \"$P\"; kill -9 $P; sleep 5; fi; rm -rf \"$HUB/$M\" \"$XET\" \"$HOME/.cache/huggingface/hub/$M\" \"$HOME/.cache/huggingface/xet\"; find / -xdev -maxdepth 6 \\( -path /proc -o -path /sys \\) -prune -o -type d -name \"$M\" -prune -exec rm -rf {} + 2>/dev/null; df -h / | tail -n 1; du -sh \"$HUB\" \"$XET\" $HOME/.cache/* 2>/dev/null; echo \"deleted but open: $(ls -l /proc/[0-9]*/fd 2>/dev/null | grep -c \"(deleted)\")\"; true",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && df -h /",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && VLLM=\"$(command -v vllm || echo \"python3 -m vllm.entrypoints.cli.main\")\"; setsid nohup $VLLM serve Qwen/Qwen3-30B-A3B-Instruct-2507 --port 8000 --gpu-memory-utilization 0.92 --max-model-len 4096 --served-model-name qwen > artifacts/vllm-8000.log 2>&1 < /dev/null & for i in $(seq 1 360); do curl -sf localhost:8000/health > /dev/null && break; sleep 5; done; curl -sf localhost:8000/health > /dev/null",
+      "exit": 0,
+      "sec": 246
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-gen --config configs/action_v11_qwen.json --workers 256 --out artifacts/gen_action_v11/raw11_qwen",
+      "exit": 0,
+      "sec": 79
+    },
+    {
+      "cmd": "cd /root/work && if [ -s artifacts/gen_action_v11/raw11_abeja/train_gen.jsonl ]; then $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-verify --config configs/action_v11_abeja.json --workers 256 --out artifacts/gen_action_v11/raw11_abeja; fi",
+      "exit": 0,
+      "sec": 32
+    },
+    {
+      "cmd": "cd /root/work && if [ -s artifacts/gen_action_v11/raw11_nemoja/train_gen.jsonl ]; then $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-verify --config configs/action_v11_nemoja.json --workers 256 --out artifacts/gen_action_v11/raw11_nemoja; fi",
+      "exit": 0,
+      "sec": 80
+    },
+    {
+      "cmd": "cd /root/work && if [ -s artifacts/gen_action_v11/raw11_qwen/train_gen.jsonl ]; then $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase train-verify --config configs/action_v11_qwen.json --workers 256 --out artifacts/gen_action_v11/raw11_qwen; fi",
+      "exit": 0,
+      "sec": 55
+    },
+    {
+      "cmd": "cd /root/work && $HOME/.local/bin/uv run --no-dev python -m jtalm.data.generate --phase eval-verify --config configs/eval_v11_led.json --workers 256 --out artifacts/gen_action_v11/raw11_eval",
+      "exit": 0,
+      "sec": 31
+    }
+  ],
+  "status": "succeeded",
+  "destroyed": true,
+  "hours": 0.509,
+  "failed_starts": [],
+  "cost_usd_estimate": 0.407
+}

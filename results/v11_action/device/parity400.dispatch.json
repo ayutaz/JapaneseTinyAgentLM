@@ -1,0 +1,37 @@
+{
+ "n": 400,
+ "plans_match": 400,
+ "valid": 400,
+ "queued": 204,
+ "calls": 237,
+ "mismatches": [],
+ "log": {
+  "act_done": 204,
+  "faces": 12,
+  "face_crc": {
+   "neutral": [
+    "b799fb2a"
+   ],
+   "sad": [
+    "4fee8a51"
+   ],
+   "doubt": [
+    "f5573acf"
+   ],
+   "happy": [
+    "0005cc0b"
+   ],
+   "angry": [
+    "11ec8882"
+   ]
+  },
+  "face_crc_stable": true,
+  "face_draw_us_max": 9844,
+  "face_push_us_max": 34435,
+  "overrun_ms_max": 62.69999999999999,
+  "tick_max_ms": 20.1,
+  "faults": [],
+  "problems": [],
+  "n_problems": 0
+ }
+}

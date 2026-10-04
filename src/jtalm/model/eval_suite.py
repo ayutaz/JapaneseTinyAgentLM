@@ -32,6 +32,7 @@ DEFAULT_SETS = {
     "eval v3 (LLM)": "datasets/action/eval_v3/eval.jsonl",
     "v0 eval (LLM)": "datasets/action/relabel_v1/v0_eval.jsonl",
     "human v1": "datasets/action/relabel_v1/human_v1.jsonl",
+    "LED v1.1 (LLM)": "datasets/action/eval_v11_led/eval.jsonl",  # data v1.1 regression set
 }
 EV2_DIR = "datasets/action/relabel_v1"  # eval_v2_<slice>.jsonl, relabeled under schema v1
 STACKCHAN_SET = "Stack-chan v1"

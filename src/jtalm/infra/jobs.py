@@ -769,6 +769,120 @@ TRAIN_ACTION_V1 = JobSpec(
     uploads=[f"{ACTION_DATA_V1}/train.jsonl", f"{ACTION_DATA_V1}/val.jsonl", TOKENIZER_V1],
 )
 
+# Data v1.1 top-up (LED on without a colour, LED colours; jtalm.data.specs_v11): llm-jp writes a
+# regression eval set, ABEJA, Mistral-Nemo-JA and Qwen3 write, Qwen3 verifies. The 4 models
+# (~180GB of weights) fit in 200GB even if _drop_weights frees nothing.
+V11_RAW = "artifacts/gen_action_v11"
+V11_WRITERS = [w for w in V04_WRITERS if w[0] in ("abeja", "nemoja")]
+
+
+def _v11_steps() -> list[str]:
+    steps = [
+        "nvidia-smi > artifacts/nvidia_smi.txt",
+        sync(),
+        f"mkdir -p {V11_RAW}",
+        DISK_LOG,
+        start_vllm(EVAL_MODEL, gpu_mem=0.9, max_len=4096, extra="--served-model-name llmjp"),
+        generate("eval-gen", "configs/eval_v11_led.json", f"{V11_RAW}/raw11_eval"),
+        f"{STOP_VLLM}; {_drop_weights(EVAL_MODEL)}",
+    ]
+    for name, hf_id, mem in V11_WRITERS:
+        start = start_vllm(hf_id, gpu_mem=mem, max_len=4096, extra=f"--served-model-name {name}")
+        gen = generate("train-gen", f"configs/action_v11_{name}.json", f"{V11_RAW}/raw11_{name}")
+        steps += [
+            DISK_LOG,
+            f"({start}) && ({gen}) || echo 'writer {name} failed' >> artifacts/failed_writers.txt",
+            f"{STOP_VLLM}; {_drop_weights(hf_id)}",
+        ]
+    steps += [
+        DISK_LOG,
+        start_vllm(TRAIN_MODEL, gpu_mem=0.92, max_len=4096, extra="--served-model-name qwen"),
+        generate("train-gen", "configs/action_v11_qwen.json", f"{V11_RAW}/raw11_qwen"),
+    ]
+    for name in [n for n, _, _ in V11_WRITERS] + ["qwen"]:
+        out = f"{V11_RAW}/raw11_{name}"
+        verify = generate("train-verify", f"configs/action_v11_{name}.json", out)
+        steps.append(f"if [ -s {out}/train_gen.jsonl ]; then {verify}; fi")
+    steps.append(generate("eval-verify", "configs/eval_v11_led.json", f"{V11_RAW}/raw11_eval"))
+    return steps
+
+
+GEN_ACTION_V11 = JobSpec(
+    name="gen_action_v11",
+    description="Data v1.1 top-up: LED on without a colour and LED colours (3 writers, "
+    "llm-jp eval slice, Qwen3 verifies)",
+    query=GEN_ACTION_V1.query,
+    image=VLLM_IMAGE,
+    disk_gb=200,
+    max_hours=3.0,
+    steps=_v11_steps(),
+)
+
+# Data v1.1: 3M x5 seeds, INT4, and the evaluation suite on the instance (the user asked to keep
+# the local PC free, 2026-10-04), so unlike train_action_v1 the evaluation sets are uploaded. The
+# published v1 model (seed 0, INT4) is evaluated with its gate as the baseline.
+ACTION_DATA_V11 = "datasets/action/v1.1"
+V1_PUBLISHED_Q4 = "runs/vast/train_action_v1-20261002T133903Z/artifacts/v1/3m-s0/best_q4_g64.pt"
+V11_EVAL_SETS = [
+    "datasets/action/stackchan_v1/eval.jsonl",
+    "datasets/action/eval_v3/eval.jsonl",
+    "datasets/action/eval_v11_led/eval.jsonl",
+    "datasets/action/relabel_v1/v0_eval.jsonl",
+    "datasets/action/relabel_v1/human_v1.jsonl",
+    *[f"datasets/action/relabel_v1/eval_v2_{s}.jsonl" for s in (
+        "amount_words", "center_phrasing", "correction", "english", "fragments", "long_preface",
+        "negation_forms", "numbers", "order_words", "orthography", "question_forms",
+        "unexecutable")],
+]  # fmt: skip
+SUITE = (
+    f"{UV} run --no-dev --group train python -m jtalm.model.eval_suite --tokenizer {TOKENIZER_V1}"
+)
+
+
+def _v11_train_steps() -> list[str]:
+    steps = train_action_steps(
+        V1_RUNS, "v11", ACTION_DATA_V11, parallel=True, tokenizer=TOKENIZER_V1,
+        cases=f"{ACTION_DATA_V11}/val.jsonl",
+    )  # fmt: skip
+    quant = " && ".join(
+        f"{UV} run --no-dev --group train python -m jtalm.model.quantize "
+        f"--ckpt artifacts/v11/{name}/best.pt --bits 4"
+        for name, _, _ in V1_RUNS
+    )
+    suites = [
+        f"{SUITE} --ckpt artifacts/v11/{name}/best_q4_g64.pt --val {ACTION_DATA_V11}/val.jsonl "
+        f"--out artifacts/v11/suite_{name} > artifacts/v11/suite_{name}.log 2>&1"
+        for name, _, _ in V1_RUNS
+    ]
+    suites.append(
+        f"{SUITE} --ckpt {V1_PUBLISHED_Q4} --gate 0.88506 --out artifacts/v11/suite_v1_s0 "
+        "> artifacts/v11/suite_v1_s0.log 2>&1"
+    )
+    launch = " ".join(f"({c}) & pids+=($!);" for c in suites)
+    return [
+        *steps,
+        quant,
+        f"pids=(); {launch} fail=0; for p in ${{pids[@]}}; do wait $p || fail=1; done; exit $fail",
+    ]
+
+
+TRAIN_ACTION_V11 = JobSpec(
+    name="train_action_v11",
+    description="Train 3M x5 seeds on data v1.1, INT4, evaluation suite (+ v1 baseline)",
+    query=TRAIN_ACTION_V1.query,
+    image=VLLM_IMAGE,
+    disk_gb=80,
+    max_hours=3.0,
+    steps=_v11_train_steps(),
+    uploads=[
+        f"{ACTION_DATA_V11}/train.jsonl",
+        f"{ACTION_DATA_V11}/val.jsonl",
+        TOKENIZER_V1,
+        V1_PUBLISHED_Q4,
+        *V11_EVAL_SETS,
+    ],  # fmt: skip
+)
+
 JOBS: dict[str, JobSpec] = {
     job.name: job
     for job in (
@@ -793,5 +907,7 @@ JOBS: dict[str, JobSpec] = {
         GEN_ACTION_V1,
         GEN_ACTION_V1B,
         TRAIN_ACTION_V1,
+        GEN_ACTION_V11,
+        TRAIN_ACTION_V11,
     )
 }

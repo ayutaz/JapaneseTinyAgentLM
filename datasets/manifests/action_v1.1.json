@@ -1,0 +1,79 @@
+{
+  "created": "2026-10-03T17:25:44+00:00",
+  "base": {
+    "train": 88720,
+    "val": 4678
+  },
+  "eval_v11_led": {
+    "n": 437,
+    "single:kept": 278,
+    "single:verifier_disagrees": 43,
+    "single:duplicate": 79,
+    "multi_action:kept": 80,
+    "multi_action:verifier_disagrees": 24,
+    "negation:kept": 20,
+    "negation:negation_mismatch": 39,
+    "negation:verifier_disagrees": 5,
+    "correction:negation_mismatch": 46,
+    "correction:kept": 10,
+    "correction:verifier_disagrees": 8,
+    "no_action:kept": 49,
+    "no_action:verifier_disagrees": 43,
+    "no_action:duplicate": 12
+  },
+  "new": {
+    "n": 3048,
+    "writers": [
+      "raw11_qwen",
+      "raw11_abeja",
+      "raw11_nemoja"
+    ],
+    "by_generator": {
+      "abeja/ABEJA-Qwen2.5-32b-Japanese-v1.0": 1004,
+      "cyberagent/Mistral-Nemo-Japanese-Instruct-2408": 1039,
+      "Qwen/Qwen3-30B-A3B-Instruct-2507": 1005
+    },
+    "single:kept": 1518,
+    "single:verifier_disagrees": 198,
+    "single:duplicate": 389,
+    "multi_action:kept": 859,
+    "multi_action:verifier_disagrees": 39,
+    "multi_action:duplicate": 5,
+    "multi_action:negation_mismatch": 4,
+    "negation:verifier_disagrees": 95,
+    "negation:negation_mismatch": 67,
+    "negation:kept": 135,
+    "negation:duplicate": 15,
+    "correction:kept": 155,
+    "correction:verifier_disagrees": 102,
+    "correction:negation_mismatch": 103,
+    "no_action:kept": 381,
+    "no_action:verifier_disagrees": 181,
+    "no_action:duplicate": 38,
+    "single:negation_mismatch": 6,
+    "single:malformed": 1,
+    "multi_action:malformed": 2
+  },
+  "train": {
+    "n": 91616,
+    "by_category": {
+      "single": 28861,
+      "multi_action": 24202,
+      "negation": 10502,
+      "correction": 5078,
+      "no_action": 22973
+    },
+    "sha256": "f1d04bf20fa5dac194cd018b69b969b2623e83e5c02a441609caaccb60532e34"
+  },
+  "val": {
+    "n": 4830,
+    "by_category": {
+      "single": 1515,
+      "multi_action": 1265,
+      "negation": 562,
+      "correction": 255,
+      "no_action": 1233
+    },
+    "sha256": "fca3266bc683ab972cf436b4c74685f1c3c4385358539b5ad5a45c2749a4fa57"
+  }
+}
