@@ -79,6 +79,7 @@ Issues and pull requests are welcome (Japanese or English). See [`CONTRIBUTING.m
 ## License
 
 - Code: [Apache-2.0](LICENSE) (see [`NOTICE`](NOTICE)).
-- Model weights ([Hugging Face](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)) and the dataset ([Hugging Face](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)): CC BY-SA 4.0.
+- Model weights ([Hugging Face](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)): CC BY-SA 4.0.
+- Dataset ([Hugging Face](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)): Apache-2.0 (changed from CC BY-SA 4.0 on 2026-10-20; earlier revisions were distributed under CC BY-SA 4.0).
 - Training text was written by Apache-2.0 / MIT open models and taken from public human-written corpora (Tatoeba, JESC, MASSIVE). Built with Claude Code (Anthropic).
 - Citation: [`CITATION.cff`](CITATION.cff).

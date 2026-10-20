@@ -101,7 +101,7 @@ def test_build_filters_dedups_removes_leaks_and_adds_massive(tmp_path: Path) -> 
         "id", "input", "output", "category", "language", "pair_id", "generator", "relabeled"
     }  # fmt: skip
     card = (hf / "README.md").read_text("utf-8")
-    assert card.startswith("---\nlicense: cc-by-sa-4.0")
+    assert card.startswith("---\nlicense: apache-2.0")
     assert "| `gen/train` | Apache-2.0 |" in card
     with pytest.raises(ValueError, match="gen/eval"):  # every writer needs a recorded license
         prepare(out, tmp_path / "hf2", manifest, {"gen/train": "Apache-2.0"})

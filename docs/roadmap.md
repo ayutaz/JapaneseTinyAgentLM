@@ -18,7 +18,7 @@
 | 公開先 | 内容 | ライセンス |
 |---|---|---|
 | [ayousanz/JapaneseTinyAgentLM-Action-3M](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M) | 重み（INT4 と量子化前の fp32、safetensors）、`.jtlm`（INT4、1,970,720 B）、tokenizer、`inference.py`、スタックチャン用のビルド済み firmware image、`stackchan_chat.py`、第三者のライセンス | CC BY-SA 4.0 |
-| [japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) | 合成データ v0（public、manual gate）。v0.3〜v0.5.1 のデータは公開していません。v1.0 は公開を予定しています | CC BY-SA 4.0 |
+| [japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth) | 合成データ v0（public、manual gate）。v0.3〜v0.5.1 のデータは公開していません。v1.0 は公開を予定しています | Apache-2.0（2026-10-20 に CC BY-SA 4.0 から変更） |
 | GitHub（本リポジトリ） | 学習・評価のコード、C runtime、firmware、評価結果（[results/](../results/README.md)） | Apache-2.0 |
 
 ### 採用モデルの要点
