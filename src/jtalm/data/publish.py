@@ -175,7 +175,7 @@ def dataset_card(
         "除いて作りました。\n"
     )
     return f"""---
-license: cc-by-sa-4.0
+license: apache-2.0
 language:
 {lang_yaml}
 pretty_name: JapaneseTinyAgentLM Action Synth
@@ -287,7 +287,7 @@ prompt version: 新しい文の生成と、すべての文の検証（読み直�
 
 ## ライセンスと出典
 
-- 本データセット: **CC BY-SA 4.0**
+- 本データセット: **Apache-2.0**（2026-10-20 に CC BY-SA 4.0 から変更。それより前のリビジョンは CC BY-SA 4.0 で配布されました）
 - 文を書いたモデルは、上の表のとおり Apache-2.0 か MIT のオープンモデルです。
 - プロジェクトの学習では、このほかに [Amazon MASSIVE](https://github.com/alexa/massive)（ja-JP、CC BY 4.0）の
   発話と、間違えやすい例として集めた Tatoeba（CC BY 2.0 FR）、JESC（CC BY-SA 4.0）、MASSIVE の文を負例

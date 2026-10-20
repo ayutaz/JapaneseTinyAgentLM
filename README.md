@@ -172,7 +172,7 @@ Issue と Pull Request を歓迎します。[`CONTRIBUTING.md`](CONTRIBUTING.md)
 |---|---|
 | コード（このリポジトリ） | [Apache-2.0](LICENSE)（[`NOTICE`](NOTICE)） |
 | モデルの重み（[Hugging Face](https://huggingface.co/ayousanz/JapaneseTinyAgentLM-Action-3M)） | CC BY-SA 4.0 |
-| 合成データセット（[Hugging Face](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)） | CC BY-SA 4.0 |
+| 合成データセット（[Hugging Face](https://huggingface.co/datasets/japanese-data-analyze/JapaneseTinyAgentLM-Action-Synth)） | Apache-2.0（2026-10-20 に CC BY-SA 4.0 から変更） |
 | firmware の binary に含まれる第三者のコード | 各ライセンス（[`firmware/jtalm_action/licenses/`](firmware/jtalm_action/licenses/README.md)） |
 
 - 学習データの文章は、ライセンス上問題のないオープンなモデル（Apache-2.0 / MIT）が書き、別のモデルが確かめたものと、人が書いた公開コーパス（Tatoeba、JESC、MASSIVE）です。利用規約で出力の利用が制限されるサービスの出力は使っていません。詳しくは [`docs/data.md`](docs/data.md)。
